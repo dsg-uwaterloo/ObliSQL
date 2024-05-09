@@ -11,6 +11,7 @@ service waffle_thrift{
   oneway void async_put(1:sequence_id seq_id, 2:string key, 3:string value);
   oneway void async_get_batch(1:sequence_id seq_id, 2:list<string> keys);
   oneway void async_put_batch(1:sequence_id seq_id, 2:list<string> keys, 3:list<string> values);
+  void init_db(1:list<string> keys, 2:list<string> values);
   string get(1:string key);
   void put(1:string key, 2:string value);
   list<string> get_batch(1:list<string> keys);

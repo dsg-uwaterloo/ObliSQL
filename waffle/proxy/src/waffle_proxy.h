@@ -38,7 +38,7 @@
 
 class waffle_proxy : public proxy {
 public:
-
+    void init_map(void **args);
     void init(const std::vector<std::string> &keys, const std::vector<std::string> &values, void ** args) override;
     void close() override;
     std::string get(const std::string &key) override;

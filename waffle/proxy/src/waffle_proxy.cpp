@@ -78,6 +78,10 @@ unsigned long long rdtscuhzProxy(void) {
     return (unsigned long long) freq;
 }
 
+void waffle_proxy::init_map(void **args){
+    id_to_client_ = *(static_cast<std::shared_ptr<thrift_response_client_map>*>(args[0]));
+}
+
 void waffle_proxy::init(const std::vector<std::string> &keys, const std::vector<std::string> &values, void ** args){
     std::unordered_set<std::string> allKeys;
     std::unordered_set<std::string> tempFakeKeys;
@@ -96,7 +100,7 @@ void waffle_proxy::init(const std::vector<std::string> &keys, const std::vector<
         storage_interface_->add_server(server_host_name_, server_port_+i);
     }
 
-    id_to_client_ = *(static_cast<std::shared_ptr<thrift_response_client_map>*>(args[0]));
+    // id_to_client_ = *(static_cast<std::shared_ptr<thrift_response_client_map>*>(args[0]));
     //int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
     std::cout << "max cores is " << sysconf(_SC_NPROCESSORS_ONLN) << std::endl << " and current cores used is " << num_cores;
     std::vector<std::thread> threads;

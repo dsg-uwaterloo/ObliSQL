@@ -48,6 +48,11 @@ class waffle_thriftHandler : virtual public waffle_thriftIf {
     printf("async_put_batch\n");
   }
 
+  void init_db(const std::vector<std::string> & keys, const std::vector<std::string> & values) {
+    // Your implementation goes here
+    printf("init_db\n");
+  }
+
   void get(std::string& _return, const std::string& key) {
     // Your implementation goes here
     printf("get\n");
