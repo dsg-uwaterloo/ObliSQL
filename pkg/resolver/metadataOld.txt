@@ -1,0 +1,5 @@
+colNames: c_id c_d_id c_w_id c_first c_middle c_last c_street_1 c_street_2 c_city c_state c_zip c_phone c_since c_credit c_credit_lim c_discount c_balance c_data 
+indexOn: c_state 
+pkEnd: 30000 
+pkStart: 1 
+tableName: customer 
