@@ -64,8 +64,6 @@ func (e myExecutor) ExecuteBatch(ctx context.Context, req *executor.RequestBatch
 		}
 	}
 
-	var ansKeys []string
-	var ansVals []string
 	var replyKeys []string
 	var replyVals []string
 	var pairs []interface{}
@@ -73,12 +71,12 @@ func (e myExecutor) ExecuteBatch(ctx context.Context, req *executor.RequestBatch
 		if v.Second == "-1" {
 			replyKeys = append(replyKeys, v.First)
 			replyVals = append(replyVals, "-1")
+		} else {
+			replyKeys = append(replyKeys, v.First)
+			replyVals = append(replyVals, v.Second)
 		}
-		ansKeys = append(ansKeys, v.First)
-		ansVals = append(ansVals, v.Second)
-		replyKeys = append(replyKeys, v.First)
-		replyVals = append(replyVals, v.Second)
 		pairs = append(pairs, v.First, v.Second)
+
 	}
 	//Push All Keys
 	if len(pairs) != 0 {
@@ -104,7 +102,7 @@ func (e myExecutor) InitDb(ctx context.Context, req *executor.RequestBatch) (*wr
 	fmt.Printf("Initialize DB with Key Size: %d \n", len(req.Keys))
 
 	threadCtx := context.Background()
-
+	e.rdb.FlushAll(threadCtx)
 	var pairs []interface{}
 
 	for i := range req.Keys {
