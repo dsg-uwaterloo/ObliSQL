@@ -240,9 +240,9 @@ func (lb *myLoadBalancer) checkQueues(ctx context.Context) {
 }
 
 func (lb *myLoadBalancer) connectToExecutors(hosts []string, ports []string, filePath string) {
-	initRequest := &executor.RequestBatch{
-		Keys:   []string{},
-		Values: []string{},
+	initMap := make(map[int]*executor.RequestBatch, lb.executorNumber)
+	for i := 0; i < lb.executorNumber; i++ {
+		initMap[i] = &executor.RequestBatch{}
 	}
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -258,9 +258,10 @@ func (lb *myLoadBalancer) connectToExecutors(hosts []string, ports []string, fil
 			op := parts[0]
 			if op == "SET" {
 				key := parts[1]
+				hashVal := int(hashString(key, uint32(lb.executorNumber)))
 				value := parts[2]
-				initRequest.Keys = append(initRequest.Keys, key)
-				initRequest.Values = append(initRequest.Values, value)
+				initMap[hashVal].Keys = append(initMap[hashVal].Keys, key)
+				initMap[hashVal].Values = append(initMap[hashVal].Values, value)
 			}
 		}
 	}
@@ -273,7 +274,7 @@ func (lb *myLoadBalancer) connectToExecutors(hosts []string, ports []string, fil
 		}
 		newClient := executor.NewExecutorClient(conn)
 		// maxSizeOption := grpc.MaxCallRecvMsgSize()
-		resp, err := newClient.InitDb(context.Background(), initRequest)
+		resp, err := newClient.InitDb(context.Background(), initMap[i])
 		if err != nil {
 			fmt.Print(err)
 			log.Fatalf("Failed to initialize DB %s", fullAddr)

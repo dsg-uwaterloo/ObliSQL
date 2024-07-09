@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -122,16 +123,25 @@ func (e myExecutor) InitDb(ctx context.Context, req *executor.RequestBatch) (*wr
 }
 
 func main() {
-	lis, err := net.Listen("tcp", ":9090")
+	redisHost := flag.String("rh", "127.0.0.1", "Redis Host")
+	redisPort := flag.String("rp", "6379", "Redis Host")
+	addrPort := flag.String("p", "9090", "Executor Port")
+
+	flag.Parse()
+
+	lis, err := net.Listen("tcp", ":"+*addrPort)
 	if err != nil {
 		log.Fatalf("Cannot create listener on port :9090 %s", err)
 	}
 
+	addr := *redisHost + ":" + *redisPort
+
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     addr,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
+	fmt.Println("Connected to Redis Server on: ", addr)
 
 	service := myExecutor{rdb: rdb}
 	serverRegister := grpc.NewServer(grpc.MaxRecvMsgSize(644000*300), grpc.MaxSendMsgSize(644000*300))
