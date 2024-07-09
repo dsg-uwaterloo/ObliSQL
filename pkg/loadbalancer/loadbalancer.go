@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,9 +25,10 @@ import (
 )
 
 type KVPair struct {
-	channelId string
-	Key       string
-	Value     string
+	channelId  string
+	Key        string
+	Value      string
+	sortingKey int
 }
 
 type responseChannel struct {
@@ -69,9 +71,10 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 	for i := 0; i < len(req.Keys); i++ {
 		hashVal := hashString(req.Keys[i], uint32(lb.executorNumber))
 		currentPair := KVPair{
-			channelId: channelId,
-			Key:       req.Keys[i],
-			Value:     req.Values[i],
+			channelId:  channelId,
+			Key:        req.Keys[i],
+			Value:      req.Values[i],
+			sortingKey: i,
 		}
 		localMap[int(hashVal)] = append(localMap[int(hashVal)], currentPair)
 	}
@@ -103,6 +106,10 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 	delete(lb.channelMap, channelId)
 	lb.channelLock.Unlock()
 
+	sort.Slice(recv_resp, func(i, j int) bool {
+		return recv_resp[i].sortingKey < recv_resp[j].sortingKey
+	})
+
 	sendKeys := make([]string, 0, len(req.Keys))
 	sendVal := make([]string, 0, len(req.Keys))
 
@@ -127,11 +134,13 @@ func (lb *myLoadBalancer) executeBatch(elements []KVPair, executerNumber int) {
 	channelIds := make([]string, 0, len(elements))
 	executeKeys := make([]string, 0, len(elements))
 	executeVals := make([]string, 0, len(elements))
+	executeSortKeys := make([]int, 0, len(elements))
 
 	for i := 0; i < len(elements); i++ {
 		channelIds = append(channelIds, elements[i].channelId)
 		executeKeys = append(executeKeys, elements[i].Key)
 		executeVals = append(executeVals, elements[i].Value)
+		executeSortKeys = append(executeSortKeys, elements[i].sortingKey)
 	}
 
 	req := &executor.RequestBatch{
@@ -146,12 +155,14 @@ func (lb *myLoadBalancer) executeBatch(elements []KVPair, executerNumber int) {
 	}
 
 	for i, v := range channelIds {
+		//Drop fake requests.
 		if v == "" {
 			continue
 		}
 		newKVPair := KVPair{
-			Key:   resp.Keys[i],
-			Value: resp.Values[i],
+			Key:        resp.Keys[i],
+			Value:      resp.Values[i],
+			sortingKey: executeSortKeys[i],
 		}
 		lb.channelLock.Lock()
 		responseStruct := lb.channelMap[v]
@@ -230,9 +241,9 @@ func (lb *myLoadBalancer) checkQueues(ctx context.Context) {
 							go lb.executeBatch(elements, j)
 						}
 						timer.Reset(waitTime)
-					} else {
-						break
 					}
+				} else {
+					break
 				}
 			}
 		}

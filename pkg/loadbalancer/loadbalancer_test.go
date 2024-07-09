@@ -74,16 +74,16 @@ func getRandomKeyValuePairs(numPairs int) map[string]string {
 
 	return randomKeyValuePairs
 }
-func initLb(hosts []string, ports []string, traceLoc string) *myLoadBalancer {
+func initLb(hosts []string, ports []string, traceLoc string, lbPort string) *myLoadBalancer {
 	ctx, cancel := context.WithCancel(context.Background())
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	lis, err := net.Listen("tcp", ":9500")
+	lis, err := net.Listen("tcp", ":"+lbPort)
 	if err != nil {
-		log.Fatalf("Cannot create listener on port :9500 %s", err)
+		log.Fatalf("Cannot create listener on port :%s %s", lbPort, err)
 	}
-	fmt.Println("Starting Load Balancer on: localhost:9500")
+	fmt.Println("Starting Load Balancer on: localhost:", lbPort)
 	//Define Service
 	service := myLoadBalancer{
 		done:           false,
@@ -190,7 +190,7 @@ func TestSingleExecutor(t *testing.T) {
 	hosts := []string{"localhost"}
 	ports := []string{"9090"}
 
-	service := initLb(hosts, ports, traceLoc)
+	service := initLb(hosts, ports, traceLoc, "9500")
 
 	time.Sleep(2 * time.Second)
 
@@ -222,13 +222,14 @@ func TestTwoExecutor(t *testing.T) {
 	hosts := []string{"localhost", "localhost"}
 	ports := []string{"9090", "9091"}
 
-	service := initLb(hosts, ports, traceLoc)
+	service := initLb(hosts, ports, traceLoc, "9600")
 
 	//Read trace into local storage
 	readTrace(traceLoc)
 	testCases := getTestCases(200)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			fmt.Println("Starting Test", tc.name)
 			resp, err := service.AddKeys(ctx, tc.requestBatch)
 			if err != nil {
 				t.Errorf("ExecuteBatch Error = %v", err)
