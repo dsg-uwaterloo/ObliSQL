@@ -61,8 +61,8 @@ func intersection(list1, list2 []string) []string {
 }
 func (c *myResolver) getFullTable(q *parsedQuery) (*queryResponse, error) {
 	ctx := context.Background()
-	startingKey := c.metaData.pkStart
-	endingKey := c.metaData.pkEnd
+	startingKey := c.metaData[q.tableName].PkStart
+	endingKey := c.metaData[q.tableName].PkEnd
 	localRequestID := c.requestId.Add(1)
 
 	req := loadbalancer.LoadBalanceRequest{
@@ -72,14 +72,14 @@ func (c *myResolver) getFullTable(q *parsedQuery) (*queryResponse, error) {
 	}
 
 	for i := startingKey; i <= endingKey; i++ {
-		for _, j := range c.metaData.colNames {
+		for _, j := range c.metaData[q.tableName].ColNames {
 			temp := q.tableName + "/" + j + "/" + fmt.Sprintf("%d", i)
 			req.Keys = append(req.Keys, temp)
 			req.Values = append(req.Values, "")
 		}
 	}
 	fmt.Println(len(req.Keys))
-	fmt.Println(len(c.metaData.colNames))
+	fmt.Println(len(c.metaData[q.tableName].ColNames))
 	fullTable, err := c.conn.AddKeys(ctx, &req)
 
 	if err != nil {
@@ -96,8 +96,8 @@ func (c *myResolver) getFullTable(q *parsedQuery) (*queryResponse, error) {
 
 func (c *myResolver) getFullColumn(q *parsedQuery) (*queryResponse, error) {
 	ctx := context.Background()
-	startingKey := c.metaData.pkStart
-	endingKey := c.metaData.pkEnd
+	startingKey := c.metaData[q.tableName].PkStart
+	endingKey := c.metaData[q.tableName].PkEnd
 	localRequestID := c.requestId.Add(1)
 
 	req := loadbalancer.LoadBalanceRequest{
@@ -134,7 +134,7 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 	ctx := context.Background()
 
 	for _, v := range q.SearchCol {
-		if contains(c.metaData.indexOn, v) {
+		if contains(c.metaData[q.TableName].IndexOn, v) {
 			continue
 		} else {
 			indexedSearch = false
@@ -168,7 +168,6 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 					startingPoint, _ := strconv.ParseInt(searchValues[counter], 10, 64)
 					endingPoint, _ := strconv.ParseInt(searchValues[counter+1], 10, 64)
 					counter += 2
-					fmt.Println(startingPoint, endingPoint)
 					for v := startingPoint; v <= endingPoint; v++ {
 						indexKey := q.TableName + "/" + q.SearchCol[i] + "_index" + "/" + strconv.FormatInt(v, 10)
 						keyTypeMap["range"] = append(keyTypeMap["range"], indexKey)

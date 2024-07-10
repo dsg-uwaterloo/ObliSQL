@@ -13,7 +13,7 @@ type myResolver struct {
 	requestId atomic.Int64
 	done      atomic.Int32
 	recvChan  chan int32
-	metaData  metaData
+	metaData  map[string]MetaData
 }
 
 type parsedQuery struct {
@@ -31,10 +31,10 @@ type queryResponse struct {
 	Values []string
 }
 
-type metaData struct {
-	colNames  []string
-	indexOn   []string
-	pkEnd     int
-	pkStart   int
-	tableName string
+type MetaData struct {
+	ColNames  []string `json:"colNames"`
+	IndexOn   []string `json:"indexOn"`
+	PkEnd     int      `json:"pkEnd"`
+	PkStart   int      `json:"pkStart"`
+	TableName string   `json:"tableName"`
 }

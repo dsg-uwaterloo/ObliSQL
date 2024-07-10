@@ -1,14 +1,14 @@
 package main
 
 import (
-	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
 	"strconv"
-	"strings"
 	"sync/atomic"
 
 	"github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
@@ -53,49 +53,26 @@ func (c *myResolver) ExecuteQuery(ctx context.Context, q *resolver.ParsedQuery) 
 func (c *myResolver) readMetaData(filePath string) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		log.Fatalf("Error opening metadata file: %s \n", err)
+		log.Fatalf("Error opening metadata file: %s\n", err)
 		return
 	}
 	defer file.Close()
 
-	configMap := make(map[string]string)
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.Split(line, ":")
-		if len(parts) == 2 {
-			key := parts[0]
-			value := parts[1]
-			configMap[key] = value
-		}
+	byteValue, err := io.ReadAll(file)
+	if err != nil {
+		log.Fatalf("Error reading metadata file: %s\n", err)
+		return
 	}
 
-	var m metaData
-	for key, value := range configMap {
-		switch key {
-		case "colNames":
-			m.colNames = strings.Split(value, " ")
-		case "indexOn":
-			m.indexOn = strings.Split(value, " ")
-		case "pkEnd":
-			pkEnd, err := strconv.Atoi(strings.TrimSpace(value))
-			if err != nil {
-				log.Fatalf("Error converting pkEnd to integer: %s \n", err)
-			}
-			m.pkEnd = pkEnd
-		case "pkStart":
-			pkStart, err := strconv.Atoi(strings.TrimSpace(value))
-			if err != nil {
-				log.Fatalf("Error converting pkStart to integer: %s \n", err)
-			}
-			m.pkStart = pkStart
-		case "tableName":
-			m.tableName = value
-		default:
-			log.Printf("Unknown key in MetaData : %s \n", key)
-		}
+	var data map[string]MetaData
+	err = json.Unmarshal(byteValue, &data)
+	if err != nil {
+		log.Fatalf("Error unmarshaling JSON: %s\n", err)
+		return
 	}
-	c.metaData = m
+
+	c.metaData = data
+
 }
 
 func main() {
