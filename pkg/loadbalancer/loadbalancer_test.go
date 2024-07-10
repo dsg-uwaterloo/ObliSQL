@@ -6,20 +6,15 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"net"
 	"os"
-	"os/signal"
 	"reflect"
 	"strings"
-	"sync"
-	"sync/atomic"
-	"syscall"
 	"testing"
 	"time"
 
-	executor "github.com/Haseeb1399/WorkingThesis/api/executor"
 	"github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var localKeyValMap = make(map[string]string)
@@ -73,60 +68,6 @@ func getRandomKeyValuePairs(numPairs int) map[string]string {
 	}
 
 	return randomKeyValuePairs
-}
-func initLb(hosts []string, ports []string, traceLoc string, lbPort string) *myLoadBalancer {
-	ctx, cancel := context.WithCancel(context.Background())
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	lis, err := net.Listen("tcp", ":"+lbPort)
-	if err != nil {
-		log.Fatalf("Cannot create listener on port :%s %s", lbPort, err)
-	}
-	fmt.Println("Starting Load Balancer on: localhost:", lbPort)
-	//Define Service
-	service := myLoadBalancer{
-		done:           false,
-		R:              100, //Fixing R to 100 for testing.
-		executorNumber: len(hosts),
-		executors:      make(map[int]executor.ExecutorClient),
-		exectorQueues:  make(map[int][]KVPair),
-		channelMap:     make(map[string]responseChannel),
-		queueLock:      make([]sync.Mutex, len(hosts)),
-		channelLock:    sync.Mutex{},
-		requestNumber:  atomic.Int64{},
-	}
-	service.requestNumber.Store(0)
-
-	serverRegister := grpc.NewServer()
-	loadbalancer.RegisterLoadBalancerServer(serverRegister, &service)
-	// Load Trace
-
-	// Connect to Executors
-	service.connectToExecutors(hosts, ports, traceLoc)
-
-	// Launch Thread to check Queues
-	go service.checkQueues(ctx)
-
-	// Launch routine to listen to sig events.
-	go func() {
-		<-sigChan
-		cancel()
-		lis.Close()
-		serverRegister.GracefulStop()
-		os.Exit(0)
-	}()
-
-	go func() {
-		//Start serving
-		err = serverRegister.Serve(lis)
-
-		if err != nil {
-			log.Fatalf("Error! Could not start loadBalancer! %s", err)
-		}
-	}()
-
-	return &service
 }
 
 func getTestCases(numKeys int) []TestCase {
@@ -188,18 +129,21 @@ func TestSingleExecutor(t *testing.T) {
 	ctx := context.Background()
 	traceLoc := "../../tracefiles/serverInput.txt"
 	hosts := []string{"localhost"}
-	ports := []string{"9090"}
+	ports := []string{"9500"}
+	lb_addr := hosts[0] + ":" + ports[0]
 
-	service := initLb(hosts, ports, traceLoc, "9500")
-
-	time.Sleep(2 * time.Second)
+	conn, err := grpc.NewClient(lb_addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
+	if err != nil {
+		log.Fatalf("Failed to open connection to load balancer")
+	}
+	lbClient := loadbalancer.NewLoadBalancerClient(conn)
 
 	//Read trace into local storage
 	readTrace(traceLoc)
 	testCases := getTestCases(100)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			resp, err := service.AddKeys(ctx, tc.requestBatch)
+			resp, err := lbClient.AddKeys(ctx, tc.requestBatch)
 			if err != nil {
 				t.Errorf("ExecuteBatch Error = %v", err)
 				return
@@ -219,18 +163,24 @@ func TestTwoExecutor(t *testing.T) {
 
 	ctx := context.Background()
 	traceLoc := "../../tracefiles/serverInput.txt"
-	hosts := []string{"localhost", "localhost"}
-	ports := []string{"9090", "9091"}
+	hosts := []string{"localhost"}
+	ports := []string{"9500"}
+	lb_addr := hosts[0] + ":" + ports[0]
 
-	service := initLb(hosts, ports, traceLoc, "9600")
+	conn, err := grpc.NewClient(lb_addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
+	if err != nil {
+		log.Fatalf("Failed to open connection to load balancer")
+	}
+	lbClient := loadbalancer.NewLoadBalancerClient(conn)
 
 	//Read trace into local storage
+
 	readTrace(traceLoc)
 	testCases := getTestCases(200)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			fmt.Println("Starting Test", tc.name)
-			resp, err := service.AddKeys(ctx, tc.requestBatch)
+			resp, err := lbClient.AddKeys(ctx, tc.requestBatch)
 			if err != nil {
 				t.Errorf("ExecuteBatch Error = %v", err)
 				return

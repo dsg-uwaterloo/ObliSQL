@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
 	"reflect"
 	"testing"
-	"time"
 
 	executor "github.com/Haseeb1399/WorkingThesis/api/executor"
-	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var testCases = []TestCase{
@@ -120,32 +118,14 @@ func generateDataSet() *executor.RequestBatch {
 
 func TestExecutor(t *testing.T) {
 	ctx := context.Background()
-	lis, err := net.Listen("tcp", ":9090")
+	fullAddr := "localhost:9090"
+	conn, err := grpc.NewClient(fullAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
 	if err != nil {
-		log.Fatalf("Cannot create listener on port :9090 %s", err)
+		log.Fatalf("Couldn't Connect to Executor Proxy at localhost:9090. Error: %s", err)
 	}
-
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-
-	service := myExecutor{rdb: rdb}
-	serverRegister := grpc.NewServer(grpc.MaxRecvMsgSize(644000*300), grpc.MaxSendMsgSize(644000*300))
-	executor.RegisterExecutorServer(serverRegister, service)
-
-	go func() {
-		err = serverRegister.Serve(lis)
-		if err != nil {
-			log.Fatalf("Error! Could not start server %s", err)
-		}
-	}()
-
-	time.Sleep(2 * time.Second)
-
+	newClient := executor.NewExecutorClient(conn)
 	//Testing Init DB
-	initSuccess, err := service.InitDb(ctx, generateDataSet())
+	initSuccess, err := newClient.InitDb(ctx, generateDataSet())
 	if err != nil {
 		log.Fatalln("Failed to Init DB! Error: ", err)
 	}
@@ -156,7 +136,8 @@ func TestExecutor(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			resp, err := service.ExecuteBatch(ctx, tc.requestBatch)
+			fmt.Printf("Running test: %s \n", tc.name)
+			resp, err := newClient.ExecuteBatch(ctx, tc.requestBatch)
 			if err != nil {
 				t.Errorf("ExecuteBatch Error = %v", err)
 				return

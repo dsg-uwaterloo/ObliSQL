@@ -300,6 +300,7 @@ func (lb *myLoadBalancer) connectToExecutors(hosts []string, ports []string, fil
 func main() {
 	//CLI arguments
 	rPtr := flag.Int("R", 10, "Real Number of Requests")
+	nPtr := flag.Int("N", 10, "Numer of Executors")
 
 	flag.Parse()
 
@@ -317,14 +318,19 @@ func main() {
 	fmt.Println("Starting Load Balancer on: localhost:9500")
 
 	//Executor Information
-	hosts := []string{"localhost"}
-	ports := []string{"9090"}
+	hosts := make([]string, 0)
+	ports := make([]string, 0)
+
+	for i := 0; i < *nPtr; i++ {
+		hosts = append(hosts, "localhost")
+		ports = append(ports, fmt.Sprintf("909%d", i))
+	}
 
 	//Define Service
 	service := myLoadBalancer{
 		done:           false,
 		R:              *rPtr,
-		executorNumber: len(hosts),
+		executorNumber: *nPtr,
 		executors:      make(map[int]executor.ExecutorClient),
 		exectorQueues:  make(map[int][]KVPair),
 		channelMap:     make(map[string]responseChannel),

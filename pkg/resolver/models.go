@@ -4,9 +4,11 @@ import (
 	"sync/atomic"
 
 	"github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
+	"github.com/Haseeb1399/WorkingThesis/api/resolver"
 )
 
-type resolver struct {
+type myResolver struct {
+	resolver.UnimplementedResolverServer
 	conn      loadbalancer.LoadBalancerClient
 	requestId atomic.Int64
 	done      atomic.Int32
@@ -15,12 +17,13 @@ type resolver struct {
 }
 
 type parsedQuery struct {
-	client_id string
-	queryType string
-	tableName string
-	colToGet  []string
-	searchCol string
-	searchVal []string
+	client_id  string
+	queryType  string
+	tableName  string
+	colToGet   []string
+	searchCol  []string
+	searchVal  []string
+	searchType []string
 }
 
 type queryResponse struct {
