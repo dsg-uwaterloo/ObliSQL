@@ -6,8 +6,14 @@
     "indexOn": [
       "c_state", "c_since"
     ],
+    "rangeIndexInfo": {
+      "c_since": {
+        "start": "1711607656757",
+        "end": "1711607656809"
+      }
+    },
     "pkEnd": 30000,
-    "tableName":"customer",
-    "pkStart": 1
+    "pkStart": 1,
+    "tableName": "customer"
   }
 }

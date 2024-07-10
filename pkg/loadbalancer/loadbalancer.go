@@ -265,6 +265,7 @@ func (lb *myLoadBalancer) connectToExecutors(hosts []string, ports []string, fil
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.Split(line, " ")
+
 		if len(parts) == 3 {
 			op := parts[0]
 			if op == "SET" {

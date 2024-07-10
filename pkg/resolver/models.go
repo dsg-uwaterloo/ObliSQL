@@ -31,10 +31,16 @@ type queryResponse struct {
 	Values []string
 }
 
+type RangeIndex struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
+}
+
 type MetaData struct {
-	ColNames  []string `json:"colNames"`
-	IndexOn   []string `json:"indexOn"`
-	PkEnd     int      `json:"pkEnd"`
-	PkStart   int      `json:"pkStart"`
-	TableName string   `json:"tableName"`
+	ColNames       []string              `json:"colNames"`
+	IndexOn        []string              `json:"indexOn"`
+	RangeIndexInfo map[string]RangeIndex `json:"rangeIndexInfo"`
+	PkEnd          int                   `json:"pkEnd"`
+	PkStart        int                   `json:"pkStart"`
+	TableName      string                `json:"tableName"`
 }

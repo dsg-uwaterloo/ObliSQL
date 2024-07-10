@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/Haseeb1399/WorkingThesis/api/resolver"
@@ -18,9 +19,30 @@ type TestCase struct {
 	expectedAns  *resolver.QueryResponse
 }
 
+func getLinearKeyNames(start int, end int, tableName string, colName string) []string {
+	tempList := make([]string, 0)
+	for i := start; i <= end; i++ {
+		tempKey := tableName + "/" + colName + "/" + strconv.FormatInt(int64(i), 10)
+		tempList = append(tempList, tempKey)
+	}
+	return tempList
+}
+func getRepeatedValueList(value string, length int) []string {
+	tempList := make([]string, 0)
+	for i := 1; i <= length; i++ {
+		tempList = append(tempList, value)
+	}
+	return tempList
+}
+
 func getTestCases() []TestCase {
 	testCases := []TestCase{
 		{
+			//Select c_balance,c_state,c_since
+			//from customer
+			//where c_since between 774 and 779
+			//and c_state = ke
+
 			name: "Mix Range and Point",
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:   "1",
@@ -42,6 +64,26 @@ func getTestCases() []TestCase {
 					"-10.00", "ke", "1711607656774",
 					"-10.00", "ke", "1711607656779",
 				},
+			},
+		},
+		{
+			//Select c_balance,c_since
+			//from customer
+			//where c_since < 775
+
+			name: "Less than Range Test",
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "customer",
+				ColToGet:   []string{"c_balance"},
+				SearchCol:  []string{"c_since"},
+				SearchVal:  []string{"<", "1711607656758"},
+				SearchType: []string{"range"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys:   getLinearKeyNames(1, 438, "customer", "c_balance"),
+				Values: getRepeatedValueList("-10.00", 438),
 			},
 		},
 	}
@@ -69,6 +111,7 @@ func TestQueryOne(t *testing.T) {
 			}
 			if !reflect.DeepEqual(resp.Keys, tc.expectedAns.Keys) || !reflect.DeepEqual(resp.Values, tc.expectedAns.Values) {
 				t.Errorf("Execute Query got incorrect values!")
+				fmt.Printf("Expected Keys: % +v \n Got Keys: %+v \n", tc.expectedAns.Values, resp.Values)
 			}
 		})
 	}

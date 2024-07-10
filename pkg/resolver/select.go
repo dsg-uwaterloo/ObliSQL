@@ -127,6 +127,21 @@ func (c *myResolver) getFullColumn(q *parsedQuery) (*queryResponse, error) {
 
 }
 
+func (c *myResolver) constructRequest(pkList []string, requestID int64, q *resolver.ParsedQuery) *loadbalancer.LoadBalanceRequest {
+	valReq := loadbalancer.LoadBalanceRequest{
+		Keys:      []string{},
+		Values:    []string{},
+		RequestId: requestID,
+	}
+	for _, pk := range pkList {
+		for _, col := range q.ColToGet {
+			keyVal := q.TableName + "/" + col + "/" + pk
+			valReq.Keys = append(valReq.Keys, keyVal)
+			valReq.Values = append(valReq.Values, "")
+		}
+	}
+	return &valReq
+}
 func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 	//Step One, Check if there is an Index or not
 	indexedSearch := true
@@ -153,7 +168,6 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 			RequestId: localRequestID,
 		}
 		for i, v := range q.SearchType {
-
 			if v == "point" {
 				indexKey := q.TableName + "/" + q.SearchCol[i] + "_index" + "/" + searchValues[counter]
 				indexReq.Keys = append(indexReq.Keys, indexKey)
@@ -163,7 +177,23 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 			} else if v == "range" {
 				_, err := strconv.Atoi(searchValues[counter])
 				if err != nil {
-					//Either a >, <, >= or <=
+					opType := searchValues[counter]
+					opValue := searchValues[counter+1]
+
+					if opType == "<" {
+						startingPoint, _ := strconv.ParseInt(c.metaData[q.TableName].RangeIndexInfo[q.SearchCol[i]].Start, 10, 64)
+						endingPoint, _ := strconv.ParseInt(opValue, 10, 64)
+						counter += 2
+
+						for k := startingPoint; k < endingPoint; k++ {
+							indexKey := q.TableName + "/" + q.SearchCol[i] + "_index" + "/" + strconv.FormatInt(k, 10)
+							indexReq.Keys = append(indexReq.Keys, indexKey)
+							indexReq.Values = append(indexReq.Values, "") //Get Request
+							keyTypeMap["range"] = append(keyTypeMap["range"], indexKey)
+						}
+
+					}
+
 				} else {
 					startingPoint, _ := strconv.ParseInt(searchValues[counter], 10, 64)
 					endingPoint, _ := strconv.ParseInt(searchValues[counter+1], 10, 64)
@@ -203,21 +233,17 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 				}
 			}
 		}
-		filteredKeys := intersection(indexPointIntersect, indexRangeAgg)
 
-		valReq := loadbalancer.LoadBalanceRequest{
-			Keys:      []string{},
-			Values:    []string{},
-			RequestId: localRequestID,
+		filteredKeys := make([]string, 0)
+		if contains(q.SearchType, "range") && contains(q.SearchType, "point") {
+			filteredKeys = intersection(indexPointIntersect, indexRangeAgg)
+		} else {
+			filteredKeys = append(indexPointIntersect, indexRangeAgg...)
 		}
-		for _, pk := range filteredKeys {
-			for _, col := range q.ColToGet {
-				keyVal := q.TableName + "/" + col + "/" + pk
-				valReq.Keys = append(valReq.Keys, keyVal)
-				valReq.Values = append(valReq.Values, "")
-			}
-		}
-		respTwo, err := c.conn.AddKeys(ctx, &valReq)
+
+		valReq := c.constructRequest(filteredKeys, localRequestID, q)
+
+		respTwo, err := c.conn.AddKeys(ctx, valReq)
 
 		if err != nil {
 			log.Fatalln("Failed to fetch Actual Values!")
