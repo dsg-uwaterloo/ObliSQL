@@ -12,15 +12,6 @@ import (
 	"github.com/Haseeb1399/WorkingThesis/api/resolver"
 )
 
-func contains(slice []string, value string) bool {
-	for _, item := range slice {
-		if item == value {
-			return true
-		}
-	}
-	return false
-}
-
 func parseValues(resp *loadbalancer.LoadBalanceResponse) map[string][]string {
 	indexedKeys := make(map[string][]string)
 	for j, val := range resp.Values {
@@ -94,54 +85,6 @@ func (c *myResolver) getFullTable(q *parsedQuery) (*queryResponse, error) {
 
 }
 
-func (c *myResolver) getFullColumn(q *parsedQuery) (*queryResponse, error) {
-	ctx := context.Background()
-	startingKey := c.metaData[q.tableName].PkStart
-	endingKey := c.metaData[q.tableName].PkEnd
-	localRequestID := c.requestId.Add(1)
-
-	req := loadbalancer.LoadBalanceRequest{
-		Keys:         []string{},
-		Values:       []string{},
-		RequestId:    localRequestID,
-		ObjectNum:    1,
-		TotalObjects: 1,
-	}
-
-	for i := startingKey; i <= endingKey; i++ {
-		temp := q.tableName + "/" + q.colToGet[0] + "/" + fmt.Sprintf("%d", i)
-		req.Keys = append(req.Keys, temp)
-		req.Values = append(req.Values, "")
-	}
-	fullCol, err := c.conn.AddKeys(ctx, &req)
-
-	if err != nil {
-		log.Fatalln("Failed to fetch full column!")
-		return nil, err
-	}
-
-	return &queryResponse{
-		Keys:   fullCol.Keys,
-		Values: fullCol.Values,
-	}, nil
-
-}
-
-func (c *myResolver) constructRequest(pkList []string, requestID int64, q *resolver.ParsedQuery) *loadbalancer.LoadBalanceRequest {
-	valReq := loadbalancer.LoadBalanceRequest{
-		Keys:      []string{},
-		Values:    []string{},
-		RequestId: requestID,
-	}
-	for _, pk := range pkList {
-		for _, col := range q.ColToGet {
-			keyVal := q.TableName + "/" + col + "/" + pk
-			valReq.Keys = append(valReq.Keys, keyVal)
-			valReq.Values = append(valReq.Values, "")
-		}
-	}
-	return &valReq
-}
 func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 	//Step One, Check if there is an Index or not
 	indexedSearch := true
@@ -181,8 +124,8 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 					opValue := searchValues[counter+1]
 
 					if opType == "<" {
-						startingPoint, _ := strconv.ParseInt(c.metaData[q.TableName].RangeIndexInfo[q.SearchCol[i]].Start, 10, 64)
-						endingPoint, _ := strconv.ParseInt(opValue, 10, 64)
+						startingPoint, endingPoint := getBounds(c.metaData[q.TableName].RangeIndexInfo[q.SearchCol[i]].Start, opValue)
+
 						counter += 2
 
 						for k := startingPoint; k < endingPoint; k++ {
@@ -195,8 +138,7 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 					}
 
 				} else {
-					startingPoint, _ := strconv.ParseInt(searchValues[counter], 10, 64)
-					endingPoint, _ := strconv.ParseInt(searchValues[counter+1], 10, 64)
+					startingPoint, endingPoint := getBounds(searchValues[counter], searchValues[counter+1])
 					counter += 2
 					for v := startingPoint; v <= endingPoint; v++ {
 						indexKey := q.TableName + "/" + q.SearchCol[i] + "_index" + "/" + strconv.FormatInt(v, 10)
