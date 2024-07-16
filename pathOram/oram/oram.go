@@ -275,3 +275,149 @@ func (o *ORAM) Get(key int) (string) {
 	returnvalue := o.Access(true, key, newblock) // Assuming Access function is defined later
 	return returnvalue.Value
 }
+
+// Read the path from the root to the given leaf and optionally populate the stash
+func (o *ORAM) ReadPath(leaf int, putInStash bool) (map[int]struct{}) {
+
+	// Calculate the maximum valid leaf value
+	maxLeaf := (1 << o.logCapacity) - 1
+
+	// Validate the leaf value
+	if leaf < 0 || leaf > maxLeaf {
+		fmt.Println("invalid leaf value: %d, valid range is [0, %d]", leaf, maxLeaf)
+		return nil
+	}
+
+	fmt.Println("the leaf give is: ", leaf)
+	path := make(map[int]struct{})
+
+	// Collect all bucket indices from root to leaf
+	for level := 0; level <= o.logCapacity; level++ {
+		bucket := o.bucketForLevelLeaf(level, leaf)
+		fmt.Println(bucket)
+		path[bucket] = struct{}{}
+	}
+
+	// Read the blocks from each bucket
+
+	if putInStash { // TODO: even if fake path is read, and nothing is put ins tash, still write the path back
+		for bucket := range path {
+			bucketData, _ := o.readBucketFromDb(bucket)
+			for _, block := range bucketData.Blocks {
+				// Skip "empty" blocks
+				if block.Key != -1 {
+					o.stashMap[block.Key] = block
+				}
+			}
+		}
+	}
+
+	return path
+}
+
+// Write the path back, ensuring all buckets contain Z blocks
+func (o *ORAM) WritePath(leaf int) {
+    // Step 1: Get all blocks from stash
+    currentStash := make(map[int]Block)
+	for blockId, block := range o.stashMap {
+		currentStash[blockId] = block
+	}
+
+    toDelete := make(map[int]struct{}) // track blocks that need to be deleted from stash
+    requests := make([]struct {
+        bucketId int
+        bucket   Bucket
+    }, 0) // storage SET requests (batching)
+
+    // Step 2: Follow the path from leaf to root (greedy)
+    for level := o.logCapacity; level >= 0; level-- {
+        toInsert := make(map[int]Block) // blocks to be inserted in the bucket (up to Z)
+        toDeleteLocal := make([]int, 0)   // indices/blockIds/keys of blocks in currentStash to delete
+
+        for key, currentBlock := range currentStash {
+            currentBlockLeaf := o.keyMap[currentBlock.Key]
+            if o.canInclude(currentBlockLeaf, leaf, level) {
+                toInsert[currentBlock.Key] = currentBlock
+                toDelete[currentBlock.Key] = struct{}{}
+                toDeleteLocal = append(toDeleteLocal, key) // add the key for block we want to delete
+                if len(toInsert) == o.Z {
+                    break
+                }
+            }
+        }
+
+        // Delete inserted blocks from currentStash
+		for _, key := range toDeleteLocal {
+			delete(currentStash, key)
+		}
+
+        // Prepare the bucket for writing
+        bucketId := o.bucketForLevelLeaf(level, leaf)
+        bucket := Bucket{
+            Blocks: make([]Block, o.Z),
+        }
+
+        i := 0
+		for _, block := range toInsert {
+			bucket.Blocks[i] = block
+			i++
+			if i >= o.Z {
+				break
+			}
+		}
+
+		// If there are fewer blocks than o.Z, fill the remaining slots with dummy blocks
+		for i < o.Z {
+			bucket.Blocks[i] = Block{Key: -1, BlockId: -1, Value: ""}
+			i++
+		}
+
+        requests = append(requests, struct {
+            bucketId int
+            bucket   Bucket
+        }{
+            bucketId: bucketId,
+            bucket:   bucket,
+        })
+    }
+
+    // Set the requests in Redis
+    for _, request := range requests {
+        if err := o.writeBucketToDb(request.bucketId, request.bucket); err != nil {
+            fmt.Printf("Error writing bucket %d: %v\n", request.bucketId, err)
+        }
+    }
+
+    // Update the stash map by removing the newly inserted blocks
+    for key := range toDelete {
+        delete(o.stashMap, key)
+    }
+}
+
+// Access simulates the access operation.
+func (o *ORAM) Access(read bool, blockId int, data Block) (Block) {
+	//blockId is treated the same as Key
+    // Step 1: Remap block
+    previousPositionLeaf, exists := o.keyMap[blockId]
+    if !exists {
+        previousPositionLeaf = getRandomInt(1 << (o.logCapacity - 1)) //TODO: onyl for PUT
+		o.stashMap[blockId] = data
+    }
+	
+    o.keyMap[blockId] = getRandomInt(1 << (o.logCapacity - 1))
+
+    // Step 2: Read path
+    o.ReadPath(previousPositionLeaf, true) // Stash updated
+
+    // Step 3: Update or read from stash
+    if !read {
+        o.stashMap[blockId] = data
+    }
+    
+	returnValue := o.stashMap[blockId]
+
+    // Step 4: Write path
+    o.WritePath(previousPositionLeaf) // Stash updated
+
+	return returnValue // returns the block
+}
