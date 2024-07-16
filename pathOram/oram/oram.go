@@ -134,3 +134,32 @@ func (o *ORAM) readBucketFromDb(index int) (Bucket, error) {
 func (o *ORAM) Close() error {
     return o.redisClient.Close()
 }
+
+// ######################################### Testing/Debugging helper functions ######################################
+
+// PrintTree prints the ORAM tree structure by reading the file sequentially
+func (o *ORAM) PrintTree() {
+	totalBuckets := (1 << (o.logCapacity + 1)) - 1
+	for i := 0; i < totalBuckets; i++ {
+		bucket, _ := o.readBucketFromDb(i)
+		indent := strings.Repeat("  ", o.getDepth(i))
+		fmt.Printf("%sBucket %d:\n", indent, i)
+		for j, block := range bucket.Blocks {
+			j=j
+			fmt.Printf("%s  Blockid %d: Key=%d, Value=%s\n", indent, block.BlockId, block.Key, block.Value)
+		}
+	}
+}
+
+// PrintStashMap prints the contents of the stash map
+func (o *ORAM) PrintStashMap() {
+	fmt.Println("Stash Map contents:")
+	for blockId, block := range o.stashMap {
+		fmt.Printf("BlockId: %d, Key: %d, Value: %s\n", blockId, block.Key, block.Value)
+	}
+}
+
+// Exported put function used for testing by directly inserting bucket (escaping writepath)
+func (o *ORAM) PutBucket(index int, bucket Bucket) { 
+	o.writeBucketToDb(index, bucket)
+}
