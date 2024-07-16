@@ -163,3 +163,70 @@ func (o *ORAM) PrintStashMap() {
 func (o *ORAM) PutBucket(index int, bucket Bucket) { 
 	o.writeBucketToDb(index, bucket)
 }
+
+// ############################################ Core ORAM functions #####################################################
+
+type ORAM struct {
+	logCapacity int // height of the tree or logarithm base 2 of capacity (i.e. capacity is 2 to the power of this value)
+	Z           int // number of blocks in a bucket (typically, 3 to 7)
+	redisClient *redis.Client
+	stashMap   map[int]Block
+	stashSize   int // Maximum number of blocks the stash can hold // TODO: not needed
+	keyMap		map[int]int
+	blockIds	int // keeps track of the blockIds used so far
+	ctx         context.Context // Context field to associate with ORAM operations
+	encryptionKey []byte // Encryption key for buckets
+}
+
+
+func NewORAM(logCapacity, Z int, stashSize int, redisAddr string) (*ORAM, error) {
+	// configuring redis client
+	// Create a Redis client with context
+    ctx := context.Background()
+	client := redis.NewClient(&redis.Options{
+        Addr: redisAddr,
+    })
+    _, err := client.Ping(ctx).Result()
+    if err != nil {
+        return nil, err
+    }
+
+	key, err := generateRandomKey()
+	if err != nil {
+		return nil, err
+	}
+
+	oram := &ORAM{
+		redisClient: client,
+		logCapacity: logCapacity,
+		Z:           Z,
+		stashSize:   stashSize,
+		stashMap:    make(map[int]Block),
+		keyMap:      make(map[int]int),
+		blockIds:		0,
+		ctx:		ctx,
+		encryptionKey: key,
+	}
+
+	// Initialization block
+	oram.initialize()
+
+	return oram, nil
+}
+
+// Initializing ORAM and populating with key = -1
+func (o *ORAM) initialize() {
+	totalBuckets := (1 << (o.logCapacity + 1)) - 1
+	for i := 0; i < totalBuckets; i++ {
+		bucket := Bucket{
+			Blocks: make([]Block, o.Z),
+			RealBlockCount: 0,
+		}
+		for j := range bucket.Blocks {
+			bucket.Blocks[j].Key = -1
+			bucket.Blocks[j].BlockId = -1
+			bucket.Blocks[j].Value = ""
+		}
+		o.writeBucketToDb(i, bucket)
+	}
+}
