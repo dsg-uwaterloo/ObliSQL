@@ -230,3 +230,22 @@ func (o *ORAM) initialize() {
 		o.writeBucketToDb(i, bucket)
 	}
 }
+
+// getDepth calculates the depth of a bucket in the tree
+func (o *ORAM) getDepth(bucketIndex int) int {
+	depth := 0
+	for (1<<depth)-1 <= bucketIndex {
+		depth++
+	}
+	return depth - 1
+}
+
+// Calculate the bucket index for a given level and leaf
+func (o *ORAM) bucketForLevelLeaf(level, leaf int) int {
+	return ((leaf + (1 << (o.logCapacity))) >> (o.logCapacity - level)) - 1
+}
+
+// on this level, do paths of entryLeaf and leaf share the same bucket
+func (o *ORAM) canInclude(entryLeaf, leaf, level int) bool {
+	return entryLeaf>>(o.logCapacity-level) == leaf>>(o.logCapacity-level)
+}
