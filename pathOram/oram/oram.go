@@ -249,3 +249,29 @@ func (o *ORAM) bucketForLevelLeaf(level, leaf int) int {
 func (o *ORAM) canInclude(entryLeaf, leaf, level int) bool {
 	return entryLeaf>>(o.logCapacity-level) == leaf>>(o.logCapacity-level)
 }
+
+// Function to put a value into the datastore
+func (o *ORAM) Put(key int, value string) (string) {
+	//create a block
+	newblock := Block{
+		BlockId: key,
+		Key:     key,
+		Value:   value,
+	}
+
+    returnvalue := o.Access(false, newblock.BlockId, newblock) // Assuming Access function is defined later
+	return returnvalue.Value
+}
+
+// Function to get a value from the datastore
+func (o *ORAM) Get(key int) (string) {
+	//create dummy block
+	newblock := Block{
+		BlockId: -1,
+		Key:     -1,
+		Value:   "",
+	}
+
+	returnvalue := o.Access(true, key, newblock) // Assuming Access function is defined later
+	return returnvalue.Value
+}
