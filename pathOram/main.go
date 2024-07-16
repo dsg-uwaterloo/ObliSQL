@@ -22,13 +22,13 @@ func main() {
 	oramInstance, _ := oram.NewORAM(logCapacity, Z, 1000, redisAddr)
 
 
-	// bucket := oram.Bucket{
-	// 	Blocks: []oram.Block{
-	// 		{BlockId: 192, Key: 1234, Value: "Block1234"},
-	// 		{BlockId: 193, Key: 5678, Value: "Block5678"},
-	// 	},
-	// }
-	// oramInstance.PutBucket(0, bucket) // Writing to the root bucket (index 0)
+	bucket := oram.Bucket{
+		Blocks: []oram.Block{
+			{BlockId: 192, Key: 1234, Value: "Block1234"},
+			{BlockId: 193, Key: 5678, Value: "Block5678"},
+		},
+	}
+	oramInstance.PutBucket(0, bucket) // Writing to the root bucket (index 0)
 
 	oramInstance.PrintTree()
 

@@ -103,6 +103,7 @@ func (o *ORAM) writeBucketToDb(index int, bucket Bucket) error {
 	}
 
     key := fmt.Sprintf("bucket:%d", index)
+	//key := index
 
     err = o.redisClient.Set(o.ctx, key, encryptedData, 0).Err() // the bucket index is the key
     return err
@@ -111,6 +112,7 @@ func (o *ORAM) writeBucketToDb(index int, bucket Bucket) error {
 // Read a bucket from Redis
 func (o *ORAM) readBucketFromDb(index int) (Bucket, error) {
     key := fmt.Sprintf("bucket:%d", index)
+	// key := index
     data, err := o.redisClient.Get(o.ctx, key).Bytes()
     if err != nil {
         return Bucket{}, err
@@ -288,13 +290,13 @@ func (o *ORAM) ReadPath(leaf int, putInStash bool) (map[int]struct{}) {
 		return nil
 	}
 
-	fmt.Println("the leaf give is: ", leaf)
+	//fmt.Println("the leaf give is: ", leaf)
 	path := make(map[int]struct{})
 
 	// Collect all bucket indices from root to leaf
 	for level := 0; level <= o.logCapacity; level++ {
 		bucket := o.bucketForLevelLeaf(level, leaf)
-		fmt.Println(bucket)
+		//fmt.Println(bucket)
 		path[bucket] = struct{}{}
 	}
 
