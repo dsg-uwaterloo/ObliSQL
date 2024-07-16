@@ -5,13 +5,13 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	// "encoding/json"
+	"encoding/json"
 	"errors"
-	// "fmt"
-	// "strings"
+	"fmt"
+	"strings"
 	"io"
-    // "github.com/go-redis/redis/v8" // using go-redis library
-	// "context"
+    "github.com/go-redis/redis/v8" // using go-redis library
+	"context"
 )
 
 // Block represents a key-value pair
@@ -78,4 +78,59 @@ func decrypt(data []byte, key []byte) ([]byte, error) {
 	stream.XORKeyStream(ciphertext, ciphertext)
 
 	return ciphertext, nil
+}
+
+// ##################################### Redis/Datastore access functions #######################################
+
+// Write a bucket to Redis
+func (o *ORAM) writeBucketToDb(index int, bucket Bucket) error {
+
+	// Ensure bucket has exactly o.Z blocks
+    if len(bucket.Blocks) < o.Z {
+        for len(bucket.Blocks) < o.Z {
+            bucket.Blocks = append(bucket.Blocks, Block{Key: -1, BlockId: -1, Value: ""})
+        }
+    }
+
+	data, err := json.Marshal(bucket)
+	if err != nil {
+		return err
+	}
+
+	encryptedData, err := encrypt(data, o.encryptionKey)
+	if err != nil {
+		return err
+	}
+
+    key := fmt.Sprintf("bucket:%d", index)
+
+    err = o.redisClient.Set(o.ctx, key, encryptedData, 0).Err() // the bucket index is the key
+    return err
+}
+
+// Read a bucket from Redis
+func (o *ORAM) readBucketFromDb(index int) (Bucket, error) {
+    key := fmt.Sprintf("bucket:%d", index)
+    data, err := o.redisClient.Get(o.ctx, key).Bytes()
+    if err != nil {
+        return Bucket{}, err
+    }
+
+	decryptedData, err := decrypt(data, o.encryptionKey)
+	if err != nil {
+		return Bucket{}, err
+	}
+
+    var bucket Bucket
+    err = json.Unmarshal(decryptedData, &bucket)
+    if err != nil {
+        return Bucket{}, err
+    }
+
+    return bucket, nil
+}
+
+// Close closes the Redis client connection
+func (o *ORAM) Close() error {
+    return o.redisClient.Close()
 }
