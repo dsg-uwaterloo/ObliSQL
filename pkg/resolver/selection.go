@@ -101,16 +101,10 @@ func filterPkUsingIndex(q *resolver.ParsedQuery) []string {
 func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 	localRequestID := c.requestId.Add(1)
 
+	var filteredPks []string
 	if c.checkIndexExists(q) {
-
-		filteredPk := filterPkUsingIndex(q)
-		requestValues := c.constructRequestAndFetch(filteredPk, localRequestID, q)
-
-		return &queryResponse{
-			Keys:   requestValues.Keys,
-			Values: requestValues.Values,
-		}, nil
-
+		filteredPks = filterPkUsingIndex(q)
+		fmt.Println(filteredPks)
 	} else {
 		//Get Full Columns for all searchCols
 		columData := make(map[string]*queryResponse)
@@ -129,15 +123,14 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 		}
 		wg.Wait()
 		//Filter Out the primary keys we want.
-		filteredPKs := filterPkFromColumns(columData, q)
-		//Fetch values we want from the cloud
-		requestValues := c.constructRequestAndFetch(filteredPKs, localRequestID, q)
-
-		//Return to user.
-		return &queryResponse{
-			Keys:   requestValues.Keys,
-			Values: requestValues.Values,
-		}, nil
+		filteredPks = filterPkFromColumns(columData, q)
 
 	}
+
+	requestValues := c.constructRequestAndFetch(filteredPks, localRequestID, q)
+
+	return &queryResponse{
+		Keys:   requestValues.Keys,
+		Values: requestValues.Values,
+	}, nil
 }

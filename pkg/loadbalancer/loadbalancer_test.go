@@ -83,6 +83,7 @@ func getTestCases(numKeys int) []TestCase {
 	}
 
 	testCases := []TestCase{
+		// One more testcase for more than R
 		{
 			name: "Valid Full R Requests",
 			requestBatch: &loadbalancer.LoadBalanceRequest{
