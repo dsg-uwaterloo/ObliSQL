@@ -38,10 +38,6 @@ func getRepeatedValueList(value string, length int) []string {
 func getTestCases() []TestCase {
 	testCases := []TestCase{
 		{
-			//Select c_balance,c_state,c_since
-			//from customer
-			//where c_since between 774 and 779
-			//and c_state = ke
 
 			name: "Mix Range and Point",
 			requestQuery: &resolver.ParsedQuery{

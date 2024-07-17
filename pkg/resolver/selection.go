@@ -98,7 +98,7 @@ func filterPkUsingIndex(q *resolver.ParsedQuery) []string {
 	return nil
 }
 
-func (c *myResolver) perfSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
+func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 	localRequestID := c.requestId.Add(1)
 
 	if c.checkIndexExists(q) {
@@ -140,6 +140,4 @@ func (c *myResolver) perfSelect(q *resolver.ParsedQuery) (*queryResponse, error)
 		}, nil
 
 	}
-
-	return nil, nil
 }

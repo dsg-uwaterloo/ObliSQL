@@ -25,6 +25,8 @@ func contains(slice []string, value string) bool {
 }
 
 func getBounds(s string, e string) (int64, int64) {
+	//How do we select precision for floating point numbers?
+	//Do we specify it for each db? (In the database)?
 	if isInt(s) && isInt(e) {
 		s_int, _ := strconv.ParseInt(s, 10, 64)
 		e_int, _ := strconv.ParseInt(e, 10, 64)

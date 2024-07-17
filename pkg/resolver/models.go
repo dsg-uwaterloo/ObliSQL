@@ -43,4 +43,5 @@ type MetaData struct {
 	PkEnd          int                   `json:"pkEnd"`
 	PkStart        int                   `json:"pkStart"`
 	TableName      string                `json:"tableName"`
+	ColTypes       map[string]string     `json:"colTypes"`
 }

@@ -72,7 +72,6 @@ func (c *myResolver) readMetaData(filePath string) {
 	}
 
 	c.metaData = data
-
 }
 
 func main() {

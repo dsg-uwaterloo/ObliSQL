@@ -19,7 +19,6 @@ import (
 
 	executor "github.com/Haseeb1399/WorkingThesis/api/executor"
 	loadbalancer "github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -53,6 +52,15 @@ func hashString(s string, N uint32) uint32 {
 	h := fnv.New32a()
 	h.Write([]byte(s))
 	return h.Sum32() % N
+}
+
+func contains(slice []string, value string) bool {
+	for _, item := range slice {
+		if item == value {
+			return true
+		}
+	}
+	return false
 }
 
 func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBalanceRequest) (*loadbalancer.LoadBalanceResponse, error) {
@@ -265,19 +273,24 @@ func (lb *myLoadBalancer) connectToExecutors(hosts []string, ports []string, fil
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.Split(line, " ")
-
 		if len(parts) == 3 {
 			op := parts[0]
 			if op == "SET" {
 				key := parts[1]
 				hashVal := int(hashString(key, uint32(lb.executorNumber)))
 				value := parts[2]
+				if contains(initMap[hashVal].Keys, key) {
+					fmt.Println("Duplicate Key: ", key)
+				}
 				initMap[hashVal].Keys = append(initMap[hashVal].Keys, key)
 				initMap[hashVal].Values = append(initMap[hashVal].Values, value)
 			}
+		} else {
+			fmt.Println("Invalid!", parts)
 		}
 	}
 
+	fmt.Println(len(initMap[0].Keys), len(initMap[0].Values))
 	for i, v := range hosts {
 		fullAddr := v + ":" + ports[i]
 		conn, err := grpc.NewClient(fullAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
