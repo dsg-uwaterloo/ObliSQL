@@ -132,7 +132,7 @@ func (o *ORAM) ReadPath(leaf int, putInStash bool) (map[int]struct{}) {
 
 	// Read the blocks from each bucket
 
-	if putInStash { // TODO: even if fake path is read, and nothing is put ins tash, still write the path back
+	if putInStash { // TODO: even if fake path is read, and nothing is put in the stash, still write the path back
 		for bucket := range path {
 			bucketData, _ := o.RedisClient.ReadBucketFromDb(bucket)
 			for _, block := range bucketData.Blocks {
@@ -232,7 +232,7 @@ func (o *ORAM) Access(read bool, blockId int, data block.Block) (block.Block) {
     // Step 1: Remap block
     previousPositionLeaf, exists := o.keyMap[blockId]
     if !exists {
-        previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1)) //TODO: onyl for PUT
+        previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1)) //TODO: only for PUT, for GET, assume key always exists
 		o.StashMap[blockId] = data
     }
 	
