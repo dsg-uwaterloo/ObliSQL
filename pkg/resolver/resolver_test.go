@@ -39,7 +39,7 @@ func getTestCases() []TestCase {
 	testCases := []TestCase{
 		{
 
-			name: "Mix Range and Point",
+			name: "Simple Select",
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:   "1",
 				QueryType:  "select",
@@ -51,7 +51,7 @@ func getTestCases() []TestCase {
 			},
 			expectedAns: &resolver.QueryResponse{
 				Keys: []string{
-					"review/rating/1529", "review/rating/1529",
+					"review/rating/1529", "review/rating/4349",
 				},
 				Values: []string{
 					"2",
@@ -85,7 +85,8 @@ func TestQueryOne(t *testing.T) {
 
 			if !reflect.DeepEqual(resp.Keys, tc.expectedAns.Keys) || !reflect.DeepEqual(resp.Values, tc.expectedAns.Values) {
 				t.Errorf("Execute Query got incorrect values!")
-				fmt.Printf("Expected Keys: % +v \n Got Keys: %+v \n", tc.expectedAns.Values, resp.Values)
+				fmt.Printf("Expected Keys: % +v \n Got Keys: %+v \n", tc.expectedAns.Keys, resp.Keys)
+				fmt.Printf("Expected Values: % +v \n Got Values: %+v \n", tc.expectedAns.Values, resp.Values)
 			}
 		})
 	}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
@@ -21,6 +23,32 @@ func (c *myResolver) checkIndexExists(q *resolver.ParsedQuery) bool {
 		}
 	}
 	return true
+}
+
+func parseValues(resp *loadbalancer.LoadBalanceResponse) map[string][]string {
+	indexedKeys := make(map[string][]string)
+	for j, val := range resp.Values {
+		respVal := strings.Split(val, ",")
+		tempList := make([]string, 0)
+		for i, v := range respVal {
+			if i == len(respVal)-1 {
+				re := regexp.MustCompile(`^\d+`)
+				numbers := re.FindString(v)
+				tempList = append(tempList, numbers)
+			} else {
+				tempList = append(tempList, v)
+			}
+
+		}
+		indexedKeys[resp.Keys[j]] = tempList
+	}
+	return indexedKeys
+}
+
+func (c *myResolver) constructPointIndexKey(searchCol string, searchValue string, tableName string, lbReq *loadbalancer.LoadBalanceRequest) {
+	indexKey := tableName + "/" + searchCol + "_index" + "/" + searchValue
+	lbReq.Keys = append(lbReq.Keys, indexKey)
+	lbReq.Values = append(lbReq.Values, "")
 }
 
 func (c *myResolver) constructRequestAndFetch(pkList []string, requestID int64, q *resolver.ParsedQuery) *loadbalancer.LoadBalanceResponse {
@@ -82,7 +110,26 @@ func (c *myResolver) getFullColumn(tableName string, colName string) (*queryResp
 
 }
 
-func filterPkFromColumns(colData map[string]*queryResponse, q *resolver.ParsedQuery) []string {
+func (c *myResolver) getSearchColumns(tableName string, searchCol []string) map[string]*queryResponse {
+	columData := make(map[string]*queryResponse)
+	var wg sync.WaitGroup
+	for _, v := range searchCol {
+		wg.Add(1)
+		go func(columnName string) {
+			defer wg.Done()
+			resp, err := c.getFullColumn(tableName, columnName)
+			if err != nil {
+				log.Fatalln("Error in GetFullColumn!", err)
+			}
+			columData[v] = resp
+		}(v)
+	}
+	wg.Wait()
+
+	return columData
+}
+
+func (c *myResolver) filterPkFromColumns(colData map[string]*queryResponse, q *resolver.ParsedQuery) []string {
 	filteredKeys := make([]string, 0)
 
 	//Iterate over all the columns in colData.
@@ -93,9 +140,36 @@ func filterPkFromColumns(colData map[string]*queryResponse, q *resolver.ParsedQu
 	return filteredKeys
 }
 
-func filterPkUsingIndex(q *resolver.ParsedQuery) []string {
-	//Entire filtering logic goes here.
-	return nil
+func (c *myResolver) filterPkUsingIndex(q *resolver.ParsedQuery, localRequestID int64) []string {
+	ctx := context.Background()
+	indexReqKeys := loadbalancer.LoadBalanceRequest{
+		Keys:      []string{},
+		Values:    []string{},
+		RequestId: localRequestID,
+	}
+	counter := 0
+	//Differentiate Between Point and Range
+	for i, v := range q.SearchType {
+		if v == "point" {
+			c.constructPointIndexKey(q.SearchCol[i], q.SearchVal[counter], q.TableName, &indexReqKeys)
+		} else if v == "range" {
+			log.Fatalln("Not implemented")
+		}
+
+	}
+	resp, err := c.conn.AddKeys(ctx, &indexReqKeys)
+	if err != nil {
+		log.Fatalln("Failed to Fetch Index Value")
+	}
+
+	respKeys := []string{}
+	parsedKeyMap := parseValues(resp)
+
+	for _, v := range parsedKeyMap {
+		respKeys = append(respKeys, v...)
+	}
+
+	return respKeys
 }
 
 func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
@@ -103,30 +177,14 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 
 	var filteredPks []string
 	if c.checkIndexExists(q) {
-		filteredPks = filterPkUsingIndex(q)
-		fmt.Println(filteredPks)
+		filteredPks = c.filterPkUsingIndex(q, localRequestID)
 	} else {
 		//Get Full Columns for all searchCols
-		columData := make(map[string]*queryResponse)
-
-		var wg sync.WaitGroup
-		for _, v := range q.SearchCol {
-			wg.Add(1)
-			go func(columnName string) {
-				defer wg.Done()
-				resp, err := c.getFullColumn(q.TableName, columnName)
-				if err != nil {
-					log.Fatalln("Error in GetFullColumn!", err)
-				}
-				columData[v] = resp
-			}(v)
-		}
-		wg.Wait()
+		columData := c.getSearchColumns(q.TableName, q.SearchCol)
 		//Filter Out the primary keys we want.
-		filteredPks = filterPkFromColumns(columData, q)
+		filteredPks = c.filterPkFromColumns(columData, q)
 
 	}
-
 	requestValues := c.constructRequestAndFetch(filteredPks, localRequestID, q)
 
 	return &queryResponse{
