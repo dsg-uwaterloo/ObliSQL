@@ -5,7 +5,7 @@ import (
     "testing"
 
     "github.com/schollz/progressbar/v3"
-    "pathOram/oram"
+    "pathOram/pkg/oram/oram"
 )
 
 const (
@@ -20,7 +20,7 @@ func TestORAMReadWrite(t *testing.T) {
     if err != nil {
         t.Fatalf("Error initializing ORAM: %v", err)
     }
-    defer o.Close()
+    defer o.RedisClient.Close()
 
     totalOperations := 1000 // Number of operations you plan to perform
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set the Go source file for your main program
-MAIN_FILE="main.go"
+MAIN_FILE="./cmd/oram/main.go"
 
 # Set the name for the executable
 EXECUTABLE="main"
