@@ -252,4 +252,21 @@ func (o *ORAM) Access(read bool, blockId int, data block.Block) (block.Block) {
     o.WritePath(previousPositionLeaf) // Stash updated
 
 	return returnValue // returns the block
+
+	// TODO:
+
+	/*
+	initialize fully for now beforehand
+
+	create separate repo for base pathoram
+
+	batching optimization is kind of like:
+	run readpath on 50 - but maintain set and fetch every block only once, one redis request for all 50
+
+	write/read stashmap[key] for all 50
+
+	writepath to 50 previousPositionLeafs and try to clear out stash -  1 redis request
+
+	many batches come in; go routines? 
+	*/
 }
