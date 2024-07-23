@@ -10,6 +10,7 @@ message parsedQuery{
     repeated string searchCol = 5;
     repeated string searchVal =6;
     repeated string searchType = 7;
+    repeated string aggregateType = 8;
     repeated string orderBy = 9;
 }
 

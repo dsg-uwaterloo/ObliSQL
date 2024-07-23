@@ -13,7 +13,7 @@
             "i_id": "int",
             "title": "varchar",
             "description": "varchar",
-            "creation_date": "timestamp"
+            "creation_date": "date"
         },
         "rangeIndexInfo": {},
         "tableName": "item"
@@ -24,7 +24,8 @@
         "indexOn": [
             "u_id",
             "a_id",
-            "i_id"
+            "i_id",
+            "creation_date"
         ],
         "colNames": [
             "a_id",
@@ -42,7 +43,7 @@
             "rating": "int",
             "rank": "int",
             "comment": "varchar",
-            "creation_date": "timestamp"
+            "creation_date": "date"
         },
         "rangeIndexInfo": {},
         "tableName": "review"
@@ -61,7 +62,7 @@
             "u_id": "int",
             "name": "varchar",
             "email": "varchar",
-            "creation_date": "timestamp"
+            "creation_date": "date"
         },
         "rangeIndexInfo": {},
         "tableName": "useracct"
@@ -83,7 +84,7 @@
             "source_u_id": "int",
             "target_u_id": "int",
             "trust": "int",
-            "creation_date": "timestamp"
+            "creation_date": "date"
         },
         "rangeIndexInfo": {},
         "tableName": "trust"
@@ -107,8 +108,8 @@
             "a_id": "int",
             "rating": "int",
             "status": "int",
-            "creation_date": "timestamp",
-            "last_mod_date": "timestamp",
+            "creation_date": "date",
+            "last_mod_date": "date",
             "type": "int",
             "vertical_id": "int"
         },

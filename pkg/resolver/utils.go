@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strconv"
+	"time"
 )
 
 func isInt(s string) bool {
@@ -23,6 +25,40 @@ func contains(slice []string, value string) bool {
 	}
 	return false
 }
+func findStringIntersection(keyMap map[string][]string) []string {
+	if len(keyMap) == 0 {
+		return []string{}
+	}
+
+	// Get the first slice to start the intersection
+	var result []string
+	for _, slice := range keyMap {
+		result = slice
+		break
+	}
+
+	// Function to find the intersection of two slices
+	intersection := func(a, b []string) []string {
+		m := make(map[string]bool)
+		for _, v := range a {
+			m[v] = true
+		}
+		var intersect []string
+		for _, v := range b {
+			if m[v] {
+				intersect = append(intersect, v)
+			}
+		}
+		return intersect
+	}
+
+	// Iterate over the map and find the intersection
+	for _, slice := range keyMap {
+		result = intersection(result, slice)
+	}
+
+	return result
+}
 
 func getBounds(s string, e string) (int64, int64) {
 	//How do we select precision for floating point numbers?
@@ -36,4 +72,36 @@ func getBounds(s string, e string) (int64, int64) {
 		log.Fatalf("Conversion of un-supported type")
 		return 0, 0
 	}
+}
+
+func getIndexFromArray[T comparable](arr []T, val T) int {
+	for i, v := range arr {
+		if v == val {
+			return i
+		}
+	}
+	return -1
+}
+
+func getDatesInRange(startDateStr, endDateStr string) ([]string, error) {
+	// Parse the startDate and endDate strings into time.Time
+	startDate, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start date: %v", err)
+	}
+	endDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid end date: %v", err)
+	}
+
+	// Check if startDate is after endDate
+	if startDate.After(endDate) {
+		return nil, fmt.Errorf("start date must be before end date")
+	}
+
+	var dates []string
+	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+		dates = append(dates, d.Format("2006-01-02"))
+	}
+	return dates, nil
 }

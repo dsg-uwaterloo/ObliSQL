@@ -34,6 +34,24 @@ func (c *myResolver) ExecuteQuery(ctx context.Context, q *resolver.ParsedQuery) 
 			Keys:      resp.Keys,
 			Values:    resp.Values,
 		}, nil
+	} else if q.QueryType == "aggregate" {
+		resp, err := c.doAggregate(q)
+
+		if err != nil {
+			log.Fatalf("Failed to execute Query!")
+		}
+		clientId, err := strconv.Atoi(q.ClientId)
+		if err != nil {
+			log.Fatalf("Error converting clientId to integer: %s \n", err)
+		}
+
+		return &resolver.QueryResponse{
+			ClientId:  int64(clientId),
+			RequestId: 1,
+			Keys:      resp.Keys,
+			Values:    resp.Values,
+		}, nil
+
 	} else {
 		//More else ifs after other types
 		clientId, err := strconv.Atoi(q.ClientId)

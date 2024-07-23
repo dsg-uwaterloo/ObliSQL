@@ -59,6 +59,98 @@ func getTestCases() []TestCase {
 				},
 			},
 		},
+		{
+			name: "Simple Range",
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "review",
+				ColToGet:   []string{"rating"},
+				SearchCol:  []string{"u_id"},
+				SearchVal:  []string{"812", "814"},
+				SearchType: []string{"range"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"review/rating/1529", "review/rating/4349", "review/rating/426", "review/rating/855", "review/rating/3442", "review/rating/4362",
+				},
+				//By default it's ordered in the way the keys appear in the index.
+				Values: []string{
+					"2",
+					"0",
+					"2",
+					"1",
+					"4",
+					"3",
+				},
+			},
+		},
+		{
+			name: "Simple Select without index",
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "item",
+				ColToGet:   []string{"title"},
+				SearchCol:  []string{"i_id"},
+				SearchVal:  []string{"500"},
+				SearchType: []string{"point"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"item/title/737",
+				},
+				Values: []string{
+					"?M7s'eFjt#_ll_<;Fjt9yMqNae!Et]]1rF0]lsW@YgM,-}Hpx'CYM.V((:bh1F[/xr@GWs*U8?rNHV^OWHt0P?JnteKvy5r/>ASYo&%##|_fW]J`c~]x>ASYfm3cVE|%",
+				},
+			},
+		},
+		{
+			name: "Simple Avg Aggregate",
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:      "1",
+				QueryType:     "aggregate",
+				TableName:     "review",
+				ColToGet:      []string{"rating"},
+				SearchCol:     []string{"i_id"},
+				SearchVal:     []string{"17"},
+				SearchType:    []string{"point"},
+				AggregateType: []string{"avg"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"",
+				},
+				Values: []string{
+					"2.25",
+				},
+			},
+		},
+		{
+			name: "Date Range",
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "review",
+				ColToGet:   []string{"rating"},
+				SearchCol:  []string{"creation_date"},
+				SearchVal:  []string{"2021-12-01", "2021-12-02"},
+				SearchType: []string{"range"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"review/rating/1579", "review/rating/2682", "review/rating/643", "review/rating/2032", "review/rating/3245",
+				},
+				//By default it's ordered in the way the keys appear in the index.
+				Values: []string{
+					"1",
+					"0",
+					"3",
+					"3",
+					"3",
+				},
+			},
+		},
 	}
 	return testCases
 }
