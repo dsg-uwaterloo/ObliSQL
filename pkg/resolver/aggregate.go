@@ -1,21 +1,16 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"strconv"
+	"sync"
 
 	"github.com/Haseeb1399/WorkingThesis/api/resolver"
 )
 
-//	sumQuery := &resolver.ParsedQuery{
-//		QueryType:  "select",
-//		TableName:  tableName,
-//		ColToGet:   []string{q.ColToGet[colToGet]},
-//		SearchCol:  []string{q.SearchCol[ind]},
-//		SearchVal:  []string{q.SearchVal[ind]},
-//		SearchType: []string{"point"},
-//	}
-func (c *myResolver) issuePointFetch(tableName string, colToGet string, searchCol string, searchVal string) *queryResponse {
+type aggregateFunc func(*myResolver, *resolver.ParsedQuery, int) (float64, error)
+
+func (c *myResolver) issuePointFetch(tableName, colToGet, searchCol, searchVal string) (*queryResponse, error) {
 	sumQuery := &resolver.ParsedQuery{
 		QueryType:  "select",
 		TableName:  tableName,
@@ -26,83 +21,118 @@ func (c *myResolver) issuePointFetch(tableName string, colToGet string, searchCo
 	}
 
 	resp, err := c.doSelect(sumQuery)
-
 	if err != nil {
-		log.Fatalln("Failed to fetch Values!")
+		return nil, fmt.Errorf("failed to fetch values: %w", err)
 	}
-	return resp
+	return resp, nil
 }
 
-func (c *myResolver) doSum(q *resolver.ParsedQuery, ind int) float64 {
+func (c *myResolver) doSum(q *resolver.ParsedQuery, ind int) (float64, error) {
+	//Only handles case one where condition.
+	resp, err := c.issuePointFetch(q.TableName, q.ColToGet[ind], q.SearchCol[ind], q.SearchVal[ind])
+	if err != nil {
+		return 0, err
+	}
 
-	resp := c.issuePointFetch(q.TableName, q.ColToGet[ind], q.SearchCol[ind], q.SearchVal[ind])
-
-	valueSum := 0.0
+	var valueSum float64
 	for _, v := range resp.Values {
 		parsedValue, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			log.Fatalf("Failed to parse value as float!")
+			return 0, fmt.Errorf("failed to parse value as float: %w", err)
 		}
 		valueSum += parsedValue
 	}
 
-	return valueSum
+	return valueSum, nil
 }
 
-func (c *myResolver) doCount(q *resolver.ParsedQuery, ind int) int {
-	resp := c.issuePointFetch(q.TableName, q.ColToGet[ind], q.SearchCol[ind], q.SearchVal[ind])
-
-	return len(resp.Values)
+func (c *myResolver) doCount(q *resolver.ParsedQuery, ind int) (float64, error) {
+	//Only handles case one where condition.
+	resp, err := c.issuePointFetch(q.TableName, q.ColToGet[ind], q.SearchCol[ind], q.SearchVal[ind])
+	if err != nil {
+		return 0, err
+	}
+	return float64(len(resp.Values)), nil
 }
 
-func (c *myResolver) doAverage(q *resolver.ParsedQuery, ind int) float64 {
-	// Create channels to receive the results from the goroutines
-	sumChan := make(chan float64)
-	countChan := make(chan int)
+func (c *myResolver) doAverage(q *resolver.ParsedQuery, ind int) (float64, error) {
+	//Only handles case one where condition.
 
-	// Start the goroutines
+	var sumValue, countValue float64
+	var sumErr, countErr error
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
 	go func() {
-		sumChan <- c.doSum(q, ind)
+		defer wg.Done()
+		sumValue, sumErr = c.doSum(q, ind)
 	}()
+
 	go func() {
-		countChan <- c.doCount(q, ind)
+		defer wg.Done()
+		countValue, countErr = c.doCount(q, ind)
 	}()
 
-	// Receive the results from the channels
-	sumValue := <-sumChan
-	countValue := <-countChan
+	wg.Wait()
 
-	// Avoid division by zero
-	if countValue == 0 {
-		return 0
+	if sumErr != nil {
+		return 0, fmt.Errorf("error in sum calculation: %w", sumErr)
+	}
+	if countErr != nil {
+		return 0, fmt.Errorf("error in count calculation: %w", countErr)
 	}
 
-	return sumValue / float64(countValue)
+	if countValue == 0 {
+		return 0, nil
+	}
+
+	return sumValue / countValue, nil
 }
 
 func (c *myResolver) doAggregate(q *resolver.ParsedQuery) (*queryResponse, error) {
-	respKeys := []string{}
-	respValues := []string{}
+	respKeys := make([]string, len(q.AggregateType))
+	respValues := make([]string, len(q.AggregateType))
+
+	aggregateFunctions := map[string]aggregateFunc{
+		"avg":   (*myResolver).doAverage,
+		"sum":   (*myResolver).doSum,
+		"count": (*myResolver).doCount,
+	}
+
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(q.AggregateType))
 
 	for ind, aggType := range q.AggregateType {
-		if aggType == "avg" {
-			resp := c.doAverage(q, ind)
-			respKeys = append(respKeys, "")
-			respValues = append(respValues, strconv.FormatFloat(resp, 'f', -1, 64))
-		} else if aggType == "sum" {
-			log.Fatalf("Sum Aggregate Not Implemented")
-		} else if aggType == "count" {
-			log.Fatalf("Count Aggregate Not Implemented")
-		} else if aggType == "min" {
-			log.Fatalf("Min Aggregate Not Implemeneted")
-		} else if aggType == "max" {
-			log.Fatalf("Max Aggregate Not Implemented")
-		}
+		wg.Add(1)
+		go func(index int, aggrType string) {
+			defer wg.Done()
+
+			fn, ok := aggregateFunctions[aggrType]
+			if !ok {
+				errChan <- fmt.Errorf("%s aggregate not implemented", aggrType)
+				return
+			}
+
+			result, err := fn(c, q, index)
+			if err != nil {
+				errChan <- fmt.Errorf("error performing %s aggregate: %w", aggrType, err)
+				return
+			}
+
+			respValues[index] = strconv.FormatFloat(result, 'f', -1, 64)
+		}(ind, aggType)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	if err := <-errChan; err != nil {
+		return nil, err
 	}
 
 	return &queryResponse{
 		Keys:   respKeys,
 		Values: respValues,
 	}, nil
-
 }

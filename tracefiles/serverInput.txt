@@ -5480,7 +5480,7 @@ SET review/u_id/211 238
 SET review/i_id/211 7
 SET review/rating/211 2
 SET review/rank/211 nan
-SET review/comment/211 zsUU)l@GW@$*}}'whzbh`4}9m+g,t#A|Spyjh8_&xLe.,E@o_htPSn#h>ASY\qqd/]krW^5KN_Gy(+SY`$9#b:#V$lK,nj3ySa^O_.9RgDHKSa9?3]\W>PbhMME6!y@dt1=RF;:~@hx5j6$U2druSDQW**i$*]$*Y-Fn,&@o_h8_{2[m'Ox=5
+SET review/comment/211 test
 SET review/creation_date/211 2020-12-15
 SET review/a_id/212 11
 SET review/u_id/212 1163

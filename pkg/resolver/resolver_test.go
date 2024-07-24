@@ -60,28 +60,29 @@ func getTestCases() []TestCase {
 			},
 		},
 		{
-			name: "Simple Range",
+
+			name: "Select using two filters with index (AND)",
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:   "1",
 				QueryType:  "select",
 				TableName:  "review",
-				ColToGet:   []string{"rating"},
-				SearchCol:  []string{"u_id"},
-				SearchVal:  []string{"812", "814"},
-				SearchType: []string{"range"},
+				ColToGet:   []string{"*"},
+				SearchCol:  []string{"a_id", "i_id"},
+				SearchVal:  []string{"10", "7"},
+				SearchType: []string{"point", "point"},
 			},
 			expectedAns: &resolver.QueryResponse{
 				Keys: []string{
-					"review/rating/1529", "review/rating/4349", "review/rating/426", "review/rating/855", "review/rating/3442", "review/rating/4362",
+					"review/a_id/211", "review/u_id/211", "review/i_id/211", "review/rating/211", "review/rank/211", "review/comment/211", "review/creation_date/211",
 				},
-				//By default it's ordered in the way the keys appear in the index.
 				Values: []string{
+					"10",
+					"238",
+					"7",
 					"2",
-					"0",
-					"2",
-					"1",
-					"4",
-					"3",
+					"nan",
+					"test",
+					"2020-12-15",
 				},
 			},
 		},
@@ -123,6 +124,99 @@ func getTestCases() []TestCase {
 				},
 				Values: []string{
 					"2.25",
+				},
+			},
+		},
+		{
+			name: "Simple Sum Aggregate",
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:      "1",
+				QueryType:     "aggregate",
+				TableName:     "review",
+				ColToGet:      []string{"rating"},
+				SearchCol:     []string{"i_id"},
+				SearchVal:     []string{"7"},
+				SearchType:    []string{"point"},
+				AggregateType: []string{"sum"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"",
+				},
+				Values: []string{
+					"6",
+				},
+			},
+		},
+		{
+			name: "Simple Count Aggregate",
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:      "1",
+				QueryType:     "aggregate",
+				TableName:     "review",
+				ColToGet:      []string{"rating"},
+				SearchCol:     []string{"i_id"},
+				SearchVal:     []string{"7"},
+				SearchType:    []string{"point"},
+				AggregateType: []string{"count"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"",
+				},
+				Values: []string{
+					"3",
+				},
+			},
+		},
+		{
+			name: "Simple Sum & Count Aggregate",
+			// select sum(rating) from new_review where i_id =7
+			// union all
+			// select count(rating)  from new_review where i_id =7;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:      "1",
+				QueryType:     "aggregate",
+				TableName:     "review",
+				ColToGet:      []string{"rating", "rating"},
+				SearchCol:     []string{"i_id", "i_id"},
+				SearchVal:     []string{"7", "7"},
+				SearchType:    []string{"point", "point"},
+				AggregateType: []string{"sum", "count"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"", "",
+				},
+				Values: []string{
+					"6",
+					"3",
+				},
+			},
+		},
+		{
+			name: "Simple Range",
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "review",
+				ColToGet:   []string{"rating"},
+				SearchCol:  []string{"u_id"},
+				SearchVal:  []string{"812", "814"},
+				SearchType: []string{"range"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"review/rating/1529", "review/rating/4349", "review/rating/426", "review/rating/855", "review/rating/3442", "review/rating/4362",
+				},
+				//By default it's ordered in the way the keys appear in the index.
+				Values: []string{
+					"2",
+					"0",
+					"2",
+					"1",
+					"4",
+					"3",
 				},
 			},
 		},

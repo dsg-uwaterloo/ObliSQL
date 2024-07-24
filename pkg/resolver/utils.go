@@ -105,3 +105,17 @@ func getDatesInRange(startDateStr, endDateStr string) ([]string, error) {
 	}
 	return dates, nil
 }
+
+func detectRepeats(arr []string) []string {
+	elementCount := make(map[string]int)
+	var repeats []string
+
+	for _, value := range arr {
+		elementCount[value]++
+		if elementCount[value] == 2 {
+			repeats = append(repeats, value)
+		}
+	}
+
+	return repeats
+}
