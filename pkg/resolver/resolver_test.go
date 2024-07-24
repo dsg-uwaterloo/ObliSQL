@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"strconv"
 	"testing"
 
 	"github.com/Haseeb1399/WorkingThesis/api/resolver"
@@ -19,21 +18,21 @@ type TestCase struct {
 	expectedAns  *resolver.QueryResponse
 }
 
-func getLinearKeyNames(start int, end int, tableName string, colName string) []string {
-	tempList := make([]string, 0)
-	for i := start; i <= end; i++ {
-		tempKey := tableName + "/" + colName + "/" + strconv.FormatInt(int64(i), 10)
-		tempList = append(tempList, tempKey)
-	}
-	return tempList
-}
-func getRepeatedValueList(value string, length int) []string {
-	tempList := make([]string, 0)
-	for i := 1; i <= length; i++ {
-		tempList = append(tempList, value)
-	}
-	return tempList
-}
+// func getLinearKeyNames(start int, end int, tableName string, colName string) []string {
+// 	tempList := make([]string, 0)
+// 	for i := start; i <= end; i++ {
+// 		tempKey := tableName + "/" + colName + "/" + strconv.FormatInt(int64(i), 10)
+// 		tempList = append(tempList, tempKey)
+// 	}
+// 	return tempList
+// }
+// func getRepeatedValueList(value string, length int) []string {
+// 	tempList := make([]string, 0)
+// 	for i := 1; i <= length; i++ {
+// 		tempList = append(tempList, value)
+// 	}
+// 	return tempList
+// }
 
 func getTestCases() []TestCase {
 	testCases := []TestCase{

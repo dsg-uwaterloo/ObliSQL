@@ -229,11 +229,11 @@ func (c *myResolver) filterPkUsingIndex(q *resolver.ParsedQuery, localRequestID 
 			if singleOp {
 				return nil, fmt.Errorf("range operations using >, <, >=, <= are not yet implemented")
 			}
-			columnType := c.getRangeColumnType(q.TableName, q.SearchCol[i])
+			columnType := c.getRangeColumnType(q.TableName, q.SearchCol[i]) //Return the type of column it is (int, varchar, date, etc)
 			switch columnType {
 			case "int":
-				startingPoint, _ := strconv.ParseInt(parsedPart, 10, 64)
-				endingPoint, _ := strconv.ParseInt(q.SearchVal[i+1], 10, 64)
+				startingPoint, _ := strconv.ParseInt(parsedPart, 10, 64)     //starting point
+				endingPoint, _ := strconv.ParseInt(q.SearchVal[i+1], 10, 64) //Ending Point
 				c.constructRangeIndexKeyInt(q.SearchCol[i], startingPoint, endingPoint, q.TableName, &indexReqKeys)
 			case "date":
 				c.constructRangeIndexDate(q.SearchCol[i], parsedPart, q.SearchVal[i+1], q.TableName, &indexReqKeys)
@@ -250,8 +250,8 @@ func (c *myResolver) filterPkUsingIndex(q *resolver.ParsedQuery, localRequestID 
 		return nil, fmt.Errorf("failed to fetch index value: %w", err)
 	}
 
-	parsedKeyMap := parseValuesAndRemoveNull(resp)
-	respKeys := make([]string, 0)
+	parsedKeyMap := parseValuesAndRemoveNull(resp) //Parses (2,3,4) --> [2,3,4] and ignores any -1 froms the executor (key didn't exist)
+	respKeys := make([]string, 0)                  //List of all primary keys
 	for _, v := range parsedKeyMap {
 		respKeys = append(respKeys, v...)
 	}
