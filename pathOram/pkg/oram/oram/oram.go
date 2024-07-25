@@ -2,11 +2,14 @@ package oram
 
 import (
 	"fmt"
+	"errors"
 
 	"pathOram/pkg/oram/block"
 	"pathOram/pkg/oram/bucket"
 	"pathOram/pkg/oram/crypto"
 	"pathOram/pkg/oram/redis"
+	"pathOram/pkg/oram/request"
+	"pathOram/pkg/oram/bucketRequest"
 )
 
 //  Core ORAM functions
@@ -18,7 +21,6 @@ type ORAM struct {
 	StashMap      map[int]block.Block
 	StashSize     int // Maximum number of blocks the stash can hold
 	keyMap        map[int]int
-	blockIds      int // keeps track of the blockIds used so far
 }
 
 
@@ -33,6 +35,11 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string) (*ORAM, error) {
 		return nil, err
 	}
 
+	// Clear the Redis database to ensure a fresh start
+    if err := client.FlushDB(); err != nil {
+        return nil, fmt.Errorf("failed to flush Redis database: %v", err)
+    }
+
 	oram := &ORAM{
 		RedisClient: client,
 		LogCapacity: LogCapacity,
@@ -40,7 +47,6 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string) (*ORAM, error) {
 		StashSize:   StashSize,
 		StashMap:    make(map[int]block.Block),
 		keyMap:      make(map[int]int),
-		blockIds:    0,
 	}
 
 	oram.initialize()
@@ -56,10 +62,9 @@ func (o *ORAM) initialize() {
 		}
 		for j := range bucket.Blocks {
 			bucket.Blocks[j].Key = -1
-			bucket.Blocks[j].BlockId = -1
 			bucket.Blocks[j].Value = ""
 		}
-		o.RedisClient.WriteBucketToDb(i, bucket)
+		o.RedisClient.WriteBucketToDb(i, bucket) // initialize dosen't use redis batching mechanism to write: NOTE: don't run this initialize formally for experiments
 	}
 }
 
@@ -82,73 +87,52 @@ func (o *ORAM) canInclude(entryLeaf, leaf, level int) bool {
 	return entryLeaf>>(o.LogCapacity-level) == leaf>>(o.LogCapacity-level)
 }
 
-// Function to put a value into the datastore
-func (o *ORAM) Put(key int, value string) (string) {
-	//create a block
-	newblock := block.Block{
-		BlockId: key,
-		Key:     key,
-		Value:   value,
-	}
 
-    returnvalue := o.Access(false, newblock.BlockId, newblock) // Assuming Access function is defined later
-	return returnvalue.Value
-}
-
-// Function to get a value from the datastore
-func (o *ORAM) Get(key int) (string) {
-	//create dummy block
-	dummyBlock := block.Block{
-		BlockId: -1,
-		Key:     -1,
-		Value:   "",
-	}
-
-	returnvalue := o.Access(true, key, dummyBlock) // Assuming Access function is defined later
-	return returnvalue.Value
-}
-
-// Read the path from the root to the given leaf and optionally populate the stash
-func (o *ORAM) ReadPath(leaf int, putInStash bool) (map[int]struct{}) {
-
+// ReadPath reads the paths from the root to the given leaves and optionally populates the stash.
+func (o *ORAM) ReadPaths(leafs []int) {
+	
 	// Calculate the maximum valid leaf value
 	maxLeaf := (1 << o.LogCapacity) - 1
 
-	// Validate the leaf value
-	if leaf < 0 || leaf > maxLeaf {
-		fmt.Println("invalid leaf value: %d, valid range is [0, %d]", leaf, maxLeaf)
-		return nil
+	// Use a map to keep track of unique bucket indices
+	uniqueBuckets := make(map[int]struct{})
+
+	// Collect all unique bucket indices from root to each leaf
+	for _, leaf := range leafs {
+		if leaf < 0 || leaf > maxLeaf {
+			fmt.Printf("invalid leaf value: %d, valid range is [0, %d]\n", leaf, maxLeaf)
+		}
+		for level := o.LogCapacity; level >= 0; level-- {
+			bucket := o.bucketForLevelLeaf(level, leaf)
+			_, exists := uniqueBuckets[bucket]
+			// If the key exists
+			if exists {
+				break
+			}
+			uniqueBuckets[bucket] = struct{}{}	
+		}
 	}
 
-	//fmt.Println("the leaf give is: ", leaf)
-	path := make(map[int]struct{})
-
-	// Collect all bucket indices from root to leaf
-	for level := 0; level <= o.LogCapacity; level++ {
-		bucket := o.bucketForLevelLeaf(level, leaf)
-		//fmt.Println(bucket)
-		path[bucket] = struct{}{}
-	}
-
-	// Read the blocks from each bucket
-
-	if putInStash { // TODO: even if fake path is read, and nothing is put in the stash, still write the path back
-		for bucket := range path {
-			bucketData, _ := o.RedisClient.ReadBucketFromDb(bucket)
-			for _, block := range bucketData.Blocks {
-				// Skip "empty" blocks
-				if block.Key != -1 {
-					o.StashMap[block.Key] = block
-				}
+	bucketsData, _ := o.RedisClient.ReadBucketsFromDb(uniqueBuckets)
+	// Read the blocks from all buckets in all retrived buckets
+	for _, bucketData := range bucketsData {
+		for _, block := range bucketData.Blocks {
+			// Skip "empty" blocks
+			if block.Key != -1 {
+				// fmt.Println("Read block from Tree and put in stash with key: ", block.Key)
+				o.StashMap[block.Key] = block
 			}
 		}
 	}
 
-	return path
 }
 
+// Old way of WritePath
 // Write the path back, ensuring all buckets contain Z blocks
-func (o *ORAM) WritePath(leaf int) {
+func (o *ORAM) WritePath(leaf int, writtenBuckets map[int]struct{}, requests *[]bucketRequest.BucketRequest) (map[int]struct{}) {
+
+	newBucketsWritten := make(map[int]struct{})
+
     // Step 1: Get all blocks from stash
     currentStash := make(map[int]block.Block)
 	for blockId, block := range o.StashMap {
@@ -156,19 +140,25 @@ func (o *ORAM) WritePath(leaf int) {
 	}
 
     toDelete := make(map[int]struct{}) // track blocks that need to be deleted from stash
-    requests := make([]struct {
-        bucketId int
-        bucket   bucket.Bucket
-    }, 0) // storage SET requests (batching)
 
     // Step 2: Follow the path from leaf to root (greedy)
     for level := o.LogCapacity; level >= 0; level-- {
         toInsert := make(map[int]block.Block) // blocks to be inserted in the bucket (up to Z)
         toDeleteLocal := make([]int, 0)   // indices/blockIds/keys of blocks in currentStash to delete
 
+		bucketId := o.bucketForLevelLeaf(level, leaf)
+
+		if _, alreadyExists := writtenBuckets[bucketId]; alreadyExists {
+			break	
+		}
+
+		newBucketsWritten[bucketId] = struct{}{} // Recording this newly written bucketId
+
+		// TODO: check bucketforlevelleaf here, if it gives a bucket that's already in writtenBucket, we are done, exit loop
         for key, currentBlock := range currentStash {
             currentBlockLeaf := o.keyMap[currentBlock.Key]
             if o.canInclude(currentBlockLeaf, leaf, level) {
+				// fmt.Println("This block can be written to Tree with key: ", currentBlock.Key)
                 toInsert[currentBlock.Key] = currentBlock
                 toDelete[currentBlock.Key] = struct{}{}
                 toDeleteLocal = append(toDeleteLocal, key) // add the key for block we want to delete
@@ -184,7 +174,7 @@ func (o *ORAM) WritePath(leaf int) {
 		}
 
         // Prepare the bucket for writing
-        bucketId := o.bucketForLevelLeaf(level, leaf)
+        
         bkt := bucket.Bucket{
             Blocks: make([]block.Block, o.Z),
         }
@@ -200,73 +190,126 @@ func (o *ORAM) WritePath(leaf int) {
 
 		// If there are fewer blocks than o.Z, fill the remaining slots with dummy blocks
 		for i < o.Z {
-			bkt.Blocks[i] = block.Block{Key: -1, BlockId: -1, Value: ""}
+			bkt.Blocks[i] = block.Block{Key: -1, Value: ""}
 			i++
 		}
 
-        requests = append(requests, struct {
-            bucketId int
-            bucket   bucket.Bucket
-        }{
-            bucketId: bucketId,
-            bucket:   bkt,
+        *requests = append(*requests, bucketRequest.BucketRequest{
+            BucketId: bucketId,
+            Bucket:   bkt,
         })
-    }
-
-    // Set the requests in Redis
-    for _, request := range requests {
-        if err := o.RedisClient.WriteBucketToDb(request.bucketId, request.bucket); err != nil {
-            fmt.Printf("Error writing bucket %d: %v\n", request.bucketId, err)
-        }
     }
 
     // Update the stash map by removing the newly inserted blocks
     for key := range toDelete {
         delete(o.StashMap, key)
     }
+
+	return newBucketsWritten
 }
 
-// Access simulates the access operation.
-func (o *ORAM) Access(read bool, blockId int, data block.Block) (block.Block) {
-	//blockId is treated the same as Key
-    // Step 1: Remap block
-    previousPositionLeaf, exists := o.keyMap[blockId]
-    if !exists {
-        previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1)) //TODO: only for PUT, for GET, assume key always exists
-		o.StashMap[blockId] = data
-    }
-	
-    o.keyMap[blockId] = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
+func (o *ORAM) WritePaths(previousPositionLeaves []int) {
 
-    // Step 2: Read path
-    o.ReadPath(previousPositionLeaf, true) // Stash updated
+	requests := make([]bucketRequest.BucketRequest, 0)
 
-    // Step 3: Update or read from stash
-    if !read {
-        o.StashMap[blockId] = data
-    }
-    
-	returnValue := o.StashMap[blockId]
+	writtenBuckets := make(map[int]struct{})
 
-    // Step 4: Write path
-    o.WritePath(previousPositionLeaf) // Stash updated
+	for _, data := range previousPositionLeaves {
+		// for each batch, as we writepath, keep a track of all buckets already touched/altered
+		// if a bucket is already changed, we dont' write that bucket or any of the buckets above it
+		// becuase all buckets above have already been considered for all elements of the stash
+		// no point in redoing, this is an optmization. also, the other path may write -1s into
+		// already filled buckets
+		var newBuckets = o.WritePath(data, writtenBuckets, &requests) // ANY PATH NEEDS TO BE READ BEFORE ITS WRITTEN
 
-	return returnValue // returns the block
+		for key, item := range newBuckets {
+			writtenBuckets[key] = item
+		}
+	}
 
-	// TODO:
+	// Set the requests in Redis
+	if err := o.RedisClient.WriteBucketsToDb(requests); err != nil {
+		fmt.Println("Error writing buckets : ", err)
+	}
 
-	/*
-	initialize fully for now beforehand
+}
 
-	create separate repo for base pathoram
+/*
+initialize fully for now beforehand
 
-	batching optimization is kind of like:
-	run readpath on 50 - but maintain set and fetch every block only once, one redis request for all 50
+create separate repo for base pathoram
 
-	write/read stashmap[key] for all 50
+batching optimization is kind of like:
+run readpath on 50 - but maintain set and fetch every block only once, one redis request for all 50
 
-	writepath to 50 previousPositionLeafs and try to clear out stash -  1 redis request
+write/read stashmap[key] for all 50
 
-	many batches come in; go routines? 
-	*/
+writepath to 50 previousPositionLeafs and try to clear out stash -  1 redis request
+
+many batches come in; go routines? 
+*/
+
+func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, error) {
+
+	if len(requests) > batchSize {
+		return nil, errors.New("batch size exceeded")
+	}
+
+	//determine keys from position map for all of them ; if something doesn't exist, add it to keymap and stash as done in Access()
+	previousPositionLeavesMap := make(map[int]struct{})
+	var previousPositionLeaves []int
+	for _, req := range requests {
+
+		previousPositionLeaf, exists := o.keyMap[req.Key]
+		if !exists {
+			previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
+			o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
+		}
+
+		// BIG FIX: ensure there are no duplicates in previousPositionLeaves - otherwise writepaths may overwrite content
+		if _, alreadyExists := previousPositionLeavesMap[previousPositionLeaf]; !alreadyExists {
+			previousPositionLeavesMap[previousPositionLeaf] = struct{}{}
+			previousPositionLeaves = append(previousPositionLeaves, previousPositionLeaf) // previousPositionLeaves goes from index 0..batchSize - 1
+		}
+
+		// randomly remap key
+		o.keyMap[req.Key] = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
+	}
+
+	// perform read path, go through all paths at once and find non overlapping buckets, fetch all from redis at once - read path use redis MGET
+	// adding all blocks to stash
+	o.ReadPaths(previousPositionLeaves)
+
+	// write to all stash blocks that have associated PUT reqeusts
+	for _, req := range requests {
+		if req.Type == "PUT" {
+			o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
+		}
+	}
+
+	// Retrieve values from stash map for all keys in requests and load them into an array
+	values := make([]string, len(requests))
+	for i, req := range requests {
+		if block, exists := o.StashMap[req.Key]; exists {
+			// THIS WORKS
+			values[i] = block.Value
+		} else {
+			values[i] = "" // or some default value to indicate missing key
+		}
+	}
+
+	// write path 50 previous position leafs at once to redis - MGET vs pipeline - use MGET 180X faster than GET, pipeline is 12x faster than GET. pipeline allows batching, non blocking for other clients
+	// pipeline also allows different types of commands.
+
+	// for each batch, as we writepath, keep a track of all buckets already touched/altered
+	// if a bucket is already changed, we dont' write that bucket or any of the buckets above it
+	// becuase all buckets above have already been considered for all elements of the stash
+	// no point in redoing, this is an optmization. also, the other path may write -1s into
+	// already filled buckets
+
+
+	o.WritePaths(previousPositionLeaves)
+
+	// return the results to the batch in an array
+	return values, nil
 }
