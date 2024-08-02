@@ -1,4 +1,4 @@
-// TODO:
+
 /*
 Approach to debugging:
 use new readpaths, old writepath, 
@@ -7,15 +7,6 @@ make sure mget and mset are working as they should be
 use printtree() and printstash() where needed
 */
 
-/*
-TODO:
-concerns:
-not everything is cleared from the stash when batch size if small.
-when batch size if large, everything is cleared, not sure why.
-
-implement writePaths by sending Redis write to all buckets at once. so use the redis writeBuckets with mset
-reduce networks latency by making one request
-*/
 
 package oram_test
 
@@ -119,4 +110,7 @@ func TestORAMReadWrite(t *testing.T) {
 	}
 
 	readProgress.Finish()
+
+    fmt.Println("Printing the stash...")
+	utils.PrintStashMap(o)
 }

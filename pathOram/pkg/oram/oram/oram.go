@@ -3,6 +3,7 @@ package oram
 import (
 	"fmt"
 	"errors"
+	"sort"
 
 	"pathOram/pkg/oram/block"
 	"pathOram/pkg/oram/bucket"
@@ -127,11 +128,14 @@ func (o *ORAM) ReadPaths(leafs []int) {
 
 }
 
-// Old way of WritePath
-// Write the path back, ensuring all buckets contain Z blocks
-func (o *ORAM) WritePath(leaf int, writtenBuckets map[int]struct{}, requests *[]bucketRequest.BucketRequest) (map[int]struct{}) {
 
-	newBucketsWritten := make(map[int]struct{})
+func (o *ORAM) WritePath(bucketInfo []int, requests *[]bucketRequest.BucketRequest) {
+
+	buckedId := bucketInfo[0]
+	leaf := bucketInfo[1]
+	level := bucketInfo[2]
+
+	//newBucketsWritten := make(map[int]struct{})
 
     // Step 1: Get all blocks from stash
     currentStash := make(map[int]block.Block)
@@ -141,91 +145,99 @@ func (o *ORAM) WritePath(leaf int, writtenBuckets map[int]struct{}, requests *[]
 
     toDelete := make(map[int]struct{}) // track blocks that need to be deleted from stash
 
-    // Step 2: Follow the path from leaf to root (greedy)
-    for level := o.LogCapacity; level >= 0; level-- {
-        toInsert := make(map[int]block.Block) // blocks to be inserted in the bucket (up to Z)
-        toDeleteLocal := make([]int, 0)   // indices/blockIds/keys of blocks in currentStash to delete
+	toInsert := make(map[int]block.Block) // blocks to be inserted in the bucket (up to Z)
 
-		bucketId := o.bucketForLevelLeaf(level, leaf)
+    toDeleteLocal := make([]int, 0)   // indices/blockIds/keys of blocks in currentStash to delete
 
-		if _, alreadyExists := writtenBuckets[bucketId]; alreadyExists {
-			break	
-		}
-
-		newBucketsWritten[bucketId] = struct{}{} // Recording this newly written bucketId
-
-		// TODO: check bucketforlevelleaf here, if it gives a bucket that's already in writtenBucket, we are done, exit loop
-        for key, currentBlock := range currentStash {
-            currentBlockLeaf := o.keyMap[currentBlock.Key]
-            if o.canInclude(currentBlockLeaf, leaf, level) {
-				// fmt.Println("This block can be written to Tree with key: ", currentBlock.Key)
-                toInsert[currentBlock.Key] = currentBlock
-                toDelete[currentBlock.Key] = struct{}{}
-                toDeleteLocal = append(toDeleteLocal, key) // add the key for block we want to delete
-                if len(toInsert) == o.Z {
-                    break
-                }
-            }
-        }
-
-        // Delete inserted blocks from currentStash
-		for _, key := range toDeleteLocal {
-			delete(currentStash, key)
-		}
-
-        // Prepare the bucket for writing
-        
-        bkt := bucket.Bucket{
-            Blocks: make([]block.Block, o.Z),
-        }
-
-        i := 0
-		for _, block := range toInsert {
-			bkt.Blocks[i] = block
-			i++
-			if i >= o.Z {
+	for key, currentBlock := range currentStash {
+		currentBlockLeaf := o.keyMap[currentBlock.Key]
+		if o.canInclude(currentBlockLeaf, leaf, level) {
+			// fmt.Println("This block can be written to Tree with key: ", currentBlock.Key)
+			toInsert[currentBlock.Key] = currentBlock
+			toDelete[currentBlock.Key] = struct{}{}
+			toDeleteLocal = append(toDeleteLocal, key) // add the key for block we want to delete
+			if len(toInsert) == o.Z {
 				break
 			}
 		}
+	}
 
-		// If there are fewer blocks than o.Z, fill the remaining slots with dummy blocks
-		for i < o.Z {
-			bkt.Blocks[i] = block.Block{Key: -1, Value: ""}
-			i++
+	// Delete inserted blocks from currentStash
+	for _, key := range toDeleteLocal {
+		delete(currentStash, key)
+	}
+
+	// Prepare the bucket for writing
+	
+	bkt := bucket.Bucket{
+		Blocks: make([]block.Block, o.Z),
+	}
+
+	i := 0
+	for _, block := range toInsert {
+		bkt.Blocks[i] = block
+		i++
+		if i >= o.Z {
+			break
 		}
+	}
 
-        *requests = append(*requests, bucketRequest.BucketRequest{
-            BucketId: bucketId,
-            Bucket:   bkt,
-        })
-    }
+	// If there are fewer blocks than o.Z, fill the remaining slots with dummy blocks
+	for i < o.Z {
+		bkt.Blocks[i] = block.Block{Key: -1, Value: ""}
+		i++
+	}
+
+	*requests = append(*requests, bucketRequest.BucketRequest{
+		BucketId: buckedId,
+		Bucket:   bkt,
+	})
 
     // Update the stash map by removing the newly inserted blocks
     for key := range toDelete {
         delete(o.StashMap, key)
     }
 
-	return newBucketsWritten
 }
 
 func (o *ORAM) WritePaths(previousPositionLeaves []int) {
 
-	requests := make([]bucketRequest.BucketRequest, 0)
+    requests := make([]bucketRequest.BucketRequest, 0)
+    bucketsToFillMap := make(map[int][]int) // Map to store bucketId and its associated [leaf, level]
 
-	writtenBuckets := make(map[int]struct{})
-
-	for _, data := range previousPositionLeaves {
-		// for each batch, as we writepath, keep a track of all buckets already touched/altered
-		// if a bucket is already changed, we dont' write that bucket or any of the buckets above it
-		// becuase all buckets above have already been considered for all elements of the stash
-		// no point in redoing, this is an optmization. also, the other path may write -1s into
-		// already filled buckets
-		var newBuckets = o.WritePath(data, writtenBuckets, &requests) // ANY PATH NEEDS TO BE READ BEFORE ITS WRITTEN
-
-		for key, item := range newBuckets {
-			writtenBuckets[key] = item
+    for _, leaf := range previousPositionLeaves {
+		for level := o.LogCapacity; level >= 0; level-- {
+			bucketId := o.bucketForLevelLeaf(level, leaf)
+			bucketsToFillMap[bucketId] = []int{leaf, level} // Store leaf and level for each bucketId
 		}
 	}
+
+	// Extract keys from the map
+	var bucketIds []int
+	for bucketId := range bucketsToFillMap {
+		bucketIds = append(bucketIds, bucketId)
+	}
+
+	// Sort bucketIds in descending order
+	sort.Slice(bucketIds, func(i, j int) bool {
+		return bucketIds[i] > bucketIds[j]
+	})
+
+	// Create a nested list [bucketId:[leaf, level]]
+	var nestedList [][]int
+	for _, bucketId := range bucketIds {
+		// Access leaf and level for the current bucketId
+		leafLevel := bucketsToFillMap[bucketId]
+		nestedList = append(nestedList, []int{bucketId, leafLevel[0], leafLevel[1]})
+	}
+
+	// Now we have all the bucketIDs that we need to fill
+
+	// Iterate through the nested list
+	for _, entry := range nestedList {
+		o.WritePath(entry, &requests)
+	}
+
 
 	// Set the requests in Redis
 	if err := o.RedisClient.WriteBucketsToDb(requests); err != nil {
@@ -266,7 +278,7 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 			o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
 		}
 
-		// BIG FIX: ensure there are no duplicates in previousPositionLeaves - otherwise writepaths may overwrite content
+		// ensure there are no duplicates in previousPositionLeaves - otherwise writepaths may overwrite content
 		if _, alreadyExists := previousPositionLeavesMap[previousPositionLeaf]; !alreadyExists {
 			previousPositionLeavesMap[previousPositionLeaf] = struct{}{}
 			previousPositionLeaves = append(previousPositionLeaves, previousPositionLeaf) // previousPositionLeaves goes from index 0..batchSize - 1
