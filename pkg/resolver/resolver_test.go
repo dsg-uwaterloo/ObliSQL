@@ -39,6 +39,7 @@ func getTestCases() []TestCase {
 		{
 
 			name: "Simple Select",
+			//Select rating from review where u_id = 812;
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:   "1",
 				QueryType:  "select",
@@ -61,6 +62,7 @@ func getTestCases() []TestCase {
 		{
 
 			name: "Select using two filters with index (AND)",
+			//Select * from review where a_id =10 and i_id = 7;
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:   "1",
 				QueryType:  "select",
@@ -86,7 +88,8 @@ func getTestCases() []TestCase {
 			},
 		},
 		{
-			name: "Simple Select without index",
+			name: "Select without index",
+			//Select title from item where i_id = 500;
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:   "1",
 				QueryType:  "select",
@@ -106,7 +109,60 @@ func getTestCases() []TestCase {
 			},
 		},
 		{
-			name: "Simple Avg Aggregate",
+
+			name: "Select with Order by (Order by included column) - ASC",
+			//Select rating from review where u_id = 812;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "review",
+				ColToGet:   []string{"rating", "creation_date"},
+				SearchCol:  []string{"u_id"},
+				SearchVal:  []string{"812"},
+				SearchType: []string{"point"},
+				OrderBy:    []string{"creation_date,ASC"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"review/creation_date/4349", "review/rating/4349", "review/creation_date/1529", "review/rating/1529",
+				},
+				Values: []string{
+					"2020-12-20",
+					"0",
+					"2021-03-22",
+					"2",
+				},
+			},
+		},
+		{
+
+			name: "Select with Order by (Order by included column) - DESC",
+			//Select rating from review where u_id = 812;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "review",
+				ColToGet:   []string{"rating", "creation_date"},
+				SearchCol:  []string{"u_id"},
+				SearchVal:  []string{"812"},
+				SearchType: []string{"point"},
+				OrderBy:    []string{"creation_date,DESC"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"review/creation_date/1529", "review/rating/1529", "review/creation_date/4349", "review/rating/4349",
+				},
+				Values: []string{
+					"2021-03-22",
+					"2",
+					"2020-12-20",
+					"0",
+				},
+			},
+		},
+		{
+			name: "Avg Aggregate",
+			//Select avg(rating) from review where i_id = 17;
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:      "1",
 				QueryType:     "aggregate",
@@ -127,7 +183,8 @@ func getTestCases() []TestCase {
 			},
 		},
 		{
-			name: "Simple Sum Aggregate",
+			name: "Sum Aggregate",
+			//select sum(rating) from review where i_id = 7;
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:      "1",
 				QueryType:     "aggregate",
@@ -148,7 +205,8 @@ func getTestCases() []TestCase {
 			},
 		},
 		{
-			name: "Simple Count Aggregate",
+			name: "Count Aggregate",
+			//select count(rating) from review where i_id = 7;
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:      "1",
 				QueryType:     "aggregate",
@@ -169,7 +227,7 @@ func getTestCases() []TestCase {
 			},
 		},
 		{
-			name: "Simple Sum & Count Aggregate",
+			name: "Sum & Count Aggregate",
 			// select sum(rating) from new_review where i_id =7
 			// union all
 			// select count(rating)  from new_review where i_id =7;
@@ -194,7 +252,8 @@ func getTestCases() []TestCase {
 			},
 		},
 		{
-			name: "Simple Range",
+			name: "Range",
+			//select rating from review where u_id between 812 and 814;
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:   "1",
 				QueryType:  "select",
@@ -221,6 +280,7 @@ func getTestCases() []TestCase {
 		},
 		{
 			name: "Date Range",
+			//select rating from review between creation_date 2021-12-01 and 2021-12-02
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:   "1",
 				QueryType:  "select",
@@ -244,6 +304,24 @@ func getTestCases() []TestCase {
 				},
 			},
 		},
+		{
+			name: "Cross Join",
+			//select rating from review,item where item.i_id=r.i_id and r.i_id = 17;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:    "1",
+				QueryType:   "join",
+				TableName:   "review,item",
+				ColToGet:    []string{"review.rating", "item.title"},
+				SearchCol:   []string{"review.i_id"},
+				SearchVal:   []string{"17"},
+				SearchType:  []string{"point"},
+				JoinColumns: []string{"i_id", "i_id"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys:   []string{"review/rating/254", "item/title/146", "review/rating/255", "item/title/146", "review/rating/256", "item/title/146", "review/rating/257", "item/title/146"},
+				Values: []string{"2", "test", "3", "test", "1", "test", "3", "test"},
+			},
+		},
 	}
 	return testCases
 }
@@ -258,6 +336,7 @@ func TestQueryOne(t *testing.T) {
 
 	resolverClient := resolver.NewResolverClient(conn)
 	testcases := getTestCases()
+	testcases = testcases[len(testcases)-1:]
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {

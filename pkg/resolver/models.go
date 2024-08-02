@@ -14,6 +14,7 @@ type myResolver struct {
 	done      atomic.Int32
 	recvChan  chan int32
 	metaData  map[string]MetaData
+	JoinMap   map[string]interface{}
 }
 
 type parsedQuery struct {

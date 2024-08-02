@@ -1,10 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
 )
 
 func isInt(s string) bool {
@@ -118,4 +123,119 @@ func detectRepeats(arr []string) []string {
 	}
 
 	return repeats
+}
+
+func createMapFromLists(keys, values []string) map[string]map[string]string {
+	result := make(map[string]map[string]string)
+
+	for i := 0; i < len(keys); i++ {
+		parts := strings.Split(keys[i], "/")
+
+		colName := parts[1]
+		pkVal := parts[2]
+		colVal := values[i]
+
+		if _, exists := result[pkVal]; !exists {
+			result[pkVal] = make(map[string]string)
+		}
+		result[pkVal][colName] = colVal
+	}
+
+	return result
+}
+
+func sortMapByColumn(data map[string]map[string]string, sortColumn, columnType, order string) []map[string]string {
+
+	supportedColumnTypes := []string{"int", "date", "varchar"}
+
+	if !contains(supportedColumnTypes, columnType) {
+		log.Fatalf("Sorting on Column Type: %s is not supported! Please check supported types in function sortMapByColumn in Utils\n", columnType)
+	}
+
+	sortedData := make([]map[string]string, 0, len(data))
+
+	// Convert the map to a slice of maps
+	for id, values := range data {
+		entry := map[string]string{"id": id}
+		for k, v := range values {
+			entry[k] = v
+		}
+		sortedData = append(sortedData, entry)
+	}
+
+	// Sort the slice based on the specified column, type, and order
+	sort.Slice(sortedData, func(i, j int) bool {
+		valueI := sortedData[i][sortColumn]
+		valueJ := sortedData[j][sortColumn]
+
+		switch columnType {
+		case "int":
+			intI, errI := strconv.Atoi(valueI)
+			intJ, errJ := strconv.Atoi(valueJ)
+			if errI == nil && errJ == nil {
+				if order == "ASC" {
+					return intI < intJ
+				} else if order == "DESC" {
+					return intI > intJ
+				}
+			}
+		case "date":
+			dateI, errI := time.Parse("2006-01-02", valueI)
+			dateJ, errJ := time.Parse("2006-01-02", valueJ)
+			if errI == nil && errJ == nil {
+				if order == "ASC" {
+					return dateI.Before(dateJ)
+				} else if order == "DESC" {
+					return dateI.After(dateJ)
+				}
+			}
+		case "varchar":
+			if order == "ASC" {
+				return valueI < valueJ
+			} else if order == "DESC" {
+				return valueI > valueJ
+			}
+		}
+		return false // Default to not swapping if order or type is invalid
+	})
+
+	return sortedData
+}
+
+func prettyPrintMap(data []map[string]string) {
+	fmt.Println("{")
+	for _, entry := range data {
+		id := entry["id"]
+		fmt.Printf("  %s: {\n", id)
+		keys := make([]string, 0, len(entry))
+		for k := range entry {
+			if k != "id" {
+				keys = append(keys, k)
+			}
+		}
+		sort.Strings(keys)
+		for i, key := range keys {
+			if i == len(keys)-1 {
+				fmt.Printf("    %s: %s\n", key, entry[key])
+			} else {
+				fmt.Printf("    %s: %s,\n", key, entry[key])
+			}
+		}
+		fmt.Println("  }")
+	}
+	fmt.Println("}")
+}
+
+func (c *myResolver) simpleFetch(keys []string, val []string, reqId int64) ([]string, []string) {
+	ctx := context.Background()
+	indexReqKeys := loadbalancer.LoadBalanceRequest{
+		Keys:      keys,
+		Values:    val,
+		RequestId: reqId,
+	}
+	resp, err := c.conn.AddKeys(ctx, &indexReqKeys)
+	if err != nil {
+		log.Fatalf("Failed to fetch from load balancer! %s \n", err)
+	}
+	return resp.Keys, resp.Values
 }

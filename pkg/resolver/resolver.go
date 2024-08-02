@@ -18,57 +18,37 @@ import (
 )
 
 func (c *myResolver) ExecuteQuery(ctx context.Context, q *resolver.ParsedQuery) (*resolver.QueryResponse, error) {
-	if q.QueryType == "select" {
-		resp, err := c.doSelect(q)
-		if err != nil {
-			log.Fatalf("Failed to execute Query!")
-		}
-		clientId, err := strconv.Atoi(q.ClientId)
-		if err != nil {
-			log.Fatalf("Error converting clientId to integer: %s \n", err)
-		}
-
-		return &resolver.QueryResponse{
-			ClientId:  int64(clientId),
-			RequestId: 1,
-			Keys:      resp.Keys,
-			Values:    resp.Values,
-		}, nil
-	} else if q.QueryType == "aggregate" {
-		resp, err := c.doAggregate(q)
-
-		if err != nil {
-			log.Fatalf("Failed to execute Query!")
-		}
-		clientId, err := strconv.Atoi(q.ClientId)
-		if err != nil {
-			log.Fatalf("Error converting clientId to integer: %s \n", err)
-		}
-
-		return &resolver.QueryResponse{
-			ClientId:  int64(clientId),
-			RequestId: 1,
-			Keys:      resp.Keys,
-			Values:    resp.Values,
-		}, nil
-
-	} else {
-		//More else ifs after other types
-		clientId, err := strconv.Atoi(q.ClientId)
-		if err != nil {
-			log.Fatalf("Error converting clientId to integer: %s \n", err)
-		}
-
-		return &resolver.QueryResponse{
-			ClientId:  int64(clientId),
-			RequestId: 1,
-			Keys:      nil,
-			Values:    nil,
-		}, nil
+	clientId, err := strconv.Atoi(q.ClientId)
+	if err != nil {
+		return nil, fmt.Errorf("error converting clientId to integer: %w", err)
 	}
+
+	var resp *queryResponse
+	switch q.QueryType {
+	case "select":
+		resp, err = c.doSelect(q)
+	case "aggregate":
+		resp, err = c.doAggregate(q)
+	case "join":
+		resp, err = c.doJoin(q)
+	default:
+		return nil, fmt.Errorf("unsupported query type: %s", q.QueryType)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute %s query: %w", q.QueryType, err)
+	}
+
+	return &resolver.QueryResponse{
+		ClientId:  int64(clientId),
+		RequestId: 1,
+		Keys:      resp.Keys,
+		Values:    resp.Values,
+	}, nil
 }
 
 func (c *myResolver) readMetaData(filePath string) {
+	//MetaData
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Fatalf("Error opening metadata file: %s\n", err)
@@ -92,6 +72,31 @@ func (c *myResolver) readMetaData(filePath string) {
 	c.metaData = data
 }
 
+func (c *myResolver) readJoinMap(filePath string) {
+	//MetaData
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Fatalf("Error opening metadata file: %s\n", err)
+		return
+	}
+	defer file.Close()
+
+	byteValue, err := io.ReadAll(file)
+	if err != nil {
+		log.Fatalf("Error reading metadata file: %s\n", err)
+		return
+	}
+
+	var data map[string]interface{}
+	err = json.Unmarshal(byteValue, &data)
+	if err != nil {
+		log.Fatalf("Error unmarshaling JSON: %s\n", err)
+		return
+	}
+
+	c.JoinMap = data
+}
+
 func main() {
 
 	lis, err := net.Listen("tcp", ":9900")
@@ -102,6 +107,7 @@ func main() {
 	fmt.Println("Starting Resolver on: localhost:9900")
 
 	metaDataLoc := "./metadata.txt"
+	joinMapLoc := "./JoinMaps/joinMapFile.json"
 
 	lb_host := "localhost"
 	lb_port := "9500"
@@ -121,6 +127,7 @@ func main() {
 		recvChan:  make(chan int32),
 	}
 	service.readMetaData(metaDataLoc)
+	service.readJoinMap(joinMapLoc)
 	service.done.Store(0)
 	serverRegister := grpc.NewServer()
 	resolver.RegisterResolverServer(serverRegister, &service)
@@ -132,11 +139,3 @@ func main() {
 	}
 
 }
-
-//Fixes (comments in the doSelect function)
-//Make it moduluar (Convert to functions) and remove repeated code.
-//Create test file and move test cases to file. (Via Network messages)
-//Tests should also check for values.
-//Convert to modular format.
-//Remove all assumptions (Single column) --> Searching, getting multiple columns.
-// >, < , >=,<= cases as well.

@@ -12,6 +12,7 @@ message parsedQuery{
     repeated string searchType = 7;
     repeated string aggregateType = 8;
     repeated string orderBy = 9;
+    repeated string joinColumns = 10;
 }
 
 message queryResponse{

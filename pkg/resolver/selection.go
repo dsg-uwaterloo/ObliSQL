@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,25 +14,42 @@ import (
 	"github.com/Haseeb1399/WorkingThesis/api/resolver"
 )
 
-func (c *myResolver) checkAllIndexExists(q *resolver.ParsedQuery) bool {
-	for _, v := range q.SearchCol {
-		if !contains(c.metaData[q.TableName].IndexOn, v) {
+func (c *myResolver) orderTuples(orderBy string, tableName string, keys []string, values []string) ([]string, []string) {
+	//Parse out Order Column and Order Type (ASC,DESC)
+	//Only works on columns being fetched --> Fix this in future.
+	//Also make it work for Joins (Columns from different tables)
+
+	orderCommand := strings.Split(orderBy, ",")
+	orderColumn, orderType := orderCommand[0], orderCommand[1]
+	orderColumnType := c.getColumnType(tableName, orderColumn)
+
+	mapVal := createMapFromLists(keys, values)
+	sortedMap := sortMapByColumn(mapVal, orderColumn, orderColumnType, orderType)
+
+	sortedKeys, sortedValues := mapToList(sortedMap, tableName)
+
+	return sortedKeys, sortedValues
+}
+
+func (c *myResolver) checkAllIndexExists(tableName string, searchCol []string) bool {
+	for _, v := range searchCol {
+		if !contains(c.metaData[tableName].IndexOn, v) {
 			return false
 		}
 	}
 	return true
 }
 
-func (c *myResolver) checkAnyIndexExists(q *resolver.ParsedQuery) bool {
-	for _, v := range q.SearchCol {
-		if contains(c.metaData[q.TableName].IndexOn, v) {
+func (c *myResolver) checkAnyIndexExists(tableName string, searchCol []string) bool {
+	for _, v := range searchCol {
+		if contains(c.metaData[tableName].IndexOn, v) {
 			return true
 		}
 	}
 	return false
 }
 
-func (c *myResolver) getRangeColumnType(tableName, colName string) string {
+func (c *myResolver) getColumnType(tableName, colName string) string {
 	return c.metaData[tableName].ColTypes[colName]
 }
 
@@ -44,12 +62,20 @@ func (c *myResolver) rangeParser(op string) (string, bool) {
 	}
 }
 
-func parseValuesAndRemoveNull(resp *loadbalancer.LoadBalanceResponse) map[string][]string {
-	indexedKeys := make(map[string][]string)
-	for j, val := range resp.Values {
-		if val == "-1" {
-			continue
-		}
+func andFilter(filterKeys []string, searchCol []string) []string {
+	newKeys := filterKeys
+	if len(searchCol) > 1 {
+		//Only handle AND case with point queries.
+		filteredQuery := detectRepeats(filterKeys)
+		newKeys = filteredQuery
+	}
+	return newKeys
+}
+
+func parseValuesAndRemoveNull(resp *loadbalancer.LoadBalanceResponse) []string {
+	indexedKeys := []string{}
+
+	for _, val := range resp.Values {
 
 		respVal := strings.Split(val, ",")
 		tempList := make([]string, 0, len(respVal))
@@ -62,9 +88,38 @@ func parseValuesAndRemoveNull(resp *loadbalancer.LoadBalanceResponse) map[string
 				tempList = append(tempList, v)
 			}
 		}
-		indexedKeys[resp.Keys[j]] = tempList
+		indexedKeys = append(indexedKeys, tempList...)
 	}
 	return indexedKeys
+}
+
+func mapToList(sortedMap []map[string]string, TableName string) ([]string, []string) {
+	sortedKeys := []string{}
+	sortedValues := []string{}
+
+	v := sortedMap[0]
+
+	keys := make([]string, 0, len(v))
+	for ik := range v {
+		if ik != "id" {
+			keys = append(keys, ik)
+		}
+	}
+
+	// Sort the keys alphabetically. This is done to ensure tests have static order.
+	sort.Strings(keys)
+
+	for _, v := range sortedMap {
+		pkVal := v["id"]
+
+		for _, ik := range keys {
+			key := TableName + "/" + ik + "/" + pkVal
+			val := v[ik]
+			sortedKeys = append(sortedKeys, key)
+			sortedValues = append(sortedValues, val)
+		}
+	}
+	return sortedKeys, sortedValues
 }
 
 func (c *myResolver) constructPointIndexKey(searchCol, searchValue, tableName string, lbReq *loadbalancer.LoadBalanceRequest) {
@@ -122,6 +177,7 @@ func (c *myResolver) constructRequestAndFetch(pkList []string, requestID int64, 
 	parsedValues := make([]string, 0, len(valueRes.Values))
 
 	for ind, key := range valueRes.Keys {
+		//Do only once, Remove from the index part. Don't do it twice.
 		if valueRes.Values[ind] != "-1" {
 			parsedKeys = append(parsedKeys, key)
 			parsedValues = append(parsedValues, valueRes.Values[ind])
@@ -188,7 +244,6 @@ func (c *myResolver) getSearchColumns(tableName string, searchCol []string, loca
 
 func (c *myResolver) filterPkFromColumns(colData map[string]*queryResponse, q *resolver.ParsedQuery, localRequestID int64) ([]string, error) {
 	keyMap := make(map[string][]string)
-
 	for k, v := range colData {
 		columnIndex := getIndexFromArray(q.SearchCol, k)
 		searchType := q.SearchType[columnIndex]
@@ -208,7 +263,7 @@ func (c *myResolver) filterPkFromColumns(colData map[string]*queryResponse, q *r
 			log.Printf("FilterPkFromColumn - Not Implemented for search type: %s", searchType)
 		}
 	}
-
+	//Remove intersection logic from here and return a list of keys.
 	return findStringIntersection(keyMap), nil
 }
 
@@ -227,9 +282,10 @@ func (c *myResolver) filterPkUsingIndex(q *resolver.ParsedQuery, localRequestID 
 		case "range":
 			parsedPart, singleOp := c.rangeParser(q.SearchVal[i])
 			if singleOp {
-				return nil, fmt.Errorf("range operations using >, <, >=, <= are not yet implemented")
+				//Fix error message. We only do between.
+				return nil, fmt.Errorf("range operations supported: Start_Date <= Column <= End_Date")
 			}
-			columnType := c.getRangeColumnType(q.TableName, q.SearchCol[i]) //Return the type of column it is (int, varchar, date, etc)
+			columnType := c.getColumnType(q.TableName, q.SearchCol[i]) //Return the type of column it is (int, varchar, date, etc)
 			switch columnType {
 			case "int":
 				startingPoint, _ := strconv.ParseInt(parsedPart, 10, 64)     //starting point
@@ -251,12 +307,7 @@ func (c *myResolver) filterPkUsingIndex(q *resolver.ParsedQuery, localRequestID 
 	}
 
 	parsedKeyMap := parseValuesAndRemoveNull(resp) //Parses (2,3,4) --> [2,3,4] and ignores any -1 froms the executor (key didn't exist)
-	respKeys := make([]string, 0)                  //List of all primary keys
-	for _, v := range parsedKeyMap {
-		respKeys = append(respKeys, v...)
-	}
-
-	return respKeys, nil
+	return parsedKeyMap, nil
 }
 
 func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
@@ -265,13 +316,14 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 	var filteredPks []string
 	var err error
 
-	if c.checkAllIndexExists(q) {
+	if c.checkAllIndexExists(q.TableName, q.SearchCol) {
 		//If all searchColumns have an index on them.
 		filteredPks, err = c.filterPkUsingIndex(q, localRequestID)
 	} else {
-		if c.checkAnyIndexExists(q) {
+		if c.checkAnyIndexExists(q.TableName, q.SearchCol) {
 			log.Fatalln("Mix of index and non-index column does not exist")
 		} else {
+
 			columData, err := c.getSearchColumns(q.TableName, q.SearchCol, localRequestID)
 			if err != nil {
 				return nil, fmt.Errorf("error filtering primary keys: %w", err)
@@ -284,15 +336,21 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 		return nil, fmt.Errorf("error filtering primary keys: %w", err)
 	}
 
-	if len(q.SearchCol) > 1 {
-		//Only handle AND case with point queries.
-		filteredQuery := detectRepeats(filteredPks)
-		filteredPks = filteredQuery
-	}
+	//Fatal Error for OR or anything else.
+	filteredPks = andFilter(filteredPks, q.SearchCol)
+	//ALl Pks we need.
 
 	requestKeys, requestValues, err := c.constructRequestAndFetch(filteredPks, localRequestID, q)
 	if err != nil {
 		return nil, fmt.Errorf("error constructing request and fetching: %w", err)
+	}
+
+	//If there is an OrderBy
+	if len(q.OrderBy) > 0 {
+		for _, v := range q.OrderBy {
+
+			requestKeys, requestValues = c.orderTuples(v, q.TableName, requestKeys, requestValues)
+		}
 	}
 
 	return &queryResponse{
@@ -300,3 +358,6 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 		Values: requestValues,
 	}, nil
 }
+
+//Intersection Filtering
+//Check again for reordered test key/values.
