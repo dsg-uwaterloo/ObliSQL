@@ -306,11 +306,12 @@ func getTestCases() []TestCase {
 		},
 		{
 			name: "Cross Join",
-			//select rating from review,item where item.i_id=r.i_id and r.i_id = 17;
+			//select review.rating,item.title from review,item where item.i_id=r.i_id and r.i_id = 17;
+			//More verbose documentation in the resolver that defines how I am returning the join.
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:    "1",
 				QueryType:   "join",
-				TableName:   "review,item",
+				TableName:   "review,item", //Make it into a list
 				ColToGet:    []string{"review.rating", "item.title"},
 				SearchCol:   []string{"review.i_id"},
 				SearchVal:   []string{"17"},

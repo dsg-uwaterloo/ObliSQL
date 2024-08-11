@@ -123,7 +123,7 @@ func (c *myResolver) doJoin(q *resolver.ParsedQuery) (*queryResponse, error) {
 			//Search Filter is indexed.
 
 			if checkJoinFilterColumnSame(splitSearchString[1], q.JoinColumns) {
-				// Search Filter and Join Column are the same.
+				// Search Filter and Join Column are the same. Assuming there is only one search filter.
 				//We have PK of the rows we want in the Map. (Best Case)
 				//Directly Query the records.
 				reqKeys, reqValues = requestUsingLocalMap(values, q, table1, table2)
