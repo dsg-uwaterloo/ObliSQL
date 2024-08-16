@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"sort"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/Haseeb1399/WorkingThesis/api/resolver"
+	"golang.org/x/exp/rand"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -16,6 +20,62 @@ type TestCase struct {
 	name         string
 	requestQuery *resolver.ParsedQuery
 	expectedAns  *resolver.QueryResponse
+}
+
+func sortKeysAndValues(keys []string, values []string) ([]string, []string) {
+	type keyValue struct {
+		key   string
+		value string
+	}
+
+	pairs := make([]keyValue, len(keys))
+	for i := range keys {
+		pairs[i] = keyValue{keys[i], values[i]}
+	}
+
+	sort.Slice(pairs, func(i, j int) bool {
+		return pairs[i].key < pairs[j].key
+	})
+
+	sortedKeys := make([]string, len(keys))
+	sortedValues := make([]string, len(values))
+	for i, pair := range pairs {
+		sortedKeys[i] = pair.key
+		sortedValues[i] = pair.value
+	}
+
+	return sortedKeys, sortedValues
+}
+
+func sampleTestCases(testcases []TestCase, sampleSize int) []TestCase {
+	rand.Seed(uint64(time.Now().UnixNano()))
+	rand.Shuffle(len(testcases), func(i, j int) { testcases[i], testcases[j] = testcases[j], testcases[i] })
+	if sampleSize > len(testcases) {
+		sampleSize = len(testcases)
+	}
+	return testcases[:sampleSize]
+}
+
+func runTestCase(tc TestCase, resolverClient resolver.ResolverClient, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	fmt.Println("Starting Test", tc.name)
+	resp, err := resolverClient.ExecuteQuery(context.Background(), tc.requestQuery)
+
+	if err != nil {
+		log.Printf("Test %s: Execute Query Error = %v\n", tc.name, err)
+		return
+	}
+	sortedRespKeys, sortedRespValues := sortKeysAndValues(resp.Keys, resp.Values)
+	sortedExpKeys, sortedExpValues := sortKeysAndValues(tc.expectedAns.Keys, tc.expectedAns.Values)
+
+	if !reflect.DeepEqual(sortedRespKeys, sortedExpKeys) || !reflect.DeepEqual(sortedRespValues, sortedExpValues) {
+		log.Printf("Test %s: Execute Query got incorrect values!\n", tc.name)
+		log.Printf("Expected Keys: %+v \n Got Keys: %+v \n", sortedExpKeys, sortedRespKeys)
+		log.Printf("Expected Values: %+v \n Got Values: %+v \n", sortedExpValues, sortedRespValues)
+	} else {
+		fmt.Println("Finished", tc.name)
+	}
 }
 
 // func getLinearKeyNames(start int, end int, tableName string, colName string) []string {
@@ -323,6 +383,43 @@ func getTestCases() []TestCase {
 				Values: []string{"2", "test", "3", "test", "1", "test", "3", "test"},
 			},
 		},
+		{
+			name: "Join with two search filters",
+			//select review.rating from review,item where review.u_id=target.target_u_id and r.i_id = ? and t.source_u_id = ?
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:    "1",
+				QueryType:   "join",
+				TableName:   "review,trust", //Make it into a list
+				ColToGet:    []string{"review.rating"},
+				SearchCol:   []string{"review.i_id", "trust.source_u_id"},
+				SearchVal:   []string{"43", "1030"},
+				SearchType:  []string{"point"},
+				JoinColumns: []string{"u_id", "target_u_id"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys:   []string{"review/rating/1421", "review/rating/1430", "review/rating/1464", "review/rating/1722", "review/rating/1717", "review/rating/1706", "review/rating/1729", "review/rating/1713"},
+				Values: []string{"4", "0", "2", "0", "0", "4", "2", "4"},
+			},
+		},
+		{
+			name: "Join Aggregate with two search filters",
+			//select avg(review.rating) from review,item where review.u_id=target.target_u_id and r.i_id = ? and t.source_u_id = ?
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:      "1",
+				QueryType:     "aggregate",
+				TableName:     "review,trust", //Make it into a list
+				ColToGet:      []string{"review.rating"},
+				SearchCol:     []string{"review.i_id", "trust.source_u_id"},
+				SearchVal:     []string{"43", "1030"},
+				SearchType:    []string{"point"},
+				JoinColumns:   []string{"u_id", "target_u_id"},
+				AggregateType: []string{"avg"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys:   []string{""},
+				Values: []string{"2"},
+			},
+		},
 	}
 	return testCases
 }
@@ -337,7 +434,6 @@ func TestQueryOne(t *testing.T) {
 
 	resolverClient := resolver.NewResolverClient(conn)
 	testcases := getTestCases()
-	testcases = testcases[len(testcases)-1:]
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -347,13 +443,40 @@ func TestQueryOne(t *testing.T) {
 			if err != nil {
 				t.Errorf("Execute Query Error = %v", err)
 			}
+			sortedRespKeys, sortedRespValues := sortKeysAndValues(resp.Keys, resp.Values)
+			sortedExpKeys, sortedExpValues := sortKeysAndValues(tc.expectedAns.Keys, tc.expectedAns.Values)
 
-			if !reflect.DeepEqual(resp.Keys, tc.expectedAns.Keys) || !reflect.DeepEqual(resp.Values, tc.expectedAns.Values) {
+			if !reflect.DeepEqual(sortedRespKeys, sortedExpKeys) || !reflect.DeepEqual(sortedRespValues, sortedExpValues) {
 				t.Errorf("Execute Query got incorrect values!")
-				fmt.Printf("Expected Keys: % +v \n Got Keys: %+v \n", tc.expectedAns.Keys, resp.Keys)
-				fmt.Printf("Expected Values: % +v \n Got Values: %+v \n", tc.expectedAns.Values, resp.Values)
+				fmt.Printf("Expected Keys: % +v \n Got Keys: %+v \n", sortedExpKeys, sortedRespKeys)
+				fmt.Printf("Expected Values: % +v \n Got Values: %+v \n", sortedExpValues, sortedRespValues)
 			}
 		})
 	}
 
+}
+
+func TestQueryParallel(t *testing.T) {
+
+	resolverAddr := "localhost:9900"
+	conn, err := grpc.NewClient(resolverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
+	if err != nil {
+		log.Fatalf("Failed to open connection to Resolver: %v", err)
+	}
+	defer conn.Close()
+
+	resolverClient := resolver.NewResolverClient(conn)
+	testcases := getTestCases()
+
+	sampleSize := 10 // Adjust the sample size as needed
+	sampledTestCases := sampleTestCases(testcases, sampleSize)
+
+	var wg sync.WaitGroup
+
+	for _, tc := range sampledTestCases {
+		wg.Add(1)
+		go runTestCase(tc, resolverClient, &wg)
+	}
+
+	wg.Wait()
 }

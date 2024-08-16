@@ -31,9 +31,24 @@ func (c *myResolver) orderTuples(orderBy string, tableName string, keys []string
 	return sortedKeys, sortedValues
 }
 
-func (c *myResolver) checkAllIndexExists(tableName string, searchCol []string) bool {
-	for _, v := range searchCol {
-		if !contains(c.metaData[tableName].IndexOn, v) {
+func (c *myResolver) checkAllIndexExists(tableName []string, searchCol []string) bool {
+	//Checks if an index exists on columns within searchCol for only one table.
+	for _, tv := range tableName {
+		for _, v := range searchCol {
+			if !contains(c.metaData[tv].IndexOn, v) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (c *myResolver) checkMultiTableIndexExists(tableName []string, searchCol []string) bool {
+	if len(tableName) != len(searchCol) {
+		return false
+	}
+	for i, tv := range tableName {
+		if !contains(c.metaData[tv].IndexOn, searchCol[i]) {
 			return false
 		}
 	}
@@ -316,7 +331,7 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery) (*queryResponse, error) {
 	var filteredPks []string
 	var err error
 
-	if c.checkAllIndexExists(q.TableName, q.SearchCol) {
+	if c.checkAllIndexExists([]string{q.TableName}, q.SearchCol) {
 		//If all searchColumns have an index on them.
 		filteredPks, err = c.filterPkUsingIndex(q, localRequestID)
 	} else {

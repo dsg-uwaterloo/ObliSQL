@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"sync/atomic"
+	"time"
 
 	"github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
 	resolver "github.com/Haseeb1399/WorkingThesis/api/resolver"
@@ -95,6 +96,7 @@ func (c *myResolver) readJoinMap(filePath string) {
 	}
 
 	c.JoinMap = data
+	time.Sleep(2 * time.Second)
 }
 
 func main() {
@@ -107,7 +109,7 @@ func main() {
 	fmt.Println("Starting Resolver on: localhost:9900")
 
 	metaDataLoc := "./metadata.txt"
-	joinMapLoc := "./JoinMaps/joinMapFile.json"
+	joinMapLoc := "./JoinMaps/join_map.json"
 
 	lb_host := "localhost"
 	lb_port := "9500"

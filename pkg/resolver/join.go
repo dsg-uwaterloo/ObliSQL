@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"reflect"
+	"sort"
 	"strings"
 
+	"github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
 	"github.com/Haseeb1399/WorkingThesis/api/resolver"
 )
 
@@ -17,6 +20,7 @@ func getTableNames(tablNames string) (string, string) {
 	return splitNames[0], splitNames[1]
 }
 
+// Order of tableNames matters. Either raise descriptive error or handle.
 func (c *myResolver) parseJoinMapForTable(tableNames string) (map[string]interface{}, map[string]interface{}) {
 	columns, ok := c.JoinMap[tableNames].(map[string]interface{})["column"]
 	if !ok {
@@ -29,14 +33,52 @@ func (c *myResolver) parseJoinMapForTable(tableNames string) (map[string]interfa
 
 	return columns.(map[string]interface{}), values.(map[string]interface{})
 }
+func (c *myResolver) CreateSearchMap(searchCol, searchVal []string) (map[string]map[string]string, []string, []string) {
+	// Initialize the result map
+	result := make(map[string]map[string]string)
+	tableNames := []string{}
+	columns := []string{}
+
+	// Iterate over the searchCol slice
+	for i, col := range searchCol {
+		// Split the searchCol into table and column
+		parts := strings.Split(col, ".")
+		if len(parts) != 2 {
+			continue // Skip if the format is incorrect
+		}
+		tableName := parts[0]
+		columnName := parts[1]
+
+		// Append the table name and column name to their respective slices
+		tableNames = append(tableNames, tableName)
+		columns = append(columns, columnName)
+
+		// Initialize the map for the table if it doesn't exist
+		if _, exists := result[tableName]; !exists {
+			result[tableName] = make(map[string]string)
+		}
+
+		// Assign the searchVal to the corresponding column in the table
+		result[tableName][columnName] = searchVal[i]
+	}
+
+	return result, tableNames, columns
+}
 
 func checkJoinColumnPresent(columns map[string]interface{}, joinColumns []string) bool {
 	localMapColumns := []string{}
 
-	for k, v := range columns {
-		// Check if the value is a list
-		if list, ok := v.([]interface{}); ok {
+	// Get all the keys and sort them
+	keys := make([]string, 0, len(columns))
+	for k := range columns {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys) // Sort keys alphabetically
 
+	for _, k := range keys {
+		v := columns[k]
+
+		if list, ok := v.([]interface{}); ok {
 			for _, item := range list {
 				if str, ok := item.(string); ok {
 					localMapColumns = append(localMapColumns, str)
@@ -49,12 +91,15 @@ func checkJoinColumnPresent(columns map[string]interface{}, joinColumns []string
 		}
 	}
 
+	sort.Strings(localMapColumns)
+	sort.Strings(joinColumns)
+
 	return reflect.DeepEqual(localMapColumns, joinColumns)
 }
 
-func checkJoinFilterColumnSame(columnName string, joinColumns []string) bool {
-	for _, v := range joinColumns {
-		if v != columnName {
+func checkJoinFilterColumnSame(columnName []string, joinColumns []string) bool {
+	for i, v := range columnName {
+		if v != joinColumns[i] {
 			return false
 		}
 	}
@@ -108,6 +153,69 @@ func requestUsingLocalMap(values map[string]interface{}, q *resolver.ParsedQuery
 	return returnKeys, returnValues
 }
 
+func (c *myResolver) indexFilterAndJoin(searchMap map[string]map[string]string, joinColumns []string, joinMapValues map[string]interface{}) map[string][]string {
+	lbReq := loadbalancer.LoadBalanceRequest{}
+	for tableName, searchObj := range searchMap {
+		for searchCol, searchVal := range searchObj {
+			c.constructPointIndexKey(searchCol, searchVal, tableName, &lbReq)
+		}
+	}
+	resp, err := c.conn.AddKeys(context.Background(), &lbReq)
+	if err != nil {
+		log.Fatalf("Failed to fetch index keys from load balancer!: %s \n", err)
+	}
+	tableNameKeyMap := make(map[string][]string)
+
+	for i, k := range resp.Keys {
+		tableName := strings.Split(k, "/")[0]
+		tableNameKeyMap[tableName] = strings.Split(resp.Values[i], ",")
+	}
+
+	tablePkMap := make(map[string][]string)
+
+	for _, pkInfo := range joinMapValues {
+		tempPkMap := make(map[string][]string)
+		for tableName, pkList := range pkInfo.(map[string]interface{}) {
+			newList := c.getListFromInterface(pkList)
+			commonPk := FindCommonElements(newList, tableNameKeyMap[tableName])
+			tempPkMap[tableName] = append(tempPkMap[tableName], commonPk...)
+		}
+		candidate := true
+		for _, v := range tempPkMap {
+			if len(v) == 0 {
+				candidate = false
+				break
+			}
+		}
+		if !candidate {
+			continue
+		} else {
+			for k, v := range tempPkMap {
+				tablePkMap[k] = append(tablePkMap[k], v...)
+			}
+		}
+	}
+	return tablePkMap
+}
+
+func (c *myResolver) constructRequestValues(pkMap map[string][]string, q *resolver.ParsedQuery) ([]string, []string) {
+	requestKeys := []string{}
+	requestValues := []string{}
+
+	for _, v := range q.ColToGet {
+		splitStrings := strings.Split(v, ".")
+		parsedTableName, colToGet := splitStrings[0], splitStrings[1]
+
+		for _, pkVal := range pkMap[parsedTableName] {
+			keyVal := fmt.Sprintf("%s/%s/%s", parsedTableName, colToGet, pkVal)
+			requestKeys = append(requestKeys, keyVal)
+			requestValues = append(requestValues, "")
+		}
+	}
+
+	return requestKeys, requestValues
+}
+
 func (c *myResolver) doJoin(q *resolver.ParsedQuery) (*queryResponse, error) {
 	localRequestID := c.requestId.Add(1)
 	table1, table2 := getTableNames(q.TableName)
@@ -115,22 +223,33 @@ func (c *myResolver) doJoin(q *resolver.ParsedQuery) (*queryResponse, error) {
 	var reqValues []string
 	columns, values := c.parseJoinMapForTable(q.TableName)
 
+	fmt.Println(columns, q.JoinColumns, checkJoinColumnPresent(columns, q.JoinColumns))
+
 	//Working only for single search filter. Extent to multiple filters.
 	if checkJoinColumnPresent(columns, q.JoinColumns) {
-		splitSearchString := strings.Split(q.SearchCol[0], ".") // review.item --> [review,item] //Extend this for multiple table searches.
+		searchMap, tabNames, tabCols := c.CreateSearchMap(q.SearchCol, q.SearchVal)
 
-		if c.checkAllIndexExists(splitSearchString[0], []string{splitSearchString[1]}) {
-			//Search Filter is indexed.
+		if checkJoinFilterColumnSame(tabCols, q.JoinColumns) {
+			//Case 1: We are searching on the same columns that are being joined. (Best Case)
 
-			if checkJoinFilterColumnSame(splitSearchString[1], q.JoinColumns) {
-				// Search Filter and Join Column are the same. Assuming there is only one search filter.
-				//We have PK of the rows we want in the Map. (Best Case)
-				//Directly Query the records.
-				reqKeys, reqValues = requestUsingLocalMap(values, q, table1, table2)
+			//Search Column and Join Column are the same.
+			//We have PK of the rows we want in the Map.
+			//Directly Query the records.
+			reqKeys, reqValues = requestUsingLocalMap(values, q, table1, table2)
+		} else {
+			//We are joining on different columns and searching on different columns.
+
+			//Do the search columns have an index on them?
+			if c.checkMultiTableIndexExists(tabNames, tabCols) {
+
+				//All Search Columns do have an index!
+				filteredKeys := c.indexFilterAndJoin(searchMap, q.JoinColumns, values)
+				reqKeys, reqValues = c.constructRequestValues(filteredKeys, q) //Note: Test might fail sometimes due to reordering of keys in Map. Fix by sorting.
 			}
-
 		}
+
 	} else {
+		fmt.Println(checkJoinColumnPresent(columns, q.JoinColumns))
 		log.Fatalln("Joins without join-map not implemented")
 	}
 

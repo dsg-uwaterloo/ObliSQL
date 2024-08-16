@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/Haseeb1399/WorkingThesis/api/resolver"
@@ -69,6 +70,33 @@ func (c *myResolver) doSumAndCount(q *resolver.ParsedQuery, ind int) (float64, f
 	return valueSum, float64(len(resp.Keys)), nil
 }
 
+func (c *myResolver) joinSumAndCount(q *resolver.ParsedQuery, ind int) (float64, float64, error) {
+	joinQuery := &resolver.ParsedQuery{
+		QueryType:   "join",
+		TableName:   q.TableName,
+		ColToGet:    q.ColToGet,
+		SearchCol:   q.SearchCol,
+		SearchVal:   q.SearchVal,
+		SearchType:  q.SearchType,
+		JoinColumns: q.JoinColumns,
+	}
+	resp, err := c.doJoin(joinQuery)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	var valueSum float64
+	for _, v := range resp.Values {
+		parsedValue, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to parse value as float: %w", err)
+		}
+		valueSum += parsedValue
+	}
+
+	return valueSum, float64(len(resp.Keys)), nil
+}
+
 func (c *myResolver) doCount(q *resolver.ParsedQuery, ind int) (float64, error) {
 	//Only handles case one where condition.
 	resp, err := c.issuePointFetch(q.TableName, q.ColToGet[ind], q.SearchCol[ind], q.SearchVal[ind])
@@ -79,12 +107,24 @@ func (c *myResolver) doCount(q *resolver.ParsedQuery, ind int) (float64, error) 
 }
 
 func (c *myResolver) doAverage(q *resolver.ParsedQuery, ind int) (float64, error) {
-	//Only handles case one where condition.
+	joinCheck := len(strings.Split(q.TableName, ",")) > 1
+	var sumValue float64
+	var countValue float64
+	var err error
 
-	sumValue, countValue, err := c.doSumAndCount(q, ind)
+	if joinCheck {
+		//We have one of the join queries
+		sumValue, countValue, err = c.joinSumAndCount(q, ind)
+		if err != nil {
+			return 0, fmt.Errorf("error in count calculation: (JounSumCount) %w", err)
+		}
+	} else {
+		//Only handles case one where condition.
 
-	if err != nil {
-		return 0, fmt.Errorf("error in count calculation: %w", err)
+		sumValue, countValue, err = c.doSumAndCount(q, ind)
+		if err != nil {
+			return 0, fmt.Errorf("error in count calculation: (doSumCount) %w", err)
+		}
 	}
 
 	if countValue == 0 {

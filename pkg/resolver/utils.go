@@ -65,6 +65,26 @@ func findStringIntersection(keyMap map[string][]string) []string {
 	return result
 }
 
+// Takes two lists
+func FindCommonElements[T comparable](list1, list2 []T) []T {
+	elementMap := make(map[T]bool)
+	commonElements := []T{}
+
+	// Add elements from the first list to the map
+	for _, item := range list1 {
+		elementMap[item] = true
+	}
+
+	// Check if elements from the second list exist in the map
+	for _, item := range list2 {
+		if elementMap[item] {
+			commonElements = append(commonElements, item)
+		}
+	}
+
+	return commonElements
+}
+
 func getBounds(s string, e string) (int64, int64) {
 	//How do we select precision for floating point numbers?
 	//Do we specify it for each db? (In the database)?
@@ -238,4 +258,25 @@ func (c *myResolver) simpleFetch(keys []string, val []string, reqId int64) ([]st
 		log.Fatalf("Failed to fetch from load balancer! %s \n", err)
 	}
 	return resp.Keys, resp.Values
+}
+
+func (c *myResolver) getListFromInterface(pkList interface{}) []string {
+	interfaceList, ok := pkList.([]interface{})
+	if !ok {
+		fmt.Printf("Unexpected type for pkList: %T\n", pkList)
+		return nil
+	}
+	newList := make([]string, len(interfaceList))
+	for i, v := range interfaceList {
+		switch value := v.(type) {
+		case string:
+			newList[i] = value
+		case float64:
+			newList[i] = fmt.Sprintf("%.0f", value) // Convert float64 to string without decimal places
+		default:
+			fmt.Printf("Unexpected type for element: %T\n", v)
+			newList[i] = fmt.Sprintf("%v", v) // Convert to string representation as fallback
+		}
+	}
+	return newList
 }
