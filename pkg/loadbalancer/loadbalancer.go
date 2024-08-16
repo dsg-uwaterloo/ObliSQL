@@ -95,7 +95,6 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 
 	recv_resp := make([]KVPair, 0, len(req.Keys))
 
-	// fmt.Println("Waiting for Response")
 	lb.channelLock.Lock()
 	responseStruct := lb.channelMap[channelId]
 	lb.channelLock.Unlock()
@@ -185,7 +184,7 @@ func (lb *myLoadBalancer) executeBatch(elements []KVPair, executerNumber int) {
 }
 
 func (lb *myLoadBalancer) checkQueues(ctx context.Context) {
-	waitTime := 2 * time.Second
+	waitTime := 500 * time.Millisecond
 
 	timer := time.NewTicker(waitTime)
 	for {
