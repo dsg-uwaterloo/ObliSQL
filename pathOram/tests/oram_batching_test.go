@@ -31,7 +31,7 @@ This test case inserts 1000 values into the key-value store and then retrieves t
 */
 func TestORAMReadWrite(t *testing.T) {
     // Initialize your ORAM structure or use a mocked instance
-    o, err := oram.NewORAM(logCapacity, Z, stashSize, "localhost:6379")
+    o, err := oram.NewORAM(logCapacity, Z, stashSize, "127.0.0.1:6379")
     if err != nil {
         t.Fatalf("Error initializing ORAM: %v", err)
     }
