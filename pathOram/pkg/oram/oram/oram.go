@@ -267,16 +267,30 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 		return nil, errors.New("batch size exceeded")
 	}
 
+	// fakeReadMap = {key: fakeRead?, key: fakeRead? , ...}
+	fakeReadMap := make(map[int]bool)
+
 	//determine keys from position map for all of them ; if something doesn't exist, add it to keymap and stash as done in Access()
 	previousPositionLeavesMap := make(map[int]struct{})
 	var previousPositionLeaves []int
+
 	for _, req := range requests {
 
-		previousPositionLeaf, exists := o.keyMap[req.Key]
-		if !exists {
+		_, keyReadBefore := fakeReadMap[req.Key]
+		var previousPositionLeaf = -1
+
+		if !keyReadBefore {
+			var exists bool
+			previousPositionLeaf, exists = o.keyMap[req.Key]
+			if !exists {
+				previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
+				o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
+			}
+			fakeReadMap[req.Key] = true
+		} else {
 			previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
-			o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
 		}
+		
 
 		// ensure there are no duplicates in previousPositionLeaves - otherwise writepaths may overwrite content
 		if _, alreadyExists := previousPositionLeavesMap[previousPositionLeaf]; !alreadyExists {
@@ -292,17 +306,15 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 	// adding all blocks to stash
 	o.ReadPaths(previousPositionLeaves)
 
-	// write to all stash blocks that have associated PUT reqeusts
-	for _, req := range requests {
-		if req.Type == "PUT" {
-			o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
-		}
-	}
-
 	// Retrieve values from stash map for all keys in requests and load them into an array
 	values := make([]string, len(requests))
+
+	// write to all stash blocks that have associated PUT reqeusts
 	for i, req := range requests {
-		if block, exists := o.StashMap[req.Key]; exists {
+		if req.Type == "PUT" {
+			o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
+			values[i] = o.StashMap[req.Key].Value
+		} else if block, exists := o.StashMap[req.Key]; exists {
 			// THIS WORKS
 			values[i] = block.Value
 		} else {
