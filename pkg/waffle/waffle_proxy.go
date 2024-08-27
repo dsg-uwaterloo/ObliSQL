@@ -7,7 +7,6 @@ import (
 	"log"
 	"math"
 	"net"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -146,7 +145,6 @@ func (w *WaffleProxy) BatchInsertToRedis() {
 }
 
 func (w *WaffleProxy) Init(ctx context.Context, req *waffle_service.InitRequest) (*waffle_service.Empty, error) {
-	fmt.Println("Init: ", req)
 	w.realBst = NewFrequencySmoother()
 	w.fakeBst = NewFrequencySmoother()
 	w.encryptionEngine = NewEncryptionEngine()
@@ -162,7 +160,7 @@ func (w *WaffleProxy) Init(ctx context.Context, req *waffle_service.InitRequest)
 		w.storageInterface = rdb
 		fmt.Println("Storage interface is initialized with Redis DB")
 	}
-	fmt.Println("Max Cores is: %s", runtime.NumCPU())
+	// fmt.Println("Max Cores is: %s", runtime.NumCPU())
 	// runtime.GOMAXPROCS(int(w.numCores)) //Default Max Number of cores.
 
 	fmt.Println("Key Size in init() is:", len(req.Keys))
@@ -193,7 +191,7 @@ func (w *WaffleProxy) Init(ctx context.Context, req *waffle_service.InitRequest)
 			valuesCache = append(valuesCache, req.Values[index])
 			key := w.encryptionEngine.PRF(fmt.Sprintf("%s#%d", req.Keys[index], w.realBst.GetFrequency(req.Keys[index])))
 
-			if _, found := w.keyValueMap[key]; found {
+			if _, found := w.keyValueMap[key]; !found {
 				fmt.Println("Warning: Key is Missing and this should not happen")
 			}
 			delete(w.keyValueMap, key)
