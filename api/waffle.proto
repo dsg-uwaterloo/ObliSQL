@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package waffle;
+
+option go_package = "github.com/Haseeb1399/waffle-go/waffle_service";
+
+// Message definitions
+message InitRequest {
+  repeated string keys = 1;
+  repeated string values = 2;
+  // Note: We can't directly represent void** in protobuf. 
+  // You might need to define a specific structure for args if needed.
+}
+
+message Empty {}
+
+message GetRequest {
+  string key = 1;
+}
+
+message GetResponse {
+  string value = 1;
+}
+
+message PutRequest {
+  string key = 1;
+  string value = 2;
+}
+
+message GetBatchRequest {
+  repeated string keys = 1;
+}
+
+message GetBatchResponse {
+  repeated string values = 1;
+}
+
+message PutBatchRequest {
+  repeated string keys = 1;
+  repeated string values = 2;
+}
+
+message ExecuteBatchResponse {
+  repeated string keys = 1;
+  repeated string values = 2;
+}
+
+
+// Service definition
+service KeyValueStore {
+  rpc Init(InitRequest) returns (Empty) {}
+  rpc Close(Empty) returns (Empty) {}
+  rpc Get(GetRequest) returns (GetResponse) {}
+  rpc Put(PutRequest) returns (GetResponse) {}
+  rpc GetBatch(GetBatchRequest) returns (GetBatchResponse) {}
+  rpc PutBatch(PutBatchRequest) returns (GetBatchResponse) {}
+  rpc ExecuteMixBatch(PutBatchRequest) returns (ExecuteBatchResponse) {}
+}
