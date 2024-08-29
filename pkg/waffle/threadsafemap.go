@@ -20,8 +20,8 @@ func NewThreadSafeUnorderedMap() *ThreadSafeUnorderedMap {
 // InsertIfNotPresent inserts a new key with an associated list of promise channels if the key doesn't already exist.
 // Returns false if the key was not present and was inserted; returns true if the key was already present.
 func (tsm *ThreadSafeUnorderedMap) InsertIfNotPresent(key string, promise chan string) bool {
-	tsm.mutex.Lock()
-	defer tsm.mutex.Unlock()
+	// tsm.mutex.Lock()
+	// defer tsm.mutex.Unlock()
 
 	_, exists := tsm.internalMap[key]
 	if !exists {
@@ -35,8 +35,8 @@ func (tsm *ThreadSafeUnorderedMap) InsertIfNotPresent(key string, promise chan s
 
 // IsPresent checks if a key exists in the map.
 func (tsm *ThreadSafeUnorderedMap) IsPresent(key string) bool {
-	tsm.mutex.RLock()
-	defer tsm.mutex.RUnlock()
+	// tsm.mutex.RLock()
+	// defer tsm.mutex.RUnlock()
 
 	_, exists := tsm.internalMap[key]
 	return exists
@@ -44,8 +44,8 @@ func (tsm *ThreadSafeUnorderedMap) IsPresent(key string) bool {
 
 // ClearPromises clears all promises associated with a key, sends the provided value to all of them, and removes the key from the map.
 func (tsm *ThreadSafeUnorderedMap) ClearPromises(key string, value string) {
-	tsm.mutex.Lock()
-	defer tsm.mutex.Unlock()
+	// tsm.mutex.Lock()
+	// defer tsm.mutex.Unlock()
 
 	promises, exists := tsm.internalMap[key]
 	if exists {

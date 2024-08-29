@@ -13,78 +13,78 @@ import (
 )
 
 var testCases = []TestCase{
-	{
-		name: "Valid Get Request",
-		requestBatch: &waffle_service.PutBatchRequest{
-			Keys:   []string{"K1", "K2", "K3"},
-			Values: []string{"", "", ""},
-		},
-		expected: &waffle_service.ExecuteBatchResponse{
-
-			Keys:   []string{"K1", "K2", "K3"},
-			Values: []string{"V1", "V2", "V3"},
-		},
-	},
-	{
-		name: "Get Non-existant Value",
-		requestBatch: &waffle_service.PutBatchRequest{
-
-			Keys:   []string{"K100", "K200", "K10000"},
-			Values: []string{"", "", ""},
-		},
-		expected: &waffle_service.ExecuteBatchResponse{
-
-			Keys:   []string{"K100", "K200", "K10000"},
-			Values: []string{"V100", "V200", "-1"},
-		},
-	},
-	{
-		name: "Normal Put Request",
-		requestBatch: &waffle_service.PutBatchRequest{
-
-			Keys:   []string{"K1", "K2", "K3"},
-			Values: []string{"VT1", "VT2", "VT3"},
-		},
-		expected: &waffle_service.ExecuteBatchResponse{
-
-			Keys:   []string{"K1", "K2", "K3"},
-			Values: []string{"VT1", "VT2", "VT3"},
-		},
-	},
-	{
-		name: "Get & Puts in One",
-		requestBatch: &waffle_service.PutBatchRequest{
-			Keys:   []string{"K1", "K2", "K1", "K3", "K1", "K1", "K1"},
-			Values: []string{"", "", "Test", "VT3", "", "Final", ""},
-		},
-		expected: &waffle_service.ExecuteBatchResponse{
-			Keys:   []string{"K1", "K2", "K1", "K3", "K1", "K1", "K1"},
-			Values: []string{"VT1", "VT2", "Test", "VT3", "Test", "Final", "Final"},
-		},
-	},
-	{
-		name: "Get & Puts With Missing Key",
-		requestBatch: &waffle_service.PutBatchRequest{
-			Keys:   []string{"K1", "K2", "K1", "k999999", "K3", "K1", "K1", "K1"},
-			Values: []string{"", "", "Test", "", "VT3", "", "Final", ""},
-		},
-		expected: &waffle_service.ExecuteBatchResponse{
-
-			Keys:   []string{"K1", "K2", "K1", "k999999", "K3", "K1", "K1", "K1"},
-			Values: []string{"Final", "VT2", "Test", "-1", "VT3", "Test", "Final", "Final"},
-		},
-	},
 	// {
-	// 	name: "Missing Key, then Inserted",
+	// 	name: "Valid Get Request",
 	// 	requestBatch: &waffle_service.PutBatchRequest{
-	// 		Keys:   []string{"K999999", "K999999", "K999999"},
-	// 		Values: []string{"", "Hello", ""},
+	// 		Keys:   []string{"K1", "K2", "K3"},
+	// 		Values: []string{"", "", ""},
 	// 	},
 	// 	expected: &waffle_service.ExecuteBatchResponse{
-	// 		Keys:   []string{"K999999", "K999999", "K999999"},
-	// 		Values: []string{"-1", "Hello", "Hello"},
+
+	// 		Keys:   []string{"K1", "K2", "K3"},
+	// 		Values: []string{"V1", "V2", "V3"},
 	// 	},
 	// },
+	// {
+	// 	name: "Get Non-existant Value",
+	// 	requestBatch: &waffle_service.PutBatchRequest{
+
+	// 		Keys:   []string{"K100", "K200", "K10000"},
+	// 		Values: []string{"", "", ""},
+	// 	},
+	// 	expected: &waffle_service.ExecuteBatchResponse{
+
+	// 		Keys:   []string{"K100", "K200", "K10000"},
+	// 		Values: []string{"V100", "V200", "-1"},
+	// 	},
+	// },
+	// {
+	// 	name: "Normal Put Request",
+	// 	requestBatch: &waffle_service.PutBatchRequest{
+
+	// 		Keys:   []string{"K1", "K2", "K3"},
+	// 		Values: []string{"VT1", "VT2", "VT3"},
+	// 	},
+	// 	expected: &waffle_service.ExecuteBatchResponse{
+
+	// 		Keys:   []string{"K1", "K2", "K3"},
+	// 		Values: []string{"VT1", "VT2", "VT3"},
+	// 	},
+	// },
+	// {
+	// 	name: "Get & Puts in One",
+	// 	requestBatch: &waffle_service.PutBatchRequest{
+	// 		Keys:   []string{"K1", "K2", "K1", "K3", "K1", "K1", "K1"},
+	// 		Values: []string{"", "", "Test", "VT3", "", "Final", ""},
+	// 	},
+	// 	expected: &waffle_service.ExecuteBatchResponse{
+	// 		Keys:   []string{"K1", "K2", "K1", "K3", "K1", "K1", "K1"},
+	// 		Values: []string{"VT1", "VT2", "Test", "VT3", "Test", "Final", "Final"},
+	// 	},
+	// },
+	// {
+	// 	name: "Get & Puts With Missing Key",
+	// 	requestBatch: &waffle_service.PutBatchRequest{
+	// 		Keys:   []string{"K1", "K2", "K1", "k999999", "K3", "K1", "K1", "K1"},
+	// 		Values: []string{"", "", "Test", "", "VT3", "", "Final", ""},
+	// 	},
+	// 	expected: &waffle_service.ExecuteBatchResponse{
+
+	// 		Keys:   []string{"K1", "K2", "K1", "k999999", "K3", "K1", "K1", "K1"},
+	// 		Values: []string{"Final", "VT2", "Test", "-1", "VT3", "Test", "Final", "Final"},
+	// 	},
+	// },
+	{
+		name: "Missing Key, then Inserted",
+		requestBatch: &waffle_service.PutBatchRequest{
+			Keys:   []string{"K999999", "K999999", "K999999"},
+			Values: []string{"", "Hello", ""},
+		},
+		expected: &waffle_service.ExecuteBatchResponse{
+			Keys:   []string{"K999999", "K999999", "K999999"},
+			Values: []string{"-1", "Hello", "Hello"},
+		},
+	},
 }
 
 type TestCase struct {

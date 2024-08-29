@@ -1,3 +1,5 @@
 tracefiles
 .vscode 
 .idea
+benchmark_input.txt
+server_input.txt

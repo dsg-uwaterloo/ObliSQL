@@ -7,6 +7,8 @@ import (
 	"log"
 	"math"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -161,7 +163,7 @@ func (w *WaffleProxy) Init(ctx context.Context, req *waffle_service.InitRequest)
 		fmt.Println("Storage interface is initialized with Redis DB")
 	}
 	// fmt.Println("Max Cores is: %s", runtime.NumCPU())
-	// runtime.GOMAXPROCS(int(w.numCores)) //Default Max Number of cores.
+	// runtime.GOMAXPROCS(runtime.NumCPU()) //Default Max Number of cores.
 
 	fmt.Println("Key Size in init() is:", len(req.Keys))
 	//Adding the Data to the Database
@@ -176,7 +178,6 @@ func (w *WaffleProxy) Init(ctx context.Context, req *waffle_service.InitRequest)
 
 		w.keyValueMap[keyEncrypted] = valEncrypted
 	}
-
 	//Initialising Cache
 	cacheCapacity := math.Ceil(float64(w.cacheBatches*int32(len(req.Keys))) / 100)
 
@@ -200,7 +201,6 @@ func (w *WaffleProxy) Init(ctx context.Context, req *waffle_service.InitRequest)
 
 	w.cache = NewCache(keysCacheUnencrypted, valuesCache, int(cacheCapacity)*10)
 	w.evictedItems = NewEvictedItems()
-
 	for i := 0; i < int(w.D); {
 		fakeKey := genRandom(rand.Intn(10))
 		if _, found := allKeys[fakeKey]; !found {
@@ -214,7 +214,6 @@ func (w *WaffleProxy) Init(ctx context.Context, req *waffle_service.InitRequest)
 			}
 		}
 	}
-
 	w.BatchInsertToRedis()
 
 	//Tests for Encryption
@@ -490,6 +489,9 @@ func (wp *WaffleProxy) create_security_batch(op *Operation, storageBatch *[]Oper
 			isPresentInRunningKeys := wp.runningKeys.InsertIfNotPresent(currentKey, op.Result)
 			if !isPresentInRunningKeys {
 				*storageBatch = append(*storageBatch, *op)
+				if isPresentInTree == -1 {
+					wp.realBst.Insert(currentKey)
+				}
 			}
 			(*cacheMisses)++
 		}
@@ -641,7 +643,7 @@ func (wp *WaffleProxy) consumer_thread() {
 			case op := <-wp.operationQueue:
 				wp.create_security_batch(op, &storageBatch, keyToPromiseMap, &cacheMisses)
 				i++
-			case <-time.After(5 * time.Millisecond):
+			case <-time.After(1 * time.Millisecond):
 				// If no operation is received within 10ms, continue waiting
 				continue
 			}
@@ -652,28 +654,35 @@ func (wp *WaffleProxy) consumer_thread() {
 }
 
 func (wp *WaffleProxy) clearThread() {
+	// Create a ticker that ticks every second
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-wp.ctx.Done():
 			// Context canceled, exit the loop
 			return
-		default:
+		case <-ticker.C:
+			// Ticker has ticked, perform the deletion operation
 			if len(wp.keysNotUsed) > 0 {
 				// Deleting batch of keys from Redis
 				wp.mutex.Lock()
 				err := wp.storageInterface.Del(wp.ctx, wp.keysNotUsed...).Err()
 				if err != nil {
 					log.Printf("Error deleting batch from Redis: %v", err)
+					log.Printf("Keys not deleted: %v", wp.keysNotUsed)
+				} else {
+					log.Printf("Successfully deleted batch of keys of length: %d", len(wp.keysNotUsed))
 				}
-				//} else {
-				//	log.Printf("Successfully deleted batch of keys of length: %d \n", len(wp.keysNotUsed))
-				//}
+				// Clear the keysNotUsed slice after deletion
 				wp.keysNotUsed = []string{}
 				wp.mutex.Unlock()
 			}
 		}
 	}
 }
+
 func (w *WaffleProxy) Close(context.Context, *waffle_service.Empty) (*waffle_service.Empty, error) {
 	w.finished = true
 	w.ctx.Done()
@@ -705,11 +714,14 @@ func main() {
 	}
 	fmt.Println("Starting Waffle Proxy on: localhost:9090")
 
-	serverRegister := grpc.NewServer()
+	serverRegister := grpc.NewServer(grpc.MaxRecvMsgSize(644000*300), grpc.MaxSendMsgSize(644000*300))
 	waffle_service.RegisterKeyValueStoreServer(serverRegister, service)
 
 	fmt.Println("R:", service.R, "B:", service.B)
 	//Start serving
+	go func() {
+		http.ListenAndServe(":10001", nil)
+	}()
 	err = serverRegister.Serve(lis)
 	if err != nil {
 		log.Fatalf("Error! Could not start loadBalancer! %s", err)

@@ -40,15 +40,15 @@ func (c *Cache) Size() int {
 }
 
 func (c *Cache) CheckIfKeyExists(key string) bool {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	// c.mutex.RLock()
+	// defer c.mutex.RUnlock()
 	_, exists := c.cacheMap[key]
 	return exists
 }
 
 func (c *Cache) GetValue(key string) string {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	// c.mutex.Lock()
+	// defer c.mutex.Unlock()
 
 	if elem, exists := c.cacheMap[key]; exists {
 		c.accessList.MoveToFront(elem)
@@ -58,8 +58,8 @@ func (c *Cache) GetValue(key string) string {
 }
 
 func (c *Cache) GetValueWithoutPositionChange(key string) string {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	// c.mutex.RLock()
+	// defer c.mutex.RUnlock()
 
 	if elem, exists := c.cacheMap[key]; exists {
 		return elem.Value.(*cacheItem).value
@@ -68,8 +68,8 @@ func (c *Cache) GetValueWithoutPositionChange(key string) string {
 }
 
 func (c *Cache) InsertIntoCache(key, value string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	// c.mutex.Lock()
+	// defer c.mutex.Unlock()
 
 	if elem, exists := c.cacheMap[key]; exists {
 		c.accessList.MoveToFront(elem)
@@ -104,8 +104,8 @@ func (c *Cache) EvictLRElementFromCache() (string, string) {
 }
 
 func (c *Cache) GetValueWithoutPositionChangeNew(key string) (string, bool) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	// c.mutex.RLock()
+	// defer c.mutex.RUnlock()
 
 	if elem, exists := c.cacheMap[key]; exists {
 		return elem.Value.(*cacheItem).value, true

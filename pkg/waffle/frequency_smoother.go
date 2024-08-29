@@ -36,8 +36,8 @@ func freqCmp(a, b KeyValuePair) bool {
 
 // Insert adds a new key with an initial frequency of 0 if it does not exist.
 func (fs *FrequencySmoother) Insert(key string) {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
+	// fs.mu.Lock()
+	// defer fs.mu.Unlock()
 
 	if _, exists := fs.accessFreqs[key]; exists {
 		return
@@ -49,8 +49,8 @@ func (fs *FrequencySmoother) Insert(key string) {
 
 // getMinFrequency returns the minimum frequency in the access tree.
 func (fs *FrequencySmoother) GetMinFrequency() int {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
+	// fs.mu.Lock()
+	// defer fs.mu.Unlock()
 
 	if len(fs.accessTree) == 0 {
 		return -1 // Or some error handling
@@ -60,8 +60,8 @@ func (fs *FrequencySmoother) GetMinFrequency() int {
 
 // GetKeyWithMinFrequency returns the key with the minimum frequency.
 func (fs *FrequencySmoother) GetKeyWithMinFrequency() string {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
+	// fs.mu.Lock()
+	// defer fs.mu.Unlock()
 
 	if len(fs.accessTree) == 0 {
 		return "" // Or some error handling
@@ -71,8 +71,8 @@ func (fs *FrequencySmoother) GetKeyWithMinFrequency() string {
 
 // IncrementFrequency increases the frequency of a given key by 1.
 func (fs *FrequencySmoother) IncrementFrequency(key string) {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
+	// fs.mu.Lock()
+	// defer fs.mu.Unlock()
 
 	if _, exists := fs.accessFreqs[key]; !exists {
 		return
@@ -86,8 +86,8 @@ func (fs *FrequencySmoother) IncrementFrequency(key string) {
 
 // SetFrequency sets the frequency of a given key to a specific value.
 func (fs *FrequencySmoother) SetFrequency(key string, value int) {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
+	// fs.mu.Lock()
+	// defer fs.mu.Unlock()
 
 	if _, exists := fs.accessFreqs[key]; !exists {
 		return
@@ -124,8 +124,8 @@ func (fs *FrequencySmoother) AddKey(key string) {
 
 // GetFrequency returns the frequency of a given key.
 func (fs *FrequencySmoother) GetFrequency(key string) int {
-	fs.mu.Lock()
-	defer fs.mu.Unlock()
+	// fs.mu.Lock()
+	// defer fs.mu.Unlock()
 
 	if freq, exists := fs.accessFreqs[key]; exists {
 		return freq

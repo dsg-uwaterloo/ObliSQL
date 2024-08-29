@@ -25,8 +25,8 @@ func NewEvictedItemsWithCapacity(capacity int) *EvictedItems {
 }
 
 func (e *EvictedItems) GetValue(key string) string {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
+	// e.mutex.Lock()
+	// defer e.mutex.Unlock()
 	if value, exists := e.cacheMap[key]; exists {
 		return value
 	}
@@ -38,20 +38,20 @@ func (e *EvictedItems) Insert(key, value string) {
 }
 
 func (e *EvictedItems) Erase(key string) {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
+	// e.mutex.Lock()
+	// defer e.mutex.Unlock()
 	delete(e.cacheMap, key)
 }
 
 func (e *EvictedItems) Size() int {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
+	// e.mutex.Lock()
+	// defer e.mutex.Unlock()
 	return len(e.cacheMap)
 }
 
 func (e *EvictedItems) CheckIfKeyExists(key string) bool {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
+	// e.mutex.Lock()
+	// defer e.mutex.Unlock()
 	_, exists := e.cacheMap[key]
 	return exists
 }
