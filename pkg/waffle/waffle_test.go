@@ -118,7 +118,12 @@ func TestExecutor(t *testing.T) {
 	}
 	newClient := waffle_service.NewKeyValueStoreClient(conn)
 	//Testing Init DB
-	resp, err := newClient.Init(ctx, generateDataSet())
+	newReq := waffle_service.InitRequest{
+		Keys:   make([]string, 0),
+		Values: make([]string, 0),
+	}
+
+	resp, err := newClient.Init(ctx, &newReq)
 	fmt.Println(resp)
 	if err != nil {
 		log.Fatalln("Failed to Init DB! Error: ", err)

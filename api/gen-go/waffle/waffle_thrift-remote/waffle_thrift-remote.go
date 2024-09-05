@@ -28,6 +28,8 @@ func Usage() {
   fmt.Fprintln(os.Stderr, "  void async_put(sequence_id seq_id, string key, string value)")
   fmt.Fprintln(os.Stderr, "  void async_get_batch(sequence_id seq_id,  keys)")
   fmt.Fprintln(os.Stderr, "  void async_put_batch(sequence_id seq_id,  keys,  values)")
+  fmt.Fprintln(os.Stderr, "  void init_db( keys,  values)")
+  fmt.Fprintln(os.Stderr, "  void init_args(i64 B, i64 R, i64 F, i64 D, i64 C, i64 N)")
   fmt.Fprintln(os.Stderr, "  string get(string key)")
   fmt.Fprintln(os.Stderr, "  void put(string key, string value)")
   fmt.Fprintln(os.Stderr, "   get_batch( keys)")
@@ -168,15 +170,15 @@ func main() {
       fmt.Fprintln(os.Stderr, "RegisterClientID requires 2 args")
       flag.Usage()
     }
-    tmp0, err37 := (strconv.Atoi(flag.Arg(1)))
-    if err37 != nil {
+    tmp0, err45 := (strconv.Atoi(flag.Arg(1)))
+    if err45 != nil {
       Usage()
       return
     }
     argvalue0 := int32(tmp0)
     value0 := argvalue0
-    argvalue1, err38 := (strconv.ParseInt(flag.Arg(2), 10, 64))
-    if err38 != nil {
+    argvalue1, err46 := (strconv.ParseInt(flag.Arg(2), 10, 64))
+    if err46 != nil {
       Usage()
       return
     }
@@ -189,19 +191,19 @@ func main() {
       fmt.Fprintln(os.Stderr, "AsyncGet requires 2 args")
       flag.Usage()
     }
-    arg39 := flag.Arg(1)
-    mbTrans40 := thrift.NewTMemoryBufferLen(len(arg39))
-    defer mbTrans40.Close()
-    _, err41 := mbTrans40.WriteString(arg39)
-    if err41 != nil {
+    arg47 := flag.Arg(1)
+    mbTrans48 := thrift.NewTMemoryBufferLen(len(arg47))
+    defer mbTrans48.Close()
+    _, err49 := mbTrans48.WriteString(arg47)
+    if err49 != nil {
       Usage()
       return
     }
-    factory42 := thrift.NewTJSONProtocolFactory()
-    jsProt43 := factory42.GetProtocol(mbTrans40)
+    factory50 := thrift.NewTJSONProtocolFactory()
+    jsProt51 := factory50.GetProtocol(mbTrans48)
     argvalue0 := waffle.NewSequenceID()
-    err44 := argvalue0.Read(context.Background(), jsProt43)
-    if err44 != nil {
+    err52 := argvalue0.Read(context.Background(), jsProt51)
+    if err52 != nil {
       Usage()
       return
     }
@@ -214,35 +216,6 @@ func main() {
   case "async_put":
     if flag.NArg() - 1 != 3 {
       fmt.Fprintln(os.Stderr, "AsyncPut requires 3 args")
-      flag.Usage()
-    }
-    arg46 := flag.Arg(1)
-    mbTrans47 := thrift.NewTMemoryBufferLen(len(arg46))
-    defer mbTrans47.Close()
-    _, err48 := mbTrans47.WriteString(arg46)
-    if err48 != nil {
-      Usage()
-      return
-    }
-    factory49 := thrift.NewTJSONProtocolFactory()
-    jsProt50 := factory49.GetProtocol(mbTrans47)
-    argvalue0 := waffle.NewSequenceID()
-    err51 := argvalue0.Read(context.Background(), jsProt50)
-    if err51 != nil {
-      Usage()
-      return
-    }
-    value0 := argvalue0
-    argvalue1 := flag.Arg(2)
-    value1 := argvalue1
-    argvalue2 := flag.Arg(3)
-    value2 := argvalue2
-    fmt.Print(client.AsyncPut(context.Background(), value0, value1, value2))
-    fmt.Print("\n")
-    break
-  case "async_get_batch":
-    if flag.NArg() - 1 != 2 {
-      fmt.Fprintln(os.Stderr, "AsyncGetBatch requires 2 args")
       flag.Usage()
     }
     arg54 := flag.Arg(1)
@@ -262,19 +235,48 @@ func main() {
       return
     }
     value0 := argvalue0
-    arg60 := flag.Arg(2)
-    mbTrans61 := thrift.NewTMemoryBufferLen(len(arg60))
-    defer mbTrans61.Close()
-    _, err62 := mbTrans61.WriteString(arg60)
-    if err62 != nil { 
+    argvalue1 := flag.Arg(2)
+    value1 := argvalue1
+    argvalue2 := flag.Arg(3)
+    value2 := argvalue2
+    fmt.Print(client.AsyncPut(context.Background(), value0, value1, value2))
+    fmt.Print("\n")
+    break
+  case "async_get_batch":
+    if flag.NArg() - 1 != 2 {
+      fmt.Fprintln(os.Stderr, "AsyncGetBatch requires 2 args")
+      flag.Usage()
+    }
+    arg62 := flag.Arg(1)
+    mbTrans63 := thrift.NewTMemoryBufferLen(len(arg62))
+    defer mbTrans63.Close()
+    _, err64 := mbTrans63.WriteString(arg62)
+    if err64 != nil {
       Usage()
       return
     }
-    factory63 := thrift.NewTJSONProtocolFactory()
-    jsProt64 := factory63.GetProtocol(mbTrans61)
+    factory65 := thrift.NewTJSONProtocolFactory()
+    jsProt66 := factory65.GetProtocol(mbTrans63)
+    argvalue0 := waffle.NewSequenceID()
+    err67 := argvalue0.Read(context.Background(), jsProt66)
+    if err67 != nil {
+      Usage()
+      return
+    }
+    value0 := argvalue0
+    arg68 := flag.Arg(2)
+    mbTrans69 := thrift.NewTMemoryBufferLen(len(arg68))
+    defer mbTrans69.Close()
+    _, err70 := mbTrans69.WriteString(arg68)
+    if err70 != nil { 
+      Usage()
+      return
+    }
+    factory71 := thrift.NewTJSONProtocolFactory()
+    jsProt72 := factory71.GetProtocol(mbTrans69)
     containerStruct1 := waffle.NewWaffleThriftAsyncGetBatchArgs()
-    err65 := containerStruct1.ReadField2(context.Background(), jsProt64)
-    if err65 != nil {
+    err73 := containerStruct1.ReadField2(context.Background(), jsProt72)
+    if err73 != nil {
       Usage()
       return
     }
@@ -288,60 +290,148 @@ func main() {
       fmt.Fprintln(os.Stderr, "AsyncPutBatch requires 3 args")
       flag.Usage()
     }
-    arg66 := flag.Arg(1)
-    mbTrans67 := thrift.NewTMemoryBufferLen(len(arg66))
-    defer mbTrans67.Close()
-    _, err68 := mbTrans67.WriteString(arg66)
-    if err68 != nil {
+    arg74 := flag.Arg(1)
+    mbTrans75 := thrift.NewTMemoryBufferLen(len(arg74))
+    defer mbTrans75.Close()
+    _, err76 := mbTrans75.WriteString(arg74)
+    if err76 != nil {
       Usage()
       return
     }
-    factory69 := thrift.NewTJSONProtocolFactory()
-    jsProt70 := factory69.GetProtocol(mbTrans67)
+    factory77 := thrift.NewTJSONProtocolFactory()
+    jsProt78 := factory77.GetProtocol(mbTrans75)
     argvalue0 := waffle.NewSequenceID()
-    err71 := argvalue0.Read(context.Background(), jsProt70)
-    if err71 != nil {
+    err79 := argvalue0.Read(context.Background(), jsProt78)
+    if err79 != nil {
       Usage()
       return
     }
     value0 := argvalue0
-    arg72 := flag.Arg(2)
-    mbTrans73 := thrift.NewTMemoryBufferLen(len(arg72))
-    defer mbTrans73.Close()
-    _, err74 := mbTrans73.WriteString(arg72)
-    if err74 != nil { 
+    arg80 := flag.Arg(2)
+    mbTrans81 := thrift.NewTMemoryBufferLen(len(arg80))
+    defer mbTrans81.Close()
+    _, err82 := mbTrans81.WriteString(arg80)
+    if err82 != nil { 
       Usage()
       return
     }
-    factory75 := thrift.NewTJSONProtocolFactory()
-    jsProt76 := factory75.GetProtocol(mbTrans73)
+    factory83 := thrift.NewTJSONProtocolFactory()
+    jsProt84 := factory83.GetProtocol(mbTrans81)
     containerStruct1 := waffle.NewWaffleThriftAsyncPutBatchArgs()
-    err77 := containerStruct1.ReadField2(context.Background(), jsProt76)
-    if err77 != nil {
+    err85 := containerStruct1.ReadField2(context.Background(), jsProt84)
+    if err85 != nil {
       Usage()
       return
     }
     argvalue1 := containerStruct1.Keys
     value1 := argvalue1
-    arg78 := flag.Arg(3)
-    mbTrans79 := thrift.NewTMemoryBufferLen(len(arg78))
-    defer mbTrans79.Close()
-    _, err80 := mbTrans79.WriteString(arg78)
-    if err80 != nil { 
+    arg86 := flag.Arg(3)
+    mbTrans87 := thrift.NewTMemoryBufferLen(len(arg86))
+    defer mbTrans87.Close()
+    _, err88 := mbTrans87.WriteString(arg86)
+    if err88 != nil { 
       Usage()
       return
     }
-    factory81 := thrift.NewTJSONProtocolFactory()
-    jsProt82 := factory81.GetProtocol(mbTrans79)
+    factory89 := thrift.NewTJSONProtocolFactory()
+    jsProt90 := factory89.GetProtocol(mbTrans87)
     containerStruct2 := waffle.NewWaffleThriftAsyncPutBatchArgs()
-    err83 := containerStruct2.ReadField3(context.Background(), jsProt82)
-    if err83 != nil {
+    err91 := containerStruct2.ReadField3(context.Background(), jsProt90)
+    if err91 != nil {
       Usage()
       return
     }
     argvalue2 := containerStruct2.Values
     value2 := argvalue2
     fmt.Print(client.AsyncPutBatch(context.Background(), value0, value1, value2))
+    fmt.Print("\n")
+    break
+  case "init_db":
+    if flag.NArg() - 1 != 2 {
+      fmt.Fprintln(os.Stderr, "InitDb requires 2 args")
+      flag.Usage()
+    }
+    arg92 := flag.Arg(1)
+    mbTrans93 := thrift.NewTMemoryBufferLen(len(arg92))
+    defer mbTrans93.Close()
+    _, err94 := mbTrans93.WriteString(arg92)
+    if err94 != nil { 
+      Usage()
+      return
+    }
+    factory95 := thrift.NewTJSONProtocolFactory()
+    jsProt96 := factory95.GetProtocol(mbTrans93)
+    containerStruct0 := waffle.NewWaffleThriftInitDbArgs()
+    err97 := containerStruct0.ReadField1(context.Background(), jsProt96)
+    if err97 != nil {
+      Usage()
+      return
+    }
+    argvalue0 := containerStruct0.Keys
+    value0 := argvalue0
+    arg98 := flag.Arg(2)
+    mbTrans99 := thrift.NewTMemoryBufferLen(len(arg98))
+    defer mbTrans99.Close()
+    _, err100 := mbTrans99.WriteString(arg98)
+    if err100 != nil { 
+      Usage()
+      return
+    }
+    factory101 := thrift.NewTJSONProtocolFactory()
+    jsProt102 := factory101.GetProtocol(mbTrans99)
+    containerStruct1 := waffle.NewWaffleThriftInitDbArgs()
+    err103 := containerStruct1.ReadField2(context.Background(), jsProt102)
+    if err103 != nil {
+      Usage()
+      return
+    }
+    argvalue1 := containerStruct1.Values
+    value1 := argvalue1
+    fmt.Print(client.InitDb(context.Background(), value0, value1))
+    fmt.Print("\n")
+    break
+  case "init_args":
+    if flag.NArg() - 1 != 6 {
+      fmt.Fprintln(os.Stderr, "InitArgs_ requires 6 args")
+      flag.Usage()
+    }
+    argvalue0, err104 := (strconv.ParseInt(flag.Arg(1), 10, 64))
+    if err104 != nil {
+      Usage()
+      return
+    }
+    value0 := argvalue0
+    argvalue1, err105 := (strconv.ParseInt(flag.Arg(2), 10, 64))
+    if err105 != nil {
+      Usage()
+      return
+    }
+    value1 := argvalue1
+    argvalue2, err106 := (strconv.ParseInt(flag.Arg(3), 10, 64))
+    if err106 != nil {
+      Usage()
+      return
+    }
+    value2 := argvalue2
+    argvalue3, err107 := (strconv.ParseInt(flag.Arg(4), 10, 64))
+    if err107 != nil {
+      Usage()
+      return
+    }
+    value3 := argvalue3
+    argvalue4, err108 := (strconv.ParseInt(flag.Arg(5), 10, 64))
+    if err108 != nil {
+      Usage()
+      return
+    }
+    value4 := argvalue4
+    argvalue5, err109 := (strconv.ParseInt(flag.Arg(6), 10, 64))
+    if err109 != nil {
+      Usage()
+      return
+    }
+    value5 := argvalue5
+    fmt.Print(client.InitArgs_(context.Background(), value0, value1, value2, value3, value4, value5))
     fmt.Print("\n")
     break
   case "get":
@@ -371,19 +461,19 @@ func main() {
       fmt.Fprintln(os.Stderr, "GetBatch requires 1 args")
       flag.Usage()
     }
-    arg87 := flag.Arg(1)
-    mbTrans88 := thrift.NewTMemoryBufferLen(len(arg87))
-    defer mbTrans88.Close()
-    _, err89 := mbTrans88.WriteString(arg87)
-    if err89 != nil { 
+    arg113 := flag.Arg(1)
+    mbTrans114 := thrift.NewTMemoryBufferLen(len(arg113))
+    defer mbTrans114.Close()
+    _, err115 := mbTrans114.WriteString(arg113)
+    if err115 != nil { 
       Usage()
       return
     }
-    factory90 := thrift.NewTJSONProtocolFactory()
-    jsProt91 := factory90.GetProtocol(mbTrans88)
+    factory116 := thrift.NewTJSONProtocolFactory()
+    jsProt117 := factory116.GetProtocol(mbTrans114)
     containerStruct0 := waffle.NewWaffleThriftGetBatchArgs()
-    err92 := containerStruct0.ReadField1(context.Background(), jsProt91)
-    if err92 != nil {
+    err118 := containerStruct0.ReadField1(context.Background(), jsProt117)
+    if err118 != nil {
       Usage()
       return
     }
@@ -397,37 +487,37 @@ func main() {
       fmt.Fprintln(os.Stderr, "MixBatch requires 2 args")
       flag.Usage()
     }
-    arg93 := flag.Arg(1)
-    mbTrans94 := thrift.NewTMemoryBufferLen(len(arg93))
-    defer mbTrans94.Close()
-    _, err95 := mbTrans94.WriteString(arg93)
-    if err95 != nil { 
+    arg119 := flag.Arg(1)
+    mbTrans120 := thrift.NewTMemoryBufferLen(len(arg119))
+    defer mbTrans120.Close()
+    _, err121 := mbTrans120.WriteString(arg119)
+    if err121 != nil { 
       Usage()
       return
     }
-    factory96 := thrift.NewTJSONProtocolFactory()
-    jsProt97 := factory96.GetProtocol(mbTrans94)
+    factory122 := thrift.NewTJSONProtocolFactory()
+    jsProt123 := factory122.GetProtocol(mbTrans120)
     containerStruct0 := waffle.NewWaffleThriftMixBatchArgs()
-    err98 := containerStruct0.ReadField1(context.Background(), jsProt97)
-    if err98 != nil {
+    err124 := containerStruct0.ReadField1(context.Background(), jsProt123)
+    if err124 != nil {
       Usage()
       return
     }
     argvalue0 := containerStruct0.Keys
     value0 := argvalue0
-    arg99 := flag.Arg(2)
-    mbTrans100 := thrift.NewTMemoryBufferLen(len(arg99))
-    defer mbTrans100.Close()
-    _, err101 := mbTrans100.WriteString(arg99)
-    if err101 != nil { 
+    arg125 := flag.Arg(2)
+    mbTrans126 := thrift.NewTMemoryBufferLen(len(arg125))
+    defer mbTrans126.Close()
+    _, err127 := mbTrans126.WriteString(arg125)
+    if err127 != nil { 
       Usage()
       return
     }
-    factory102 := thrift.NewTJSONProtocolFactory()
-    jsProt103 := factory102.GetProtocol(mbTrans100)
+    factory128 := thrift.NewTJSONProtocolFactory()
+    jsProt129 := factory128.GetProtocol(mbTrans126)
     containerStruct1 := waffle.NewWaffleThriftMixBatchArgs()
-    err104 := containerStruct1.ReadField2(context.Background(), jsProt103)
-    if err104 != nil {
+    err130 := containerStruct1.ReadField2(context.Background(), jsProt129)
+    if err130 != nil {
       Usage()
       return
     }
@@ -441,37 +531,37 @@ func main() {
       fmt.Fprintln(os.Stderr, "PutBatch requires 2 args")
       flag.Usage()
     }
-    arg105 := flag.Arg(1)
-    mbTrans106 := thrift.NewTMemoryBufferLen(len(arg105))
-    defer mbTrans106.Close()
-    _, err107 := mbTrans106.WriteString(arg105)
-    if err107 != nil { 
+    arg131 := flag.Arg(1)
+    mbTrans132 := thrift.NewTMemoryBufferLen(len(arg131))
+    defer mbTrans132.Close()
+    _, err133 := mbTrans132.WriteString(arg131)
+    if err133 != nil { 
       Usage()
       return
     }
-    factory108 := thrift.NewTJSONProtocolFactory()
-    jsProt109 := factory108.GetProtocol(mbTrans106)
+    factory134 := thrift.NewTJSONProtocolFactory()
+    jsProt135 := factory134.GetProtocol(mbTrans132)
     containerStruct0 := waffle.NewWaffleThriftPutBatchArgs()
-    err110 := containerStruct0.ReadField1(context.Background(), jsProt109)
-    if err110 != nil {
+    err136 := containerStruct0.ReadField1(context.Background(), jsProt135)
+    if err136 != nil {
       Usage()
       return
     }
     argvalue0 := containerStruct0.Keys
     value0 := argvalue0
-    arg111 := flag.Arg(2)
-    mbTrans112 := thrift.NewTMemoryBufferLen(len(arg111))
-    defer mbTrans112.Close()
-    _, err113 := mbTrans112.WriteString(arg111)
-    if err113 != nil { 
+    arg137 := flag.Arg(2)
+    mbTrans138 := thrift.NewTMemoryBufferLen(len(arg137))
+    defer mbTrans138.Close()
+    _, err139 := mbTrans138.WriteString(arg137)
+    if err139 != nil { 
       Usage()
       return
     }
-    factory114 := thrift.NewTJSONProtocolFactory()
-    jsProt115 := factory114.GetProtocol(mbTrans112)
+    factory140 := thrift.NewTJSONProtocolFactory()
+    jsProt141 := factory140.GetProtocol(mbTrans138)
     containerStruct1 := waffle.NewWaffleThriftPutBatchArgs()
-    err116 := containerStruct1.ReadField2(context.Background(), jsProt115)
-    if err116 != nil {
+    err142 := containerStruct1.ReadField2(context.Background(), jsProt141)
+    if err142 != nil {
       Usage()
       return
     }

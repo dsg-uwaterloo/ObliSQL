@@ -232,6 +232,18 @@ type WaffleThrift interface {
   //  - Values
   AsyncPutBatch(ctx context.Context, seq_id *SequenceID, keys []string, values []string) (_err error)
   // Parameters:
+  //  - Keys
+  //  - Values
+  InitDb(ctx context.Context, keys []string, values []string) (_err error)
+  // Parameters:
+  //  - B
+  //  - R
+  //  - F
+  //  - D
+  //  - C
+  //  - N
+  InitArgs_(ctx context.Context, B int64, R int64, F int64, D int64, C int64, N int64) (_err error)
+  // Parameters:
   //  - Key
   Get(ctx context.Context, key string) (_r string, _err error)
   // Parameters:
@@ -376,31 +388,73 @@ func (p *WaffleThriftClient) AsyncPutBatch(ctx context.Context, seq_id *Sequence
 }
 
 // Parameters:
-//  - Key
-func (p *WaffleThriftClient) Get(ctx context.Context, key string) (_r string, _err error) {
-  var _args10 WaffleThriftGetArgs
-  _args10.Key = key
-  var _result12 WaffleThriftGetResult
+//  - Keys
+//  - Values
+func (p *WaffleThriftClient) InitDb(ctx context.Context, keys []string, values []string) (_err error) {
+  var _args10 WaffleThriftInitDbArgs
+  _args10.Keys = keys
+  _args10.Values = values
+  var _result12 WaffleThriftInitDbResult
   var _meta11 thrift.ResponseMeta
-  _meta11, _err = p.Client_().Call(ctx, "get", &_args10, &_result12)
+  _meta11, _err = p.Client_().Call(ctx, "init_db", &_args10, &_result12)
   p.SetLastResponseMeta_(_meta11)
   if _err != nil {
     return
   }
-  return _result12.GetSuccess(), nil
+  return nil
+}
+
+// Parameters:
+//  - B
+//  - R
+//  - F
+//  - D
+//  - C
+//  - N
+func (p *WaffleThriftClient) InitArgs_(ctx context.Context, B int64, R int64, F int64, D int64, C int64, N int64) (_err error) {
+  var _args13 WaffleThriftInitArgsArgs
+  _args13.B = B
+  _args13.R = R
+  _args13.F = F
+  _args13.D = D
+  _args13.C = C
+  _args13.N = N
+  var _result15 WaffleThriftInitArgsResult
+  var _meta14 thrift.ResponseMeta
+  _meta14, _err = p.Client_().Call(ctx, "init_args", &_args13, &_result15)
+  p.SetLastResponseMeta_(_meta14)
+  if _err != nil {
+    return
+  }
+  return nil
+}
+
+// Parameters:
+//  - Key
+func (p *WaffleThriftClient) Get(ctx context.Context, key string) (_r string, _err error) {
+  var _args16 WaffleThriftGetArgs
+  _args16.Key = key
+  var _result18 WaffleThriftGetResult
+  var _meta17 thrift.ResponseMeta
+  _meta17, _err = p.Client_().Call(ctx, "get", &_args16, &_result18)
+  p.SetLastResponseMeta_(_meta17)
+  if _err != nil {
+    return
+  }
+  return _result18.GetSuccess(), nil
 }
 
 // Parameters:
 //  - Key
 //  - Value
 func (p *WaffleThriftClient) Put(ctx context.Context, key string, value string) (_err error) {
-  var _args13 WaffleThriftPutArgs
-  _args13.Key = key
-  _args13.Value = value
-  var _result15 WaffleThriftPutResult
-  var _meta14 thrift.ResponseMeta
-  _meta14, _err = p.Client_().Call(ctx, "put", &_args13, &_result15)
-  p.SetLastResponseMeta_(_meta14)
+  var _args19 WaffleThriftPutArgs
+  _args19.Key = key
+  _args19.Value = value
+  var _result21 WaffleThriftPutResult
+  var _meta20 thrift.ResponseMeta
+  _meta20, _err = p.Client_().Call(ctx, "put", &_args19, &_result21)
+  p.SetLastResponseMeta_(_meta20)
   if _err != nil {
     return
   }
@@ -410,46 +464,46 @@ func (p *WaffleThriftClient) Put(ctx context.Context, key string, value string) 
 // Parameters:
 //  - Keys
 func (p *WaffleThriftClient) GetBatch(ctx context.Context, keys []string) (_r []string, _err error) {
-  var _args16 WaffleThriftGetBatchArgs
-  _args16.Keys = keys
-  var _result18 WaffleThriftGetBatchResult
-  var _meta17 thrift.ResponseMeta
-  _meta17, _err = p.Client_().Call(ctx, "get_batch", &_args16, &_result18)
-  p.SetLastResponseMeta_(_meta17)
+  var _args22 WaffleThriftGetBatchArgs
+  _args22.Keys = keys
+  var _result24 WaffleThriftGetBatchResult
+  var _meta23 thrift.ResponseMeta
+  _meta23, _err = p.Client_().Call(ctx, "get_batch", &_args22, &_result24)
+  p.SetLastResponseMeta_(_meta23)
   if _err != nil {
     return
   }
-  return _result18.GetSuccess(), nil
+  return _result24.GetSuccess(), nil
 }
 
 // Parameters:
 //  - Keys
 //  - Values
 func (p *WaffleThriftClient) MixBatch(ctx context.Context, keys []string, values []string) (_r []string, _err error) {
-  var _args19 WaffleThriftMixBatchArgs
-  _args19.Keys = keys
-  _args19.Values = values
-  var _result21 WaffleThriftMixBatchResult
-  var _meta20 thrift.ResponseMeta
-  _meta20, _err = p.Client_().Call(ctx, "mix_batch", &_args19, &_result21)
-  p.SetLastResponseMeta_(_meta20)
+  var _args25 WaffleThriftMixBatchArgs
+  _args25.Keys = keys
+  _args25.Values = values
+  var _result27 WaffleThriftMixBatchResult
+  var _meta26 thrift.ResponseMeta
+  _meta26, _err = p.Client_().Call(ctx, "mix_batch", &_args25, &_result27)
+  p.SetLastResponseMeta_(_meta26)
   if _err != nil {
     return
   }
-  return _result21.GetSuccess(), nil
+  return _result27.GetSuccess(), nil
 }
 
 // Parameters:
 //  - Keys
 //  - Values
 func (p *WaffleThriftClient) PutBatch(ctx context.Context, keys []string, values []string) (_err error) {
-  var _args22 WaffleThriftPutBatchArgs
-  _args22.Keys = keys
-  _args22.Values = values
-  var _result24 WaffleThriftPutBatchResult
-  var _meta23 thrift.ResponseMeta
-  _meta23, _err = p.Client_().Call(ctx, "put_batch", &_args22, &_result24)
-  p.SetLastResponseMeta_(_meta23)
+  var _args28 WaffleThriftPutBatchArgs
+  _args28.Keys = keys
+  _args28.Values = values
+  var _result30 WaffleThriftPutBatchResult
+  var _meta29 thrift.ResponseMeta
+  _meta29, _err = p.Client_().Call(ctx, "put_batch", &_args28, &_result30)
+  p.SetLastResponseMeta_(_meta29)
   if _err != nil {
     return
   }
@@ -476,19 +530,21 @@ func (p *WaffleThriftProcessor) ProcessorMap() map[string]thrift.TProcessorFunct
 
 func NewWaffleThriftProcessor(handler WaffleThrift) *WaffleThriftProcessor {
 
-  self25 := &WaffleThriftProcessor{handler:handler, processorMap:make(map[string]thrift.TProcessorFunction)}
-  self25.processorMap["get_client_id"] = &waffleThriftProcessorGetClientID{handler:handler}
-  self25.processorMap["register_client_id"] = &waffleThriftProcessorRegisterClientID{handler:handler}
-  self25.processorMap["async_get"] = &waffleThriftProcessorAsyncGet{handler:handler}
-  self25.processorMap["async_put"] = &waffleThriftProcessorAsyncPut{handler:handler}
-  self25.processorMap["async_get_batch"] = &waffleThriftProcessorAsyncGetBatch{handler:handler}
-  self25.processorMap["async_put_batch"] = &waffleThriftProcessorAsyncPutBatch{handler:handler}
-  self25.processorMap["get"] = &waffleThriftProcessorGet{handler:handler}
-  self25.processorMap["put"] = &waffleThriftProcessorPut{handler:handler}
-  self25.processorMap["get_batch"] = &waffleThriftProcessorGetBatch{handler:handler}
-  self25.processorMap["mix_batch"] = &waffleThriftProcessorMixBatch{handler:handler}
-  self25.processorMap["put_batch"] = &waffleThriftProcessorPutBatch{handler:handler}
-return self25
+  self31 := &WaffleThriftProcessor{handler:handler, processorMap:make(map[string]thrift.TProcessorFunction)}
+  self31.processorMap["get_client_id"] = &waffleThriftProcessorGetClientID{handler:handler}
+  self31.processorMap["register_client_id"] = &waffleThriftProcessorRegisterClientID{handler:handler}
+  self31.processorMap["async_get"] = &waffleThriftProcessorAsyncGet{handler:handler}
+  self31.processorMap["async_put"] = &waffleThriftProcessorAsyncPut{handler:handler}
+  self31.processorMap["async_get_batch"] = &waffleThriftProcessorAsyncGetBatch{handler:handler}
+  self31.processorMap["async_put_batch"] = &waffleThriftProcessorAsyncPutBatch{handler:handler}
+  self31.processorMap["init_db"] = &waffleThriftProcessorInitDb{handler:handler}
+  self31.processorMap["init_args"] = &waffleThriftProcessorInitArgs_{handler:handler}
+  self31.processorMap["get"] = &waffleThriftProcessorGet{handler:handler}
+  self31.processorMap["put"] = &waffleThriftProcessorPut{handler:handler}
+  self31.processorMap["get_batch"] = &waffleThriftProcessorGetBatch{handler:handler}
+  self31.processorMap["mix_batch"] = &waffleThriftProcessorMixBatch{handler:handler}
+  self31.processorMap["put_batch"] = &waffleThriftProcessorPutBatch{handler:handler}
+return self31
 }
 
 func (p *WaffleThriftProcessor) Process(ctx context.Context, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
@@ -499,12 +555,12 @@ func (p *WaffleThriftProcessor) Process(ctx context.Context, iprot, oprot thrift
   }
   iprot.Skip(ctx, thrift.STRUCT)
   iprot.ReadMessageEnd(ctx)
-  x26 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function " + name)
+  x32 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function " + name)
   oprot.WriteMessageBegin(ctx, name, thrift.EXCEPTION, seqId)
-  x26.Write(ctx, oprot)
+  x32.Write(ctx, oprot)
   oprot.WriteMessageEnd(ctx)
   oprot.Flush(ctx)
-  return false, x26
+  return false, x32
 
 }
 
@@ -757,6 +813,158 @@ func (p *waffleThriftProcessorAsyncPutBatch) Process(ctx context.Context, seqId 
   }
   tickerCancel()
   return true, nil
+}
+
+type waffleThriftProcessorInitDb struct {
+  handler WaffleThrift
+}
+
+func (p *waffleThriftProcessorInitDb) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+  args := WaffleThriftInitDbArgs{}
+  var err2 error
+  if err2 = args.Read(ctx, iprot); err2 != nil {
+    iprot.ReadMessageEnd(ctx)
+    x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err2.Error())
+    oprot.WriteMessageBegin(ctx, "init_db", thrift.EXCEPTION, seqId)
+    x.Write(ctx, oprot)
+    oprot.WriteMessageEnd(ctx)
+    oprot.Flush(ctx)
+    return false, thrift.WrapTException(err2)
+  }
+  iprot.ReadMessageEnd(ctx)
+
+  tickerCancel := func() {}
+  // Start a goroutine to do server side connectivity check.
+  if thrift.ServerConnectivityCheckInterval > 0 {
+    var cancel context.CancelFunc
+    ctx, cancel = context.WithCancel(ctx)
+    defer cancel()
+    var tickerCtx context.Context
+    tickerCtx, tickerCancel = context.WithCancel(context.Background())
+    defer tickerCancel()
+    go func(ctx context.Context, cancel context.CancelFunc) {
+      ticker := time.NewTicker(thrift.ServerConnectivityCheckInterval)
+      defer ticker.Stop()
+      for {
+        select {
+        case <-ctx.Done():
+          return
+        case <-ticker.C:
+          if !iprot.Transport().IsOpen() {
+            cancel()
+            return
+          }
+        }
+      }
+    }(tickerCtx, cancel)
+  }
+
+  result := WaffleThriftInitDbResult{}
+  if err2 = p.handler.InitDb(ctx, args.Keys, args.Values); err2 != nil {
+    tickerCancel()
+    if err2 == thrift.ErrAbandonRequest {
+      return false, thrift.WrapTException(err2)
+    }
+    x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing init_db: " + err2.Error())
+    oprot.WriteMessageBegin(ctx, "init_db", thrift.EXCEPTION, seqId)
+    x.Write(ctx, oprot)
+    oprot.WriteMessageEnd(ctx)
+    oprot.Flush(ctx)
+    return true, thrift.WrapTException(err2)
+  }
+  tickerCancel()
+  if err2 = oprot.WriteMessageBegin(ctx, "init_db", thrift.REPLY, seqId); err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err2 = result.Write(ctx, oprot); err == nil && err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err2 = oprot.WriteMessageEnd(ctx); err == nil && err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err2 = oprot.Flush(ctx); err == nil && err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err != nil {
+    return
+  }
+  return true, err
+}
+
+type waffleThriftProcessorInitArgs_ struct {
+  handler WaffleThrift
+}
+
+func (p *waffleThriftProcessorInitArgs_) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+  args := WaffleThriftInitArgsArgs{}
+  var err2 error
+  if err2 = args.Read(ctx, iprot); err2 != nil {
+    iprot.ReadMessageEnd(ctx)
+    x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err2.Error())
+    oprot.WriteMessageBegin(ctx, "init_args", thrift.EXCEPTION, seqId)
+    x.Write(ctx, oprot)
+    oprot.WriteMessageEnd(ctx)
+    oprot.Flush(ctx)
+    return false, thrift.WrapTException(err2)
+  }
+  iprot.ReadMessageEnd(ctx)
+
+  tickerCancel := func() {}
+  // Start a goroutine to do server side connectivity check.
+  if thrift.ServerConnectivityCheckInterval > 0 {
+    var cancel context.CancelFunc
+    ctx, cancel = context.WithCancel(ctx)
+    defer cancel()
+    var tickerCtx context.Context
+    tickerCtx, tickerCancel = context.WithCancel(context.Background())
+    defer tickerCancel()
+    go func(ctx context.Context, cancel context.CancelFunc) {
+      ticker := time.NewTicker(thrift.ServerConnectivityCheckInterval)
+      defer ticker.Stop()
+      for {
+        select {
+        case <-ctx.Done():
+          return
+        case <-ticker.C:
+          if !iprot.Transport().IsOpen() {
+            cancel()
+            return
+          }
+        }
+      }
+    }(tickerCtx, cancel)
+  }
+
+  result := WaffleThriftInitArgsResult{}
+  if err2 = p.handler.InitArgs_(ctx, args.B, args.R, args.F, args.D, args.C, args.N); err2 != nil {
+    tickerCancel()
+    if err2 == thrift.ErrAbandonRequest {
+      return false, thrift.WrapTException(err2)
+    }
+    x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing init_args: " + err2.Error())
+    oprot.WriteMessageBegin(ctx, "init_args", thrift.EXCEPTION, seqId)
+    x.Write(ctx, oprot)
+    oprot.WriteMessageEnd(ctx)
+    oprot.Flush(ctx)
+    return true, thrift.WrapTException(err2)
+  }
+  tickerCancel()
+  if err2 = oprot.WriteMessageBegin(ctx, "init_args", thrift.REPLY, seqId); err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err2 = result.Write(ctx, oprot); err == nil && err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err2 = oprot.WriteMessageEnd(ctx); err == nil && err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err2 = oprot.Flush(ctx); err == nil && err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err != nil {
+    return
+  }
+  return true, err
 }
 
 type waffleThriftProcessorGet struct {
@@ -1875,13 +2083,13 @@ func (p *WaffleThriftAsyncGetBatchArgs)  ReadField2(ctx context.Context, iprot t
   tSlice := make([]string, 0, size)
   p.Keys =  tSlice
   for i := 0; i < size; i ++ {
-var _elem27 string
+var _elem33 string
     if v, err := iprot.ReadString(ctx); err != nil {
     return thrift.PrependError("error reading field 0: ", err)
 } else {
-    _elem27 = v
+    _elem33 = v
 }
-    p.Keys = append(p.Keys, _elem27)
+    p.Keys = append(p.Keys, _elem33)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)
@@ -2046,13 +2254,13 @@ func (p *WaffleThriftAsyncPutBatchArgs)  ReadField2(ctx context.Context, iprot t
   tSlice := make([]string, 0, size)
   p.Keys =  tSlice
   for i := 0; i < size; i ++ {
-var _elem28 string
+var _elem34 string
     if v, err := iprot.ReadString(ctx); err != nil {
     return thrift.PrependError("error reading field 0: ", err)
 } else {
-    _elem28 = v
+    _elem34 = v
 }
-    p.Keys = append(p.Keys, _elem28)
+    p.Keys = append(p.Keys, _elem34)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)
@@ -2068,13 +2276,13 @@ func (p *WaffleThriftAsyncPutBatchArgs)  ReadField3(ctx context.Context, iprot t
   tSlice := make([]string, 0, size)
   p.Values =  tSlice
   for i := 0; i < size; i ++ {
-var _elem29 string
+var _elem35 string
     if v, err := iprot.ReadString(ctx); err != nil {
     return thrift.PrependError("error reading field 0: ", err)
 } else {
-    _elem29 = v
+    _elem35 = v
 }
-    p.Values = append(p.Values, _elem29)
+    p.Values = append(p.Values, _elem35)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)
@@ -2149,6 +2357,548 @@ func (p *WaffleThriftAsyncPutBatchArgs) String() string {
     return "<nil>"
   }
   return fmt.Sprintf("WaffleThriftAsyncPutBatchArgs(%+v)", *p)
+}
+
+// Attributes:
+//  - Keys
+//  - Values
+type WaffleThriftInitDbArgs struct {
+  Keys []string `thrift:"keys,1" db:"keys" json:"keys"`
+  Values []string `thrift:"values,2" db:"values" json:"values"`
+}
+
+func NewWaffleThriftInitDbArgs() *WaffleThriftInitDbArgs {
+  return &WaffleThriftInitDbArgs{}
+}
+
+
+func (p *WaffleThriftInitDbArgs) GetKeys() []string {
+  return p.Keys
+}
+
+func (p *WaffleThriftInitDbArgs) GetValues() []string {
+  return p.Values
+}
+func (p *WaffleThriftInitDbArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
+  if _, err := iprot.ReadStructBegin(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
+  }
+
+
+  for {
+    _, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
+    if err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+    }
+    if fieldTypeId == thrift.STOP { break; }
+    switch fieldId {
+    case 1:
+      if fieldTypeId == thrift.LIST {
+        if err := p.ReadField1(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 2:
+      if fieldTypeId == thrift.LIST {
+        if err := p.ReadField2(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    default:
+      if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+        return err
+      }
+    }
+    if err := iprot.ReadFieldEnd(ctx); err != nil {
+      return err
+    }
+  }
+  if err := iprot.ReadStructEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+  }
+  return nil
+}
+
+func (p *WaffleThriftInitDbArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
+  _, size, err := iprot.ReadListBegin(ctx)
+  if err != nil {
+    return thrift.PrependError("error reading list begin: ", err)
+  }
+  tSlice := make([]string, 0, size)
+  p.Keys =  tSlice
+  for i := 0; i < size; i ++ {
+var _elem36 string
+    if v, err := iprot.ReadString(ctx); err != nil {
+    return thrift.PrependError("error reading field 0: ", err)
+} else {
+    _elem36 = v
+}
+    p.Keys = append(p.Keys, _elem36)
+  }
+  if err := iprot.ReadListEnd(ctx); err != nil {
+    return thrift.PrependError("error reading list end: ", err)
+  }
+  return nil
+}
+
+func (p *WaffleThriftInitDbArgs)  ReadField2(ctx context.Context, iprot thrift.TProtocol) error {
+  _, size, err := iprot.ReadListBegin(ctx)
+  if err != nil {
+    return thrift.PrependError("error reading list begin: ", err)
+  }
+  tSlice := make([]string, 0, size)
+  p.Values =  tSlice
+  for i := 0; i < size; i ++ {
+var _elem37 string
+    if v, err := iprot.ReadString(ctx); err != nil {
+    return thrift.PrependError("error reading field 0: ", err)
+} else {
+    _elem37 = v
+}
+    p.Values = append(p.Values, _elem37)
+  }
+  if err := iprot.ReadListEnd(ctx); err != nil {
+    return thrift.PrependError("error reading list end: ", err)
+  }
+  return nil
+}
+
+func (p *WaffleThriftInitDbArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
+  if err := oprot.WriteStructBegin(ctx, "init_db_args"); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
+  if p != nil {
+    if err := p.writeField1(ctx, oprot); err != nil { return err }
+    if err := p.writeField2(ctx, oprot); err != nil { return err }
+  }
+  if err := oprot.WriteFieldStop(ctx); err != nil {
+    return thrift.PrependError("write field stop error: ", err) }
+  if err := oprot.WriteStructEnd(ctx); err != nil {
+    return thrift.PrependError("write struct stop error: ", err) }
+  return nil
+}
+
+func (p *WaffleThriftInitDbArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "keys", thrift.LIST, 1); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:keys: ", p), err) }
+  if err := oprot.WriteListBegin(ctx, thrift.STRING, len(p.Keys)); err != nil {
+    return thrift.PrependError("error writing list begin: ", err)
+  }
+  for _, v := range p.Keys {
+    if err := oprot.WriteString(ctx, string(v)); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T. (0) field write error: ", p), err) }
+  }
+  if err := oprot.WriteListEnd(ctx); err != nil {
+    return thrift.PrependError("error writing list end: ", err)
+  }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 1:keys: ", p), err) }
+  return err
+}
+
+func (p *WaffleThriftInitDbArgs) writeField2(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "values", thrift.LIST, 2); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 2:values: ", p), err) }
+  if err := oprot.WriteListBegin(ctx, thrift.STRING, len(p.Values)); err != nil {
+    return thrift.PrependError("error writing list begin: ", err)
+  }
+  for _, v := range p.Values {
+    if err := oprot.WriteString(ctx, string(v)); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T. (0) field write error: ", p), err) }
+  }
+  if err := oprot.WriteListEnd(ctx); err != nil {
+    return thrift.PrependError("error writing list end: ", err)
+  }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 2:values: ", p), err) }
+  return err
+}
+
+func (p *WaffleThriftInitDbArgs) String() string {
+  if p == nil {
+    return "<nil>"
+  }
+  return fmt.Sprintf("WaffleThriftInitDbArgs(%+v)", *p)
+}
+
+type WaffleThriftInitDbResult struct {
+}
+
+func NewWaffleThriftInitDbResult() *WaffleThriftInitDbResult {
+  return &WaffleThriftInitDbResult{}
+}
+
+func (p *WaffleThriftInitDbResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
+  if _, err := iprot.ReadStructBegin(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
+  }
+
+
+  for {
+    _, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
+    if err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+    }
+    if fieldTypeId == thrift.STOP { break; }
+    if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+      return err
+    }
+    if err := iprot.ReadFieldEnd(ctx); err != nil {
+      return err
+    }
+  }
+  if err := iprot.ReadStructEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+  }
+  return nil
+}
+
+func (p *WaffleThriftInitDbResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
+  if err := oprot.WriteStructBegin(ctx, "init_db_result"); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
+  if p != nil {
+  }
+  if err := oprot.WriteFieldStop(ctx); err != nil {
+    return thrift.PrependError("write field stop error: ", err) }
+  if err := oprot.WriteStructEnd(ctx); err != nil {
+    return thrift.PrependError("write struct stop error: ", err) }
+  return nil
+}
+
+func (p *WaffleThriftInitDbResult) String() string {
+  if p == nil {
+    return "<nil>"
+  }
+  return fmt.Sprintf("WaffleThriftInitDbResult(%+v)", *p)
+}
+
+// Attributes:
+//  - B
+//  - R
+//  - F
+//  - D
+//  - C
+//  - N
+type WaffleThriftInitArgsArgs struct {
+  B int64 `thrift:"B,1" db:"B" json:"B"`
+  R int64 `thrift:"R,2" db:"R" json:"R"`
+  F int64 `thrift:"F,3" db:"F" json:"F"`
+  D int64 `thrift:"D,4" db:"D" json:"D"`
+  C int64 `thrift:"C,5" db:"C" json:"C"`
+  N int64 `thrift:"N,6" db:"N" json:"N"`
+}
+
+func NewWaffleThriftInitArgsArgs() *WaffleThriftInitArgsArgs {
+  return &WaffleThriftInitArgsArgs{}
+}
+
+
+func (p *WaffleThriftInitArgsArgs) GetB() int64 {
+  return p.B
+}
+
+func (p *WaffleThriftInitArgsArgs) GetR() int64 {
+  return p.R
+}
+
+func (p *WaffleThriftInitArgsArgs) GetF() int64 {
+  return p.F
+}
+
+func (p *WaffleThriftInitArgsArgs) GetD() int64 {
+  return p.D
+}
+
+func (p *WaffleThriftInitArgsArgs) GetC() int64 {
+  return p.C
+}
+
+func (p *WaffleThriftInitArgsArgs) GetN() int64 {
+  return p.N
+}
+func (p *WaffleThriftInitArgsArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
+  if _, err := iprot.ReadStructBegin(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
+  }
+
+
+  for {
+    _, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
+    if err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+    }
+    if fieldTypeId == thrift.STOP { break; }
+    switch fieldId {
+    case 1:
+      if fieldTypeId == thrift.I64 {
+        if err := p.ReadField1(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 2:
+      if fieldTypeId == thrift.I64 {
+        if err := p.ReadField2(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 3:
+      if fieldTypeId == thrift.I64 {
+        if err := p.ReadField3(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 4:
+      if fieldTypeId == thrift.I64 {
+        if err := p.ReadField4(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 5:
+      if fieldTypeId == thrift.I64 {
+        if err := p.ReadField5(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 6:
+      if fieldTypeId == thrift.I64 {
+        if err := p.ReadField6(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    default:
+      if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+        return err
+      }
+    }
+    if err := iprot.ReadFieldEnd(ctx); err != nil {
+      return err
+    }
+  }
+  if err := iprot.ReadStructEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+  }
+  return nil
+}
+
+func (p *WaffleThriftInitArgsArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadI64(ctx); err != nil {
+  return thrift.PrependError("error reading field 1: ", err)
+} else {
+  p.B = v
+}
+  return nil
+}
+
+func (p *WaffleThriftInitArgsArgs)  ReadField2(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadI64(ctx); err != nil {
+  return thrift.PrependError("error reading field 2: ", err)
+} else {
+  p.R = v
+}
+  return nil
+}
+
+func (p *WaffleThriftInitArgsArgs)  ReadField3(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadI64(ctx); err != nil {
+  return thrift.PrependError("error reading field 3: ", err)
+} else {
+  p.F = v
+}
+  return nil
+}
+
+func (p *WaffleThriftInitArgsArgs)  ReadField4(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadI64(ctx); err != nil {
+  return thrift.PrependError("error reading field 4: ", err)
+} else {
+  p.D = v
+}
+  return nil
+}
+
+func (p *WaffleThriftInitArgsArgs)  ReadField5(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadI64(ctx); err != nil {
+  return thrift.PrependError("error reading field 5: ", err)
+} else {
+  p.C = v
+}
+  return nil
+}
+
+func (p *WaffleThriftInitArgsArgs)  ReadField6(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadI64(ctx); err != nil {
+  return thrift.PrependError("error reading field 6: ", err)
+} else {
+  p.N = v
+}
+  return nil
+}
+
+func (p *WaffleThriftInitArgsArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
+  if err := oprot.WriteStructBegin(ctx, "init_args_args"); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
+  if p != nil {
+    if err := p.writeField1(ctx, oprot); err != nil { return err }
+    if err := p.writeField2(ctx, oprot); err != nil { return err }
+    if err := p.writeField3(ctx, oprot); err != nil { return err }
+    if err := p.writeField4(ctx, oprot); err != nil { return err }
+    if err := p.writeField5(ctx, oprot); err != nil { return err }
+    if err := p.writeField6(ctx, oprot); err != nil { return err }
+  }
+  if err := oprot.WriteFieldStop(ctx); err != nil {
+    return thrift.PrependError("write field stop error: ", err) }
+  if err := oprot.WriteStructEnd(ctx); err != nil {
+    return thrift.PrependError("write struct stop error: ", err) }
+  return nil
+}
+
+func (p *WaffleThriftInitArgsArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "B", thrift.I64, 1); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:B: ", p), err) }
+  if err := oprot.WriteI64(ctx, int64(p.B)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.B (1) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 1:B: ", p), err) }
+  return err
+}
+
+func (p *WaffleThriftInitArgsArgs) writeField2(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "R", thrift.I64, 2); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 2:R: ", p), err) }
+  if err := oprot.WriteI64(ctx, int64(p.R)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.R (2) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 2:R: ", p), err) }
+  return err
+}
+
+func (p *WaffleThriftInitArgsArgs) writeField3(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "F", thrift.I64, 3); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 3:F: ", p), err) }
+  if err := oprot.WriteI64(ctx, int64(p.F)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.F (3) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 3:F: ", p), err) }
+  return err
+}
+
+func (p *WaffleThriftInitArgsArgs) writeField4(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "D", thrift.I64, 4); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 4:D: ", p), err) }
+  if err := oprot.WriteI64(ctx, int64(p.D)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.D (4) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 4:D: ", p), err) }
+  return err
+}
+
+func (p *WaffleThriftInitArgsArgs) writeField5(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "C", thrift.I64, 5); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 5:C: ", p), err) }
+  if err := oprot.WriteI64(ctx, int64(p.C)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.C (5) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 5:C: ", p), err) }
+  return err
+}
+
+func (p *WaffleThriftInitArgsArgs) writeField6(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "N", thrift.I64, 6); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 6:N: ", p), err) }
+  if err := oprot.WriteI64(ctx, int64(p.N)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.N (6) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 6:N: ", p), err) }
+  return err
+}
+
+func (p *WaffleThriftInitArgsArgs) String() string {
+  if p == nil {
+    return "<nil>"
+  }
+  return fmt.Sprintf("WaffleThriftInitArgsArgs(%+v)", *p)
+}
+
+type WaffleThriftInitArgsResult struct {
+}
+
+func NewWaffleThriftInitArgsResult() *WaffleThriftInitArgsResult {
+  return &WaffleThriftInitArgsResult{}
+}
+
+func (p *WaffleThriftInitArgsResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
+  if _, err := iprot.ReadStructBegin(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
+  }
+
+
+  for {
+    _, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
+    if err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+    }
+    if fieldTypeId == thrift.STOP { break; }
+    if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+      return err
+    }
+    if err := iprot.ReadFieldEnd(ctx); err != nil {
+      return err
+    }
+  }
+  if err := iprot.ReadStructEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+  }
+  return nil
+}
+
+func (p *WaffleThriftInitArgsResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
+  if err := oprot.WriteStructBegin(ctx, "init_args_result"); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
+  if p != nil {
+  }
+  if err := oprot.WriteFieldStop(ctx); err != nil {
+    return thrift.PrependError("write field stop error: ", err) }
+  if err := oprot.WriteStructEnd(ctx); err != nil {
+    return thrift.PrependError("write struct stop error: ", err) }
+  return nil
+}
+
+func (p *WaffleThriftInitArgsResult) String() string {
+  if p == nil {
+    return "<nil>"
+  }
+  return fmt.Sprintf("WaffleThriftInitArgsResult(%+v)", *p)
 }
 
 // Attributes:
@@ -2580,13 +3330,13 @@ func (p *WaffleThriftGetBatchArgs)  ReadField1(ctx context.Context, iprot thrift
   tSlice := make([]string, 0, size)
   p.Keys =  tSlice
   for i := 0; i < size; i ++ {
-var _elem30 string
+var _elem38 string
     if v, err := iprot.ReadString(ctx); err != nil {
     return thrift.PrependError("error reading field 0: ", err)
 } else {
-    _elem30 = v
+    _elem38 = v
 }
-    p.Keys = append(p.Keys, _elem30)
+    p.Keys = append(p.Keys, _elem38)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)
@@ -2697,13 +3447,13 @@ func (p *WaffleThriftGetBatchResult)  ReadField0(ctx context.Context, iprot thri
   tSlice := make([]string, 0, size)
   p.Success =  tSlice
   for i := 0; i < size; i ++ {
-var _elem31 string
+var _elem39 string
     if v, err := iprot.ReadString(ctx); err != nil {
     return thrift.PrependError("error reading field 0: ", err)
 } else {
-    _elem31 = v
+    _elem39 = v
 }
-    p.Success = append(p.Success, _elem31)
+    p.Success = append(p.Success, _elem39)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)
@@ -2827,13 +3577,13 @@ func (p *WaffleThriftMixBatchArgs)  ReadField1(ctx context.Context, iprot thrift
   tSlice := make([]string, 0, size)
   p.Keys =  tSlice
   for i := 0; i < size; i ++ {
-var _elem32 string
+var _elem40 string
     if v, err := iprot.ReadString(ctx); err != nil {
     return thrift.PrependError("error reading field 0: ", err)
 } else {
-    _elem32 = v
+    _elem40 = v
 }
-    p.Keys = append(p.Keys, _elem32)
+    p.Keys = append(p.Keys, _elem40)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)
@@ -2849,13 +3599,13 @@ func (p *WaffleThriftMixBatchArgs)  ReadField2(ctx context.Context, iprot thrift
   tSlice := make([]string, 0, size)
   p.Values =  tSlice
   for i := 0; i < size; i ++ {
-var _elem33 string
+var _elem41 string
     if v, err := iprot.ReadString(ctx); err != nil {
     return thrift.PrependError("error reading field 0: ", err)
 } else {
-    _elem33 = v
+    _elem41 = v
 }
-    p.Values = append(p.Values, _elem33)
+    p.Values = append(p.Values, _elem41)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)
@@ -2985,13 +3735,13 @@ func (p *WaffleThriftMixBatchResult)  ReadField0(ctx context.Context, iprot thri
   tSlice := make([]string, 0, size)
   p.Success =  tSlice
   for i := 0; i < size; i ++ {
-var _elem34 string
+var _elem42 string
     if v, err := iprot.ReadString(ctx); err != nil {
     return thrift.PrependError("error reading field 0: ", err)
 } else {
-    _elem34 = v
+    _elem42 = v
 }
-    p.Success = append(p.Success, _elem34)
+    p.Success = append(p.Success, _elem42)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)
@@ -3115,13 +3865,13 @@ func (p *WaffleThriftPutBatchArgs)  ReadField1(ctx context.Context, iprot thrift
   tSlice := make([]string, 0, size)
   p.Keys =  tSlice
   for i := 0; i < size; i ++ {
-var _elem35 string
+var _elem43 string
     if v, err := iprot.ReadString(ctx); err != nil {
     return thrift.PrependError("error reading field 0: ", err)
 } else {
-    _elem35 = v
+    _elem43 = v
 }
-    p.Keys = append(p.Keys, _elem35)
+    p.Keys = append(p.Keys, _elem43)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)
@@ -3137,13 +3887,13 @@ func (p *WaffleThriftPutBatchArgs)  ReadField2(ctx context.Context, iprot thrift
   tSlice := make([]string, 0, size)
   p.Values =  tSlice
   for i := 0; i < size; i ++ {
-var _elem36 string
+var _elem44 string
     if v, err := iprot.ReadString(ctx); err != nil {
     return thrift.PrependError("error reading field 0: ", err)
 } else {
-    _elem36 = v
+    _elem44 = v
 }
-    p.Values = append(p.Values, _elem36)
+    p.Values = append(p.Values, _elem44)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)
@@ -3308,12 +4058,12 @@ func (p *WaffleThriftResponseClient) SetLastResponseMeta_(meta thrift.ResponseMe
 //  - OpCode
 //  - Result_
 func (p *WaffleThriftResponseClient) AsyncResponse(ctx context.Context, seq_id *SequenceID, op_code int32, result []string) (_err error) {
-  var _args117 WaffleThriftResponseAsyncResponseArgs
-  _args117.SeqID = seq_id
-  _args117.OpCode = op_code
-  _args117.Result_ = result
+  var _args143 WaffleThriftResponseAsyncResponseArgs
+  _args143.SeqID = seq_id
+  _args143.OpCode = op_code
+  _args143.Result_ = result
   p.SetLastResponseMeta_(thrift.ResponseMeta{})
-  if _, err := p.Client_().Call(ctx, "async_response", &_args117, nil); err != nil {
+  if _, err := p.Client_().Call(ctx, "async_response", &_args143, nil); err != nil {
     return err
   }
   return nil
@@ -3339,9 +4089,9 @@ func (p *WaffleThriftResponseProcessor) ProcessorMap() map[string]thrift.TProces
 
 func NewWaffleThriftResponseProcessor(handler WaffleThriftResponse) *WaffleThriftResponseProcessor {
 
-  self118 := &WaffleThriftResponseProcessor{handler:handler, processorMap:make(map[string]thrift.TProcessorFunction)}
-  self118.processorMap["async_response"] = &waffleThriftResponseProcessorAsyncResponse{handler:handler}
-return self118
+  self144 := &WaffleThriftResponseProcessor{handler:handler, processorMap:make(map[string]thrift.TProcessorFunction)}
+  self144.processorMap["async_response"] = &waffleThriftResponseProcessorAsyncResponse{handler:handler}
+return self144
 }
 
 func (p *WaffleThriftResponseProcessor) Process(ctx context.Context, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
@@ -3352,12 +4102,12 @@ func (p *WaffleThriftResponseProcessor) Process(ctx context.Context, iprot, opro
   }
   iprot.Skip(ctx, thrift.STRUCT)
   iprot.ReadMessageEnd(ctx)
-  x119 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function " + name)
+  x145 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function " + name)
   oprot.WriteMessageBegin(ctx, name, thrift.EXCEPTION, seqId)
-  x119.Write(ctx, oprot)
+  x145.Write(ctx, oprot)
   oprot.WriteMessageEnd(ctx)
   oprot.Flush(ctx)
-  return false, x119
+  return false, x145
 
 }
 
@@ -3504,13 +4254,13 @@ func (p *WaffleThriftResponseAsyncResponseArgs)  ReadField3(ctx context.Context,
   tSlice := make([]string, 0, size)
   p.Result_ =  tSlice
   for i := 0; i < size; i ++ {
-var _elem120 string
+var _elem146 string
     if v, err := iprot.ReadString(ctx); err != nil {
     return thrift.PrependError("error reading field 0: ", err)
 } else {
-    _elem120 = v
+    _elem146 = v
 }
-    p.Result_ = append(p.Result_, _elem120)
+    p.Result_ = append(p.Result_, _elem146)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)

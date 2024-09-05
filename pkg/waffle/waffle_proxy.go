@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -146,7 +149,35 @@ func (w *WaffleProxy) BatchInsertToRedis() {
 	}
 }
 
+func loadInitTrace(fileName string) ([]string, []string) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		log.Fatalf("Failed to open file: %s", err)
+	}
+	defer file.Close()
+
+	keys := []string{}
+	values := []string{}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Fields(line)
+		if parts[0] == "SET" {
+			keys = append(keys, parts[1])
+			values = append(values, parts[2])
+		}
+	}
+
+	return keys, values
+}
+
 func (w *WaffleProxy) Init(ctx context.Context, req *waffle_service.InitRequest) (*waffle_service.Empty, error) {
+	fileName := "./server_input.txt"
+	Keys, Values := loadInitTrace(fileName)
+	req.Keys = Keys
+	req.Values = Values
+
 	w.realBst = NewFrequencySmoother()
 	w.fakeBst = NewFrequencySmoother()
 	w.encryptionEngine = NewEncryptionEngine()
@@ -168,6 +199,7 @@ func (w *WaffleProxy) Init(ctx context.Context, req *waffle_service.InitRequest)
 	fmt.Println("Key Size in init() is:", len(req.Keys))
 	//Adding the Data to the Database
 	for i, k := range req.Keys {
+		fmt.Println(i)
 		w.realBst.Insert(k)
 
 		keyEncrypted := w.encryptionEngine.PRF(fmt.Sprintf("%s#%d", k, w.realBst.GetFrequency(k)))

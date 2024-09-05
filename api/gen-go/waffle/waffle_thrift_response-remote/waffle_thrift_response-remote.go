@@ -150,43 +150,43 @@ func main() {
       fmt.Fprintln(os.Stderr, "AsyncResponse requires 3 args")
       flag.Usage()
     }
-    arg121 := flag.Arg(1)
-    mbTrans122 := thrift.NewTMemoryBufferLen(len(arg121))
-    defer mbTrans122.Close()
-    _, err123 := mbTrans122.WriteString(arg121)
-    if err123 != nil {
+    arg147 := flag.Arg(1)
+    mbTrans148 := thrift.NewTMemoryBufferLen(len(arg147))
+    defer mbTrans148.Close()
+    _, err149 := mbTrans148.WriteString(arg147)
+    if err149 != nil {
       Usage()
       return
     }
-    factory124 := thrift.NewTJSONProtocolFactory()
-    jsProt125 := factory124.GetProtocol(mbTrans122)
+    factory150 := thrift.NewTJSONProtocolFactory()
+    jsProt151 := factory150.GetProtocol(mbTrans148)
     argvalue0 := waffle.NewSequenceID()
-    err126 := argvalue0.Read(context.Background(), jsProt125)
-    if err126 != nil {
+    err152 := argvalue0.Read(context.Background(), jsProt151)
+    if err152 != nil {
       Usage()
       return
     }
     value0 := argvalue0
-    tmp1, err127 := (strconv.Atoi(flag.Arg(2)))
-    if err127 != nil {
+    tmp1, err153 := (strconv.Atoi(flag.Arg(2)))
+    if err153 != nil {
       Usage()
       return
     }
     argvalue1 := int32(tmp1)
     value1 := argvalue1
-    arg128 := flag.Arg(3)
-    mbTrans129 := thrift.NewTMemoryBufferLen(len(arg128))
-    defer mbTrans129.Close()
-    _, err130 := mbTrans129.WriteString(arg128)
-    if err130 != nil { 
+    arg154 := flag.Arg(3)
+    mbTrans155 := thrift.NewTMemoryBufferLen(len(arg154))
+    defer mbTrans155.Close()
+    _, err156 := mbTrans155.WriteString(arg154)
+    if err156 != nil { 
       Usage()
       return
     }
-    factory131 := thrift.NewTJSONProtocolFactory()
-    jsProt132 := factory131.GetProtocol(mbTrans129)
+    factory157 := thrift.NewTJSONProtocolFactory()
+    jsProt158 := factory157.GetProtocol(mbTrans155)
     containerStruct2 := waffle.NewWaffleThriftResponseAsyncResponseArgs()
-    err133 := containerStruct2.ReadField3(context.Background(), jsProt132)
-    if err133 != nil {
+    err159 := containerStruct2.ReadField3(context.Background(), jsProt158)
+    if err159 != nil {
       Usage()
       return
     }

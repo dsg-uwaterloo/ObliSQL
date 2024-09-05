@@ -84,6 +84,30 @@ func loadDbTrace(fileName string, traceSize int) map[string]map[string][]interfa
 	}
 	return result
 }
+
+func loadInitTrace(fileName string) ([]string, []string) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		log.Fatalf("Failed to open file: %s", err)
+	}
+	defer file.Close()
+
+	keys := []string{}
+	values := []string{}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Fields(line)
+		if parts[0] == "SET" {
+			keys = append(keys, parts[1])
+			values = append(values, parts[2])
+		}
+	}
+
+	return keys, values
+}
+
 func (p *ProxyClient) Init(host string, port int) error {
 	// Create a configuration for the socket
 	conf := &thrift.TConfiguration{
@@ -93,8 +117,8 @@ func (p *ProxyClient) Init(host string, port int) error {
 	// Use NewTSocketConf instead of NewTSocket
 	socket := thrift.NewTSocketConf(fmt.Sprintf("%s:%d", host, port), conf)
 
-	transport := thrift.NewTFramedTransport(socket)
-	protocol := thrift.NewTBinaryProtocolFactoryDefault()
+	transport := thrift.NewTFramedTransportConf(socket, conf)
+	protocol := thrift.NewTBinaryProtocolFactoryConf(conf)
 	client := waffle.NewWaffleThriftClientFactory(transport, protocol)
 	response := waffle.NewWaffleThriftResponseClientFactory(transport, protocol)
 
@@ -196,6 +220,15 @@ func (p *ProxyClient) PutBatch(keys, values []string) error {
 	return nil
 }
 
+func (p *ProxyClient) AsyncResponse(seqID *waffle.SequenceID, opCode int32, result []string) error {
+	ctx := context.Background()
+	err := p.response.AsyncResponse(ctx, seqID, opCode, result)
+	if err != nil {
+		return fmt.Errorf("error calling AsyncResponse: %v", err)
+	}
+	return nil
+}
+
 func (p *ProxyClient) MixBatch(keys, values []string) ([]string, error) {
 	ctx := context.Background()
 	results, err := p.client.MixBatch(ctx, keys, values)
@@ -205,14 +238,23 @@ func (p *ProxyClient) MixBatch(keys, values []string) ([]string, error) {
 	return results, nil
 }
 
-func (p *ProxyClient) AsyncResponse(seqID *waffle.SequenceID, opCode int32, result []string) error {
+func (p *ProxyClient) InitDB(keys, values []string) {
 	ctx := context.Background()
-	err := p.response.AsyncResponse(ctx, seqID, opCode, result)
+	err := p.client.InitDb(ctx, keys, values)
+
 	if err != nil {
-		return fmt.Errorf("error calling AsyncResponse: %v", err)
+		fmt.Errorf("Error Initializing DB: %v", err)
 	}
-	return nil
 }
+
+func (p *ProxyClient) InitArgs(B, R, F, D, C, N int64) {
+	ctx := context.Background()
+	err := p.client.InitArgs_(ctx, B, R, F, D, C, N)
+	if err != nil {
+		fmt.Errorf("Error Initializing Arguments: %v", err)
+	}
+}
+
 func runBenchmark(traceFile map[string]map[string][]interface{}, clients []*ProxyClient, timeVal time.Duration) {
 	var wg sync.WaitGroup
 	startTime := time.Now()
@@ -303,7 +345,11 @@ benchmarkLoop:
 
 func main() {
 	// Initialize 4 clients
-	numClients := 4
+
+	initTrace := "./server_input.txt"
+	keys, values := loadInitTrace(initTrace)
+
+	numClients := 2
 	clients := make([]*ProxyClient, numClients)
 	for i := 0; i < numClients; i++ {
 		client := &ProxyClient{}
@@ -312,8 +358,13 @@ func main() {
 			fmt.Printf("Error initializing client %d: %v\n", i, err)
 			return
 		}
+		client.GetClientID()
 		clients[i] = client
 	}
+	//Use one of the Clients to init waffle.
+
+	clients[0].InitArgs(1200, 800, 100, 100000, 2, 1)
+	clients[0].InitDB(keys, values)
 
 	benchTrace := "./benchmark_input.txt"
 	traceFile := loadDbTrace(benchTrace, 800)
