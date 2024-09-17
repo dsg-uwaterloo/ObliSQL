@@ -1,1 +1,6 @@
 .vscode
+cmakebuild
+tracfiles
+benchmark_client
+loadbalancer
+resolver

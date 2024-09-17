@@ -21,6 +21,7 @@ import (
 	executor "github.com/Haseeb1399/WorkingThesis/api/executor"
 	loadbalancer "github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
 	waffle_client "github.com/Haseeb1399/WorkingThesis/pkg/waffle_executor"
+	queue "github.com/golang-collections/collections/queue"
 	"google.golang.org/grpc"
 )
 
@@ -36,24 +37,28 @@ type responseChannel struct {
 	channel chan KVPair
 }
 
+type executorQueue struct {
+	m     *sync.Mutex
+	queue *queue.Queue
+}
+
 type myLoadBalancer struct {
 	loadbalancer.UnimplementedLoadBalancerServer
-	done           bool
-	R              int
-	B              int
-	F              int
-	D              int
-	C              int
-	N              int
-	executorNumber int
-	executorType   string
-	executors      map[int][]*waffle_client.ProxyClient
-	clientMutexes  map[int][]sync.Mutex
-	exectorQueues  map[int][]KVPair
-	channelMap     map[string]responseChannel
-	queueLock      []sync.Mutex
-	channelLock    sync.Mutex
-	requestNumber  atomic.Int64
+	done              bool
+	R                 int
+	B                 int
+	F                 int
+	D                 int
+	C                 int
+	N                 int
+	executorNumber    int
+	executorType      string
+	executors         map[int][]*waffle_client.ProxyClient
+	clientMutexes     map[int][]sync.Mutex
+	executorQueueList map[int]executorQueue
+	channelMap        map[string]responseChannel
+	channelLock       sync.Mutex
+	requestNumber     atomic.Int64
 }
 
 func hashString(s string, N uint32) uint32 {
@@ -111,9 +116,13 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 	}
 
 	for i := 0; i < lb.executorNumber; i++ {
-		lb.queueLock[i].Lock()
-		lb.exectorQueues[i] = append(lb.exectorQueues[i], localMap[i]...)
-		lb.queueLock[i].Unlock()
+		lb.executorQueueList[i].m.Lock()
+
+		for j := 0; j < len(localMap[i]); j++ {
+			lb.executorQueueList[i].queue.Enqueue(localMap[i][j])
+		}
+
+		lb.executorQueueList[i].m.Unlock()
 	}
 
 	recv_resp := make([]KVPair, 0, len(req.Keys))
@@ -148,7 +157,6 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 		sendVal = append(sendVal, v.Value)
 	}
 
-	fmt.Println("Finished: ", channelId)
 	return &loadbalancer.LoadBalanceResponse{
 		RequestId:    req.RequestId,
 		ObjectNum:    req.ObjectNum,
@@ -258,29 +266,29 @@ func (lb *myLoadBalancer) checkQueues(ctx context.Context) {
 			// fmt.Println("Timer Click")
 			localMap := make(map[int][]KVPair)
 			localAdded := make(map[int]int)
-
+			elements := []KVPair{}
 			for i := 0; i < lb.executorNumber; i++ {
-				lb.queueLock[i].Lock()
-				currLen := len(lb.exectorQueues[i])
+				lb.executorQueueList[i].m.Lock()
+				currLen := lb.executorQueueList[i].queue.Len()
 				toAdd := lb.R - currLen
 				if toAdd < 0 {
 					toAdd = 0
 				}
 
-				elements := lb.exectorQueues[i][:(lb.R - toAdd)]
-				lb.exectorQueues[i] = lb.exectorQueues[i][(lb.R - toAdd):]
-
-				fakeRequests := make([]KVPair, toAdd)
-
-				for i := range fakeRequests {
-					fakeRequests[i] = KVPair{Key: "Fake", Value: "", channelId: "noChannel"}
+				for lb.executorQueueList[i].queue.Len() > 0 {
+					currElement := lb.executorQueueList[i].queue.Dequeue()
+					elements = append(elements, currElement.(KVPair))
 				}
-				elements = append(elements, fakeRequests...)
 
-				lb.queueLock[i].Unlock()
+				for toAdd > 0 {
+					temp := KVPair{Key: "Fake", Value: "", channelId: "noChannel"}
+					elements = append(elements, temp)
+					toAdd--
+				}
+
+				lb.executorQueueList[i].m.Unlock()
 				localMap[i] = elements
 				localAdded[i] = toAdd
-				// go lb.executeBatch(elements, i)
 			}
 			toSend := false
 			for i := 0; i < lb.executorNumber; i++ {
@@ -297,16 +305,19 @@ func (lb *myLoadBalancer) checkQueues(ctx context.Context) {
 			timer.Reset(waitTime)
 		default:
 			for i := 0; i < lb.executorNumber; i++ {
-				lb.queueLock[i].Lock()
-				currLen := len(lb.exectorQueues[i])
-				lb.queueLock[i].Unlock()
+				lb.executorQueueList[i].m.Lock()
+				currLen := lb.executorQueueList[i].queue.Len()
+				lb.executorQueueList[i].m.Unlock()
 				if currLen >= lb.R {
 					if i == lb.executorNumber-1 {
 						for j := 0; j < lb.executorNumber; j++ {
-							lb.queueLock[j].Lock()
-							elements := lb.exectorQueues[j][:lb.R]
-							lb.exectorQueues[j] = lb.exectorQueues[j][lb.R:]
-							lb.queueLock[j].Unlock()
+							lb.executorQueueList[j].m.Lock()
+							elements := []KVPair{}
+							for elementNum := 0; elementNum < lb.R; elementNum++ {
+								currEle := lb.executorQueueList[j].queue.Dequeue()
+								elements = append(elements, currEle.(KVPair))
+							}
+							lb.executorQueueList[j].m.Unlock()
 							go lb.executeBatch(elements, j)
 						}
 						timer.Reset(waitTime)
@@ -351,7 +362,7 @@ func (lb *myLoadBalancer) connectToExecutors(hosts []string, ports []string, fil
 		}
 	}
 
-	fmt.Println(len(initMap[0].Keys), len(initMap[0].Values))
+	fmt.Println("Total Keys and Values: ", len(initMap[0].Keys), len(initMap[0].Values))
 
 	lb.executors = make(map[int][]*waffle_client.ProxyClient)
 	lb.clientMutexes = make(map[int][]sync.Mutex)
@@ -359,6 +370,10 @@ func (lb *myLoadBalancer) connectToExecutors(hosts []string, ports []string, fil
 	for i, v := range hosts {
 		lb.executors[i] = make([]*waffle_client.ProxyClient, numClient)
 		lb.clientMutexes[i] = make([]sync.Mutex, numClient)
+		lb.executorQueueList[i] = executorQueue{
+			m:     &sync.Mutex{},
+			queue: queue.New(),
+		}
 
 		port, err := strconv.Atoi(ports[i])
 		if err != nil {
@@ -420,22 +435,21 @@ func main() {
 
 	//Define Service
 	service := myLoadBalancer{
-		done:           false,
-		R:              *rPtr,
-		B:              *bPtr,
-		C:              *cPtr,
-		F:              *fPtr,
-		N:              *nCPtr,
-		D:              *dPtr,
-		executorNumber: *nPtr,
-		executorType:   *tPtr,
-		executors:      make(map[int][]*waffle_client.ProxyClient),
-		clientMutexes:  make(map[int][]sync.Mutex),
-		exectorQueues:  make(map[int][]KVPair),
-		channelMap:     make(map[string]responseChannel),
-		queueLock:      make([]sync.Mutex, len(hosts)),
-		channelLock:    sync.Mutex{},
-		requestNumber:  atomic.Int64{},
+		done:              false,
+		R:                 *rPtr,
+		B:                 *bPtr,
+		C:                 *cPtr,
+		F:                 *fPtr,
+		N:                 *nCPtr,
+		D:                 *dPtr,
+		executorNumber:    *nPtr,
+		executorType:      *tPtr,
+		executors:         make(map[int][]*waffle_client.ProxyClient),
+		clientMutexes:     make(map[int][]sync.Mutex),
+		executorQueueList: make(map[int]executorQueue),
+		channelMap:        make(map[string]responseChannel),
+		channelLock:       sync.Mutex{},
+		requestNumber:     atomic.Int64{},
 	}
 	service.requestNumber.Store(0)
 
@@ -458,7 +472,6 @@ func main() {
 		serverRegister.GracefulStop()
 		os.Exit(0)
 	}()
-
 	//Start serving
 	err = serverRegister.Serve(lis)
 

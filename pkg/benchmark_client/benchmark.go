@@ -75,7 +75,7 @@ func main() {
 
 	requests := []Query{}
 
-	for len(requests) < 1000000 {
+	for len(requests) < 500000 {
 		requests = append(requests, getTestCases()...)
 	}
 
