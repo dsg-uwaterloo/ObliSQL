@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+option go_package = "LoadBalancer/service;loadbalancer";
+
+message loadBalanceRequest{
+    int64 request_id = 1;
+    int64 object_num = 2;
+    int64 totalObjects = 3;
+    repeated string keys =4;
+    repeated string values = 5;
+}
+
+message loadBalanceResponse{
+    int64 request_id = 1;
+    int64 object_num = 2;
+    int64 totalObjects = 3;
+    repeated string keys = 4;
+    repeated string values = 5;
+}
+
+service LoadBalancer{
+    rpc addKeys(loadBalanceRequest) returns (loadBalanceResponse);
+}

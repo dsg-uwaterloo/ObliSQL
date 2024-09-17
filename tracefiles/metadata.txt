@@ -1,0 +1,118 @@
+{
+    "item": {
+        "pkStart": 0,
+        "pkEnd": 999,
+        "indexOn": [],
+        "colNames": [
+            "i_id",
+            "title",
+            "description",
+            "creation_date"
+        ],
+        "colTypes": {
+            "i_id": "int",
+            "title": "varchar",
+            "description": "varchar",
+            "creation_date": "timestamp"
+        },
+        "rangeIndexInfo": {},
+        "tableName": "item"
+    },
+    "review": {
+        "pkStart": 0,
+        "pkEnd": 4969,
+        "indexOn": [
+            "u_id",
+            "a_id",
+            "i_id"
+        ],
+        "colNames": [
+            "a_id",
+            "u_id",
+            "i_id",
+            "rating",
+            "rank",
+            "comment",
+            "creation_date"
+        ],
+        "colTypes": {
+            "a_id": "int",
+            "u_id": "int",
+            "i_id": "int",
+            "rating": "int",
+            "rank": "int",
+            "comment": "varchar",
+            "creation_date": "timestamp"
+        },
+        "rangeIndexInfo": {},
+        "tableName": "review"
+    },
+    "useracct": {
+        "pkStart": 0,
+        "pkEnd": 1999,
+        "indexOn": [],
+        "colNames": [
+            "u_id",
+            "name",
+            "email",
+            "creation_date"
+        ],
+        "colTypes": {
+            "u_id": "int",
+            "name": "varchar",
+            "email": "varchar",
+            "creation_date": "timestamp"
+        },
+        "rangeIndexInfo": {},
+        "tableName": "useracct"
+    },
+    "trust": {
+        "pkStart": 0,
+        "pkEnd": 2531,
+        "indexOn": [
+            "source_u_id",
+            "target_u_id"
+        ],
+        "colNames": [
+            "source_u_id",
+            "target_u_id",
+            "trust",
+            "creation_date"
+        ],
+        "colTypes": {
+            "source_u_id": "int",
+            "target_u_id": "int",
+            "trust": "int",
+            "creation_date": "timestamp"
+        },
+        "rangeIndexInfo": {},
+        "tableName": "trust"
+    },
+    "review_rating": {
+        "pkStart": 0,
+        "pkEnd": 0,
+        "indexOn": [],
+        "colNames": [
+            "u_id",
+            "a_id",
+            "rating",
+            "status",
+            "creation_date",
+            "last_mod_date",
+            "type",
+            "vertical_id"
+        ],
+        "colTypes": {
+            "u_id": "int",
+            "a_id": "int",
+            "rating": "int",
+            "status": "int",
+            "creation_date": "timestamp",
+            "last_mod_date": "timestamp",
+            "type": "int",
+            "vertical_id": "int"
+        },
+        "rangeIndexInfo": {},
+        "tableName": "review_rating"
+    }
+}

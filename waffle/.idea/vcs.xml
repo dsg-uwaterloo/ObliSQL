@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="$PROJECT_DIR$/.." vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cmakebuild/cpp_redis-prefix/src/cpp_redis" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cmakebuild/cpp_redis-prefix/src/cpp_redis/tacopie" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cmakebuild/libcuckoo-prefix/src/libcuckoo" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/cmakebuild/tacopie-prefix/src/tacopie" vcs="Git" />
+  </component>
+</project>
