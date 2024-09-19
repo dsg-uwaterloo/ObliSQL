@@ -13,6 +13,7 @@ message parsedQuery{
     repeated string aggregateType = 8;
     repeated string orderBy = 9;
     repeated string joinColumns = 10;
+    repeated string updateVal = 11;
 }
 
 message queryResponse{

@@ -33,6 +33,8 @@ func (c *myResolver) ExecuteQuery(ctx context.Context, q *resolver.ParsedQuery) 
 		resp, err = c.doAggregate(q, requestID)
 	case "join":
 		resp, err = c.doJoin(q, requestID)
+	case "update":
+		resp, err = c.doUpdate(q, requestID)
 	default:
 		return nil, fmt.Errorf("unsupported query type: %s", q.QueryType)
 	}

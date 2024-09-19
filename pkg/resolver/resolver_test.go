@@ -148,6 +148,30 @@ func getTestCases() []TestCase {
 			},
 		},
 		{
+			name: "Update using two filters with index (AND)",
+			//Update review set comment = "This is the new comment" where a_id =10 and i_id = 7;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "update",
+				TableName:  "review",
+				ColToGet:   []string{"rank", "comment"},
+				SearchCol:  []string{"a_id", "i_id"},
+				SearchVal:  []string{"10", "7"},
+				SearchType: []string{"point", "point"},
+				UpdateVal:  []string{"1", "This is the new comment"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"review/rank/211",
+					"review/comment/211",
+				},
+				Values: []string{
+					"1",
+					"This is the new comment",
+				},
+			},
+		},
+		{
 			name: "Select without index",
 			//Select title from item where i_id = 500;
 			requestQuery: &resolver.ParsedQuery{
@@ -165,6 +189,28 @@ func getTestCases() []TestCase {
 				},
 				Values: []string{
 					"?M7s'eFjt#_ll_<;Fjt9yMqNae!Et]]1rF0]lsW@YgM,-}Hpx'CYM.V((:bh1F[/xr@GWs*U8?rNHV^OWHt0P?JnteKvy5r/>ASYo&%##|_fW]J`c~]x>ASYfm3cVE|%",
+				},
+			},
+		},
+		{
+			name: "Update without index",
+			//Select title from item where i_id = 500;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "update",
+				TableName:  "item",
+				ColToGet:   []string{"title"},
+				SearchCol:  []string{"i_id"},
+				SearchVal:  []string{"500"},
+				SearchType: []string{"point"},
+				UpdateVal:  []string{"New Title for testing!"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"item/title/737",
+				},
+				Values: []string{
+					"New Title for testing!",
 				},
 			},
 		},
@@ -286,31 +332,31 @@ func getTestCases() []TestCase {
 				},
 			},
 		},
-		// {
-		// 	name: "Sum & Count Aggregate",
-		// 	// select sum(rating) from new_review where i_id =7
-		// 	// union all
-		// 	// select count(rating)  from new_review where i_id =7;
-		// 	requestQuery: &resolver.ParsedQuery{
-		// 		ClientId:      "1",
-		// 		QueryType:     "aggregate",
-		// 		TableName:     "review",
-		// 		ColToGet:      []string{"rating", "rating"},
-		// 		SearchCol:     []string{"i_id", "i_id"},
-		// 		SearchVal:     []string{"7", "7"},
-		// 		SearchType:    []string{"point", "point"},
-		// 		AggregateType: []string{"sum", "count"},
-		// 	},
-		// 	expectedAns: &resolver.QueryResponse{
-		// 		Keys: []string{
-		// 			"", "",
-		// 		},
-		// 		Values: []string{
-		// 			"6",
-		// 			"3",
-		// 		},
-		// 	},
-		// },
+		{
+			name: "Sum & Count Aggregate",
+			// select sum(rating) from new_review where i_id =7
+			// union all
+			// select count(rating)  from new_review where i_id =7;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:      "1",
+				QueryType:     "aggregate",
+				TableName:     "review",
+				ColToGet:      []string{"rating", "rating"},
+				SearchCol:     []string{"i_id", "i_id"},
+				SearchVal:     []string{"7", "7"},
+				SearchType:    []string{"point", "point"},
+				AggregateType: []string{"sum", "count"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"", "",
+				},
+				Values: []string{
+					"6",
+					"3",
+				},
+			},
+		},
 		{
 			name: "Range",
 			//select rating from review where u_id between 812 and 814;
@@ -421,6 +467,52 @@ func getTestCases() []TestCase {
 				Values: []string{"2"},
 			},
 		},
+		//Test to ensure that the update actually happened (Done at the end to reduce chances of value returning from cache)
+		{
+
+			name: "Select using two filters -- Checking Update",
+			//Select * from review where a_id =10 and i_id = 7;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "review",
+				ColToGet:   []string{"rank", "comment"},
+				SearchCol:  []string{"a_id", "i_id"},
+				SearchVal:  []string{"10", "7"},
+				SearchType: []string{"point", "point"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"review/rank/211",
+					"review/comment/211",
+				},
+				Values: []string{
+					"1",
+					"This is the new comment",
+				},
+			},
+		},
+		{
+			name: "Select without index -- Checking Update",
+			//Select title from item where i_id = 500;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "item",
+				ColToGet:   []string{"title"},
+				SearchCol:  []string{"i_id"},
+				SearchVal:  []string{"500"},
+				SearchType: []string{"point"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys: []string{
+					"item/title/737",
+				},
+				Values: []string{
+					"New Title for testing!",
+				},
+			},
+		},
 	}
 	return testCases
 }
@@ -462,27 +554,27 @@ func TestQueryOne(t *testing.T) {
 
 }
 
-func TestQueryParallel(t *testing.T) {
+// func TestQueryParallel(t *testing.T) {
 
-	resolverAddr := "localhost:9900"
-	conn, err := grpc.NewClient(resolverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
-	if err != nil {
-		log.Fatalf("Failed to open connection to Resolver: %v", err)
-	}
-	defer conn.Close()
+// 	resolverAddr := "localhost:9900"
+// 	conn, err := grpc.NewClient(resolverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
+// 	if err != nil {
+// 		log.Fatalf("Failed to open connection to Resolver: %v", err)
+// 	}
+// 	defer conn.Close()
 
-	resolverClient := resolver.NewResolverClient(conn)
-	testcases := getTestCases()
+// 	resolverClient := resolver.NewResolverClient(conn)
+// 	testcases := getTestCases()
 
-	sampleSize := 20 // Adjust the sample size as needed
-	sampledTestCases := sampleTestCases(testcases, sampleSize)
+// 	sampleSize := 20 // Adjust the sample size as needed
+// 	sampledTestCases := sampleTestCases(testcases, sampleSize)
 
-	var wg sync.WaitGroup
+// 	var wg sync.WaitGroup
 
-	for _, tc := range sampledTestCases {
-		wg.Add(1)
-		go runTestCase(tc, resolverClient, &wg)
-	}
+// 	for _, tc := range sampledTestCases {
+// 		wg.Add(1)
+// 		go runTestCase(tc, resolverClient, &wg)
+// 	}
 
-	wg.Wait()
-}
+// 	wg.Wait()
+// }

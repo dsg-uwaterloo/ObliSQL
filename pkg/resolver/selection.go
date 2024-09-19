@@ -335,7 +335,7 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery, localRequestID int64) (*q
 		filteredPks, err = c.filterPkUsingIndex(q, localRequestID)
 	} else {
 		if c.checkAnyIndexExists(q.TableName, q.SearchCol) {
-			log.Fatalln("Mix of index and non-index column does not exist")
+			log.Fatalln("Mix of index and non-index column not implemented.")
 		} else {
 
 			columData, err := c.getSearchColumns(q.TableName, q.SearchCol, localRequestID)
