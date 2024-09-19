@@ -1,6 +1,9 @@
 .vscode
+.idea
 cmakebuild
+cmake-build-debug
 tracfiles
 benchmark_client
 loadbalancer
 resolver
+proxyJump.txt

@@ -18,6 +18,9 @@ import (
 	"syscall"
 	"time"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	executor "github.com/Haseeb1399/WorkingThesis/api/executor"
 	loadbalancer "github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
 	waffle_client "github.com/Haseeb1399/WorkingThesis/pkg/waffle_executor"
@@ -410,6 +413,14 @@ func main() {
 	tPtr := flag.String("T", "Waffle", "Executor Type")
 
 	flag.Parse()
+
+	// Start pprof server
+	go func() {
+		log.Println("Starting pprof server on :6060")
+		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+			log.Fatalf("pprof server failed: %v", err)
+		}
+	}()
 
 	//Gracefully exist go routines by passing in main context
 
