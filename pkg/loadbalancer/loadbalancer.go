@@ -60,6 +60,7 @@ type myLoadBalancer struct {
 	clientMutexes     map[int][]sync.Mutex
 	executorQueueList map[int]executorQueue
 	channelMap        map[string]responseChannel
+	updateCacheMap    ConcurrentMap
 	channelLock       sync.Mutex
 	requestNumber     atomic.Int64
 }
@@ -108,6 +109,16 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 	localMap := make(map[int][]KVPair)
 
 	for i := 0; i < len(req.Keys); i++ {
+
+		if req.Values[i] != "" {
+			//Insert if a higher version does not exist.
+			err := lb.updateCacheMap.Set(req.Keys[i], req.Values[i], req.RequestId)
+			//Error only happens when trying to overwrite a newer value in the cache. Abort request.
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		hashVal := hashString(req.Keys[i], uint32(lb.executorNumber))
 		currentPair := KVPair{
 			channelId:  channelId,
@@ -459,6 +470,7 @@ func main() {
 		clientMutexes:     make(map[int][]sync.Mutex),
 		executorQueueList: make(map[int]executorQueue),
 		channelMap:        make(map[string]responseChannel),
+		updateCacheMap:    NewConcurrentMap(),
 		channelLock:       sync.Mutex{},
 		requestNumber:     atomic.Int64{},
 	}
