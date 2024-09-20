@@ -5480,7 +5480,7 @@ SET review/u_id/211 238
 SET review/i_id/211 7
 SET review/rating/211 2
 SET review/rank/211 nan
-SET review/comment/211 test
+SET review/comment/211 start_value
 SET review/creation_date/211 2020-12-15
 SET review/a_id/212 11
 SET review/u_id/212 1163

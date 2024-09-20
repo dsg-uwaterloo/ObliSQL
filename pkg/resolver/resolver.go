@@ -20,12 +20,13 @@ import (
 
 func (c *myResolver) ExecuteQuery(ctx context.Context, q *resolver.ParsedQuery) (*resolver.QueryResponse, error) {
 	requestID := c.localRequestID.Add(1)
-	clientId, err := strconv.Atoi(q.ClientId)
-	if err != nil {
-		return nil, fmt.Errorf("error converting clientId to integer: %w", err)
+	clientId, errConv := strconv.Atoi(q.ClientId)
+	if errConv != nil {
+		return nil, fmt.Errorf("error converting clientId to integer: %w", errConv)
 	}
 
 	var resp *queryResponse
+	var err error
 	switch q.QueryType {
 	case "select":
 		resp, err = c.doSelect(q, requestID)
@@ -40,15 +41,15 @@ func (c *myResolver) ExecuteQuery(ctx context.Context, q *resolver.ParsedQuery) 
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute %s query: %w", q.QueryType, err)
+		return nil, fmt.Errorf("failed to execute %s query with id:%d. error: %w", q.QueryType, requestID, err)
+	} else {
+		return &resolver.QueryResponse{
+			ClientId:  int64(clientId),
+			RequestId: requestID,
+			Keys:      resp.Keys,
+			Values:    resp.Values,
+		}, nil
 	}
-
-	return &resolver.QueryResponse{
-		ClientId:  int64(clientId),
-		RequestId: 1,
-		Keys:      resp.Keys,
-		Values:    resp.Values,
-	}, nil
 }
 
 func (c *myResolver) readMetaData(filePath string) {

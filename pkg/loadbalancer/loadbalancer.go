@@ -98,6 +98,9 @@ func separateKeysValues(pairs []string) ([]string, []string) {
 func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBalanceRequest) (*loadbalancer.LoadBalanceResponse, error) {
 	// fmt.Printf("Got Request for Size: %d \n", len(req.Keys))
 	reqNum := lb.requestNumber.Add(1)
+	recv_resp := make([]KVPair, 0, len(req.Keys))
+	localUpdateMap := make(map[string]int)
+
 	channelId := fmt.Sprintf("%d-%d-%d-%d", req.RequestId, req.ObjectNum, req.TotalObjects, reqNum)
 	lb.channelLock.Lock()
 	lb.channelMap[channelId] = responseChannel{
@@ -110,12 +113,24 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 
 	for i := 0; i < len(req.Keys); i++ {
 
+		//Insert Operation
 		if req.Values[i] != "" {
 			//Insert if a higher version does not exist.
 			err := lb.updateCacheMap.Set(req.Keys[i], req.Values[i], req.RequestId)
 			//Error only happens when trying to overwrite a newer value in the cache. Abort request.
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("update request aborted: %w", err)
+			}
+			localUpdateMap[req.Keys[i]] = 1 //Local state that I (the thread) added this to the cache and have to remove it.
+		} else {
+			//Get Operation
+			cachedVal, _, isPresent := lb.updateCacheMap.Get(req.Keys[i], req.RequestId)
+			if isPresent {
+				recv_resp = append(recv_resp, KVPair{
+					Key:   req.Keys[i],
+					Value: cachedVal.(string),
+				})
+				continue //No need to request key from the Server.
 			}
 		}
 
@@ -128,7 +143,6 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 		}
 		localMap[int(hashVal)] = append(localMap[int(hashVal)], currentPair)
 	}
-
 	for i := 0; i < lb.executorNumber; i++ {
 		lb.executorQueueList[i].m.Lock()
 
@@ -139,8 +153,6 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 		lb.executorQueueList[i].m.Unlock()
 	}
 
-	recv_resp := make([]KVPair, 0, len(req.Keys))
-
 	lb.channelLock.Lock()
 	responseStruct := lb.channelMap[channelId]
 	lb.channelLock.Unlock()
@@ -149,7 +161,8 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 	myChan := responseStruct.channel
 	responseStruct.m.Unlock()
 
-	for i := 0; i < len(req.Keys); i++ {
+	expectedNonCachedResp := len(req.Keys) - len(recv_resp)
+	for i := 0; i < expectedNonCachedResp; i++ {
 		item := <-myChan
 		recv_resp = append(recv_resp, item)
 	}
@@ -167,6 +180,11 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 	sendVal := make([]string, 0, len(req.Keys))
 
 	for _, v := range recv_resp {
+		// _, ok := localUpdateMap[v.Key]
+		// if ok {
+		// 	//Delete the version that I added.
+		// 	lb.updateCacheMap.DeleteVersion(v.Key, req.RequestId)
+		// }
 		sendKeys = append(sendKeys, v.Key)
 		sendVal = append(sendVal, v.Value)
 	}
