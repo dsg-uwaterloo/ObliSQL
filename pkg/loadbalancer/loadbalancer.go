@@ -122,6 +122,7 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 				return nil, fmt.Errorf("update request aborted: %w", err)
 			}
 			localUpdateMap[req.Keys[i]] = 1 //Local state that I (the thread) added this to the cache and have to remove it.
+			continue // Fix this by adding some eviction policy
 		} else {
 			//Get Operation
 			cachedVal, _, isPresent := lb.updateCacheMap.Get(req.Keys[i], req.RequestId)
