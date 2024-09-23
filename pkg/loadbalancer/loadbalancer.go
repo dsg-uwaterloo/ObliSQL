@@ -122,16 +122,20 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 				return nil, fmt.Errorf("update request aborted: %w", err)
 			}
 			localUpdateMap[req.Keys[i]] = 1 //Local state that I (the thread) added this to the cache and have to remove it.
-			continue // Fix this by adding some eviction policy
+
 		} else {
 			//Get Operation
-			cachedVal, _, isPresent := lb.updateCacheMap.Get(req.Keys[i], req.RequestId)
+			cachedVal, version, isPresent := lb.updateCacheMap.Get(req.Keys[i], req.RequestId)
 			if isPresent {
 				recv_resp = append(recv_resp, KVPair{
 					Key:   req.Keys[i],
 					Value: cachedVal.(string),
 				})
 				continue //No need to request key from the Server.
+			}
+
+			if version == -2 {
+				return nil, fmt.Errorf("get failed due to lower version, retry request")
 			}
 		}
 
@@ -506,6 +510,14 @@ func main() {
 	//Launch Thread to check Queues
 	go service.checkQueues(ctx)
 
+	time.AfterFunc(10*time.Second, func() {
+		fmt.Println("200 seconds passed. Shutting down...")
+		cancel()
+		lis.Close()
+		serverRegister.GracefulStop()
+		os.Exit(0)
+	})
+
 	//Launch routine to listen to sig events.
 	go func() {
 		<-sigChan
@@ -518,7 +530,7 @@ func main() {
 	err = serverRegister.Serve(lis)
 
 	if err != nil {
-		log.Fatalf("Error! Could not start loadBalancer! %s", err)
+		log.Fatalf("Error! %s", err)
 	}
 
 }

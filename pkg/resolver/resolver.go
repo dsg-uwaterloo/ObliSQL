@@ -8,8 +8,10 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"strconv"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
@@ -139,10 +141,31 @@ func main() {
 	serverRegister := grpc.NewServer()
 	resolver.RegisterResolverServer(serverRegister, &service)
 
+	// Start a background goroutine to gracefully shut down after 200 seconds
+	time.AfterFunc(200*time.Second, func() {
+		fmt.Println("200 seconds passed. Shutting down the resolver...")
+		lis.Close()
+		serverRegister.GracefulStop()
+		os.Exit(0)
+	})
+
+	// Handle system signals (e.g., SIGINT, SIGTERM) for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Launch a goroutine to handle signal events
+	go func() {
+		<-sigChan
+		fmt.Println("Received interrupt signal. Shutting down the resolver...")
+		lis.Close()
+		serverRegister.GracefulStop()
+		os.Exit(0)
+	}()
+
 	err = serverRegister.Serve(lis)
 
 	if err != nil {
-		log.Fatalf("Error! Could not start loadBalancer! %s", err)
+		log.Fatalf("Error! %s", err)
 	}
 
 }

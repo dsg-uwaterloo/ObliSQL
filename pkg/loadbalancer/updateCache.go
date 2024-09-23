@@ -41,53 +41,45 @@ func (m ConcurrentMap) Set(key string, value interface{}, version int64) error {
 	shard.Lock()
 	defer shard.Unlock()
 
-	if versions, ok := shard.items[key]; ok {
-		for v := range versions {
-			if v > version {
-				return errors.New("abort: higher version exists")
+	// Check if the key already exists
+	if currentVersionedValue, ok := shard.items[key]; ok {
+		// Abort if the provided version is lower or equal to the current version
+		for v := range currentVersionedValue {
+			if version <= v {
+				return errors.New("abort: cannot overwrite with an older or same version")
 			}
 		}
-	} else {
-		shard.items[key] = make(map[int64]VersionedValue)
 	}
+
+	// Store the new value with the version, removing any old version for the key
+	shard.items[key] = map[int64]VersionedValue{
+		version: {Value: value},
+	}
+
 	fmt.Println("SET: ", version, value)
-	shard.items[key][version] = VersionedValue{Value: value}
 	return nil
 }
-
 func (m ConcurrentMap) Get(key string, version int64) (interface{}, int64, bool) {
 	shard := m.getShard(key)
 	shard.RLock()
 	defer shard.RUnlock()
 
-	if versions, ok := shard.items[key]; ok {
-		var highestLesserVersion int64 = -1
-		var highestLesserValue interface{}
-		for v, val := range versions {
-			if v <= version && v > highestLesserVersion {
-				highestLesserVersion = v
-				highestLesserValue = val.Value
+	// Check if the key exists
+	if currentVersionedValue, ok := shard.items[key]; ok {
+		// There will be only one version for the key
+		for currentVersion, value := range currentVersionedValue {
+			// Return the value if the provided version is greater or equal to the stored version
+			if version >= currentVersion {
+				fmt.Println("GET: ", version, value.Value)
+				return value.Value, currentVersion, true
+			}
+			if version < currentVersion {
+				fmt.Println("GET: Requested version is lower than stored version")
+				return nil, -2, false
 			}
 		}
-		if highestLesserVersion != -1 {
-			fmt.Println("GET: ", version, highestLesserValue.(string))
-			return highestLesserValue, highestLesserVersion, true
-		}
 	}
-	return nil, -1, false
-}
-
-func (m ConcurrentMap) GetExactVersion(key string, version int64) (interface{}, bool) {
-	shard := m.getShard(key)
-	shard.RLock()
-	defer shard.RUnlock()
-
-	if versions, ok := shard.items[key]; ok {
-		if val, exists := versions[version]; exists {
-			return val.Value, true
-		}
-	}
-	return nil, false
+	return nil, -1, false // Return false if the requested version is lower than the stored version
 }
 
 func (m ConcurrentMap) Delete(key string) {
@@ -95,16 +87,4 @@ func (m ConcurrentMap) Delete(key string) {
 	shard.Lock()
 	defer shard.Unlock()
 	delete(shard.items, key)
-}
-
-func (m ConcurrentMap) DeleteVersion(key string, version int64) {
-	shard := m.getShard(key)
-	shard.Lock()
-	defer shard.Unlock()
-	if versions, ok := shard.items[key]; ok {
-		delete(versions, version)
-		if len(versions) == 0 {
-			delete(shard.items, key)
-		}
-	}
 }
