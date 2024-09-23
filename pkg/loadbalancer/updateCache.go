@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"hash/fnv"
 	"sync"
 )
@@ -56,7 +55,7 @@ func (m ConcurrentMap) Set(key string, value interface{}, version int64) error {
 		version: {Value: value},
 	}
 
-	fmt.Println("SET: ", version, value)
+	// fmt.Println("SET: ", version, value)
 	return nil
 }
 func (m ConcurrentMap) Get(key string, version int64) (interface{}, int64, bool) {
@@ -70,11 +69,11 @@ func (m ConcurrentMap) Get(key string, version int64) (interface{}, int64, bool)
 		for currentVersion, value := range currentVersionedValue {
 			// Return the value if the provided version is greater or equal to the stored version
 			if version >= currentVersion {
-				fmt.Println("GET: ", version, value.Value)
+				// fmt.Println("GET: ", version, value.Value)
 				return value.Value, currentVersion, true
 			}
 			if version < currentVersion {
-				fmt.Println("GET: Requested version is lower than stored version")
+				// fmt.Println("GET: Requested version is lower than stored version")
 				return nil, -2, false
 			}
 		}
