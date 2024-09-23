@@ -56,6 +56,7 @@ type myLoadBalancer struct {
 	N                 int
 	executorNumber    int
 	executorType      string
+	waitTime          int
 	executors         map[int][]*waffle_client.ProxyClient
 	clientMutexes     map[int][]sync.Mutex
 	executorQueueList map[int]executorQueue
@@ -291,7 +292,7 @@ func (lb *myLoadBalancer) executeBatch(elements []KVPair, executorNumber int) {
 }
 
 func (lb *myLoadBalancer) checkQueues(ctx context.Context) {
-	waitTime := 500 * time.Millisecond
+	waitTime := time.Duration(lb.waitTime) * time.Millisecond
 
 	timer := time.NewTicker(waitTime)
 	for {
@@ -300,7 +301,7 @@ func (lb *myLoadBalancer) checkQueues(ctx context.Context) {
 			fmt.Println("Exiting out of CheckQueues")
 			return
 		case <-timer.C:
-			// fmt.Println("Timer Click")
+			fmt.Println("Timer Click")
 			localMap := make(map[int][]KVPair)
 			localAdded := make(map[int]int)
 			elements := []KVPair{}
@@ -438,6 +439,7 @@ func (lb *myLoadBalancer) connectToExecutors(hosts []string, ports []string, fil
 func main() {
 	//CLI arguments
 	rPtr := flag.Int("R", 800, "Real Number of Requests")
+	timeOutPtr := flag.Int("Z", 500, "Queue Wait time in Milliseconds")
 	nPtr := flag.Int("num", 1, "Numer of Executors")
 	bPtr := flag.Int("B", 1200, "Batch Size for Executors (Waffle)")
 	fPtr := flag.Int("F", 100, "Fake request size for Exectors (Waffle)")
@@ -489,6 +491,7 @@ func main() {
 		D:                 *dPtr,
 		executorNumber:    *nPtr,
 		executorType:      *tPtr,
+		waitTime:          *timeOutPtr,
 		executors:         make(map[int][]*waffle_client.ProxyClient),
 		clientMutexes:     make(map[int][]sync.Mutex),
 		executorQueueList: make(map[int]executorQueue),
