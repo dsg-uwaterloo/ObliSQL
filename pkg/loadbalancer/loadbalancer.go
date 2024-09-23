@@ -510,7 +510,7 @@ func main() {
 	//Launch Thread to check Queues
 	go service.checkQueues(ctx)
 
-	time.AfterFunc(10*time.Second, func() {
+	time.AfterFunc(200*time.Second, func() {
 		fmt.Println("200 seconds passed. Shutting down...")
 		cancel()
 		lis.Close()
