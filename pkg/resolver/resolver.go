@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -106,6 +107,10 @@ func (c *myResolver) readJoinMap(filePath string) {
 }
 
 func main() {
+	hPtr := flag.String("h", "localhost", "Address of Batch Manager")
+	pPtr := flag.String("p", "9500", "Port of Batch Manager")
+
+	flag.Parse()
 
 	lis, err := net.Listen("tcp", ":9900")
 	if err != nil {
@@ -117,8 +122,8 @@ func main() {
 	metaDataLoc := "./metadata.txt"
 	joinMapLoc := "./JoinMaps/join_map.json"
 
-	lb_host := "localhost"
-	lb_port := "9500"
+	lb_host := *hPtr
+	lb_port := *pPtr
 	lb_addr := lb_host + ":" + lb_port
 
 	conn, err := grpc.NewClient(lb_addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
