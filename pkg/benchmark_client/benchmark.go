@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"time"
@@ -59,12 +60,18 @@ func runBenchmark(resolverClient resolver.ResolverClient, requests []Query, rate
 	defer cancel()
 	go sendRequestsForever(ctx, ack_channel, requests, resolverClient, rateLimit)
 	Ops, Err := getResponses(ctx, ack_channel)
-
+	fmt.Println("Ops/s, Err")
 	fmt.Println(Ops, Err)
 }
 
 func main() {
-	resolverAddr := "localhost:9900"
+	hPtr := flag.String("h", "localhost", "Resolver Host")
+	pPtr := flag.String("p", "9900", "Resolver Host")
+
+	flag.Parse()
+
+	resolverAddr := *hPtr + ":" + *pPtr
+	fmt.Println(resolverAddr)
 	conn, err := grpc.NewClient(resolverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(
 		grpc.MaxCallRecvMsgSize(644000*300),
 		grpc.MaxCallSendMsgSize(644000*300),
@@ -73,18 +80,26 @@ func main() {
 		log.Fatalf("Failed to open connection to Resolver: %v", err)
 	}
 
+	resolverClient := resolver.NewResolverClient(conn)
+
+	res, err := resolverClient.ConnectPingResolver(context.Background(), &resolver.ClientConnectResolver{Id: "1"})
+
+	if err != nil || res.Id != "1" {
+		log.Fatalf("Could not connect to Resolver")
+		return
+	} else {
+		fmt.Println("Connected to Resolver!")
+	}
+
 	requests := []Query{}
 
 	for len(requests) < 500000 {
 		requests = append(requests, getTestCases()...)
 	}
 
-	rateLimit := NewRateLimit(8000)
+	rateLimit := NewRateLimit(2000)
 
 	defer conn.Close()
 
-	resolverClient := resolver.NewResolverClient(conn)
 	runBenchmark(resolverClient, requests, rateLimit, 10)
-
-	log.Println("Benchmark completed.")
 }

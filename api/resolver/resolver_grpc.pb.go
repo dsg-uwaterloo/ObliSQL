@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	Resolver_ExecuteQuery_FullMethodName = "/resolver/executeQuery"
+	Resolver_ExecuteQuery_FullMethodName        = "/resolver/executeQuery"
+	Resolver_ConnectPingResolver_FullMethodName = "/resolver/connectPingResolver"
 )
 
 // ResolverClient is the client API for Resolver service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ResolverClient interface {
 	ExecuteQuery(ctx context.Context, in *ParsedQuery, opts ...grpc.CallOption) (*QueryResponse, error)
+	ConnectPingResolver(ctx context.Context, in *ClientConnectResolver, opts ...grpc.CallOption) (*ClientConnectResolver, error)
 }
 
 type resolverClient struct {
@@ -47,11 +49,22 @@ func (c *resolverClient) ExecuteQuery(ctx context.Context, in *ParsedQuery, opts
 	return out, nil
 }
 
+func (c *resolverClient) ConnectPingResolver(ctx context.Context, in *ClientConnectResolver, opts ...grpc.CallOption) (*ClientConnectResolver, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ClientConnectResolver)
+	err := c.cc.Invoke(ctx, Resolver_ConnectPingResolver_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ResolverServer is the server API for Resolver service.
 // All implementations must embed UnimplementedResolverServer
 // for forward compatibility
 type ResolverServer interface {
 	ExecuteQuery(context.Context, *ParsedQuery) (*QueryResponse, error)
+	ConnectPingResolver(context.Context, *ClientConnectResolver) (*ClientConnectResolver, error)
 	mustEmbedUnimplementedResolverServer()
 }
 
@@ -61,6 +74,9 @@ type UnimplementedResolverServer struct {
 
 func (UnimplementedResolverServer) ExecuteQuery(context.Context, *ParsedQuery) (*QueryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ExecuteQuery not implemented")
+}
+func (UnimplementedResolverServer) ConnectPingResolver(context.Context, *ClientConnectResolver) (*ClientConnectResolver, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ConnectPingResolver not implemented")
 }
 func (UnimplementedResolverServer) mustEmbedUnimplementedResolverServer() {}
 
@@ -93,6 +109,24 @@ func _Resolver_ExecuteQuery_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Resolver_ConnectPingResolver_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClientConnectResolver)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ResolverServer).ConnectPingResolver(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Resolver_ConnectPingResolver_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ResolverServer).ConnectPingResolver(ctx, req.(*ClientConnectResolver))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Resolver_ServiceDesc is the grpc.ServiceDesc for Resolver service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -103,6 +137,10 @@ var Resolver_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "executeQuery",
 			Handler:    _Resolver_ExecuteQuery_Handler,
+		},
+		{
+			MethodName: "connectPingResolver",
+			Handler:    _Resolver_ConnectPingResolver_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

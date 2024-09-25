@@ -18,6 +18,11 @@ message loadBalanceResponse{
     repeated string values = 5;
 }
 
+message clientConnect{
+    string id = 1;
+}
+
 service LoadBalancer{
     rpc addKeys(loadBalanceRequest) returns (loadBalanceResponse);
+    rpc connectPing(clientConnect) returns (clientConnect);
 }

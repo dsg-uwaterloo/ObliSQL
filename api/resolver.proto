@@ -23,6 +23,12 @@ message queryResponse{
     repeated string values = 4;
 }
 
+message clientConnectResolver{
+    string id = 1;
+}
+
+
 service resolver{
     rpc executeQuery(parsedQuery) returns (queryResponse);
+    rpc connectPingResolver(clientConnectResolver) returns (clientConnectResolver);
 }

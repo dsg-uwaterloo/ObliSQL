@@ -96,6 +96,16 @@ func separateKeysValues(pairs []string) ([]string, []string) {
 	return keys, values
 }
 
+func (lb *myLoadBalancer) ConnectPing(ctx context.Context, req *loadbalancer.ClientConnect) (*loadbalancer.ClientConnect, error) {
+	fmt.Println("Resolver Connected!")
+
+	toRet := loadbalancer.ClientConnect{
+		Id: req.Id,
+	}
+
+	return &toRet, nil
+}
+
 func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBalanceRequest) (*loadbalancer.LoadBalanceResponse, error) {
 	// fmt.Printf("Got Request for Size: %d \n", len(req.Keys))
 	reqNum := lb.requestNumber.Add(1)
@@ -301,7 +311,7 @@ func (lb *myLoadBalancer) checkQueues(ctx context.Context) {
 			fmt.Println("Exiting out of CheckQueues")
 			return
 		case <-timer.C:
-			fmt.Println("Timer Click")
+			// fmt.Println("Timer Click")
 			localMap := make(map[int][]KVPair)
 			localAdded := make(map[int]int)
 			elements := []KVPair{}
@@ -447,6 +457,8 @@ func main() {
 	nCPtr := flag.Int("N", 1, "Number of Cores for Executor (Waffle)")
 	dPtr := flag.Int("D", 100000, "Number of Dummy Values")
 	tPtr := flag.String("T", "Waffle", "Executor Type")
+	hostsPtr := flag.String("hosts", "localhost", "Comma-separated list of host addresses (e.g., 'localhost,host2,host3')")
+	portsPtr := flag.String("ports", "9090", "Comma-separated list of port numbers (e.g., '9090,9091,9092')")
 
 	flag.Parse()
 
@@ -472,12 +484,13 @@ func main() {
 	fmt.Println("Starting Load Balancer on: localhost:9500")
 
 	//Executor Information
-	hosts := make([]string, 0)
-	ports := make([]string, 0)
+	// Split hosts and ports based on user input
+	hosts := strings.Split(*hostsPtr, ",")
+	ports := strings.Split(*portsPtr, ",")
 
-	for i := 0; i < *nPtr; i++ {
-		hosts = append(hosts, "localhost")
-		ports = append(ports, fmt.Sprintf("909%d", i))
+	// Check if the number of hosts and ports match the number of executors
+	if len(hosts) != *nPtr || len(ports) != *nPtr {
+		log.Fatalf("The number of hosts (%d) or ports (%d) does not match the number of executors (%d).", len(hosts), len(ports), *nPtr)
 	}
 
 	//Define Service

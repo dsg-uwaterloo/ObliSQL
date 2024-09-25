@@ -5,3 +5,7 @@ cmake-build-debug
 tracfiles
 benchmark_client
 proxyJump.txt
+loadbalancer_*.log
+loadbalancer_*.pid
+proxy_*.log
+proxy_*.pid

@@ -55,6 +55,16 @@ func (c *myResolver) ExecuteQuery(ctx context.Context, q *resolver.ParsedQuery) 
 	}
 }
 
+func (lb *myResolver) ConnectPingResolver(ctx context.Context, req *resolver.ClientConnectResolver) (*resolver.ClientConnectResolver, error) {
+	fmt.Println("Client Connected!")
+
+	toRet := resolver.ClientConnectResolver{
+		Id: req.Id,
+	}
+
+	return &toRet, nil
+}
+
 func (c *myResolver) readMetaData(filePath string) {
 	//MetaData
 	file, err := os.Open(filePath)
@@ -132,6 +142,15 @@ func main() {
 		log.Fatalf("Failed to open connection to load balancer")
 	}
 	lbClient := loadbalancer.NewLoadBalancerClient(conn)
+
+	res, err := lbClient.ConnectPing(context.Background(), &loadbalancer.ClientConnect{Id: "1"})
+
+	if err != nil || res.Id != "1" {
+		log.Fatalf("Could not connect to batch manager")
+		return
+	} else {
+		fmt.Println("Connected to Batch Manager!")
+	}
 
 	service := myResolver{
 		conn:           lbClient,
