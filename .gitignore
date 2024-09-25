@@ -1,5 +1,9 @@
 .vscode
 .idea
+pkg/benchmark_client/benchmark_client
+pkg/loadbalancer/loadbalancer
+pkg/resolver/resolver
+waffle/bin/*
 cmakebuild
 cmake-build-debug
 tracfiles
