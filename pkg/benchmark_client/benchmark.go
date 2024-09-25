@@ -62,8 +62,7 @@ func runBenchmark(resolverClient resolver.ResolverClient, requests []Query, rate
 	Ops, Err := getResponses(ctx, ack_channel)
 	if !warmup {
 
-		fmt.Println("Ops/s, Err")
-		fmt.Println(Ops, Err)
+		fmt.Printf("Ops/s,%d,Err,%d\n", Ops, Err)
 
 	}
 }
@@ -112,10 +111,7 @@ func main() {
 	fmt.Println("In-Flight Requests:", *sPtr)
 	defer conn.Close()
 
-	fmt.Println("Starting Warmup")
 	runBenchmark(resolverClient, requestsWarmup, rateLimit, 10, true)
-
-	fmt.Println("Starting Benchmark")
 
 	runBenchmark(resolverClient, requestsBench, rateLimit, *tPtr, false)
 
