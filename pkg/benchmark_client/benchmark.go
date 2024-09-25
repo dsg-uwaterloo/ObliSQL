@@ -67,6 +67,7 @@ func runBenchmark(resolverClient resolver.ResolverClient, requests []Query, rate
 func main() {
 	hPtr := flag.String("h", "localhost", "Resolver Host")
 	pPtr := flag.String("p", "9900", "Resolver Host")
+	sPtr := flag.Int("s", 2000, "Maximum in-flight requests")
 
 	flag.Parse()
 
@@ -97,7 +98,7 @@ func main() {
 		requests = append(requests, getTestCases()...)
 	}
 
-	rateLimit := NewRateLimit(2000)
+	rateLimit := NewRateLimit(*sPtr)
 
 	defer conn.Close()
 
