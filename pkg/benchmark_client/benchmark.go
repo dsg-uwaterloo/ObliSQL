@@ -54,14 +54,18 @@ func getResponses(ctx context.Context, ack_channel chan Ack) (int, int) {
 	}
 }
 
-func runBenchmark(resolverClient resolver.ResolverClient, requests []Query, rateLimit *RateLimit, duration int) {
+func runBenchmark(resolverClient resolver.ResolverClient, requests []Query, rateLimit *RateLimit, duration int, warmup bool) {
 	ack_channel := make(chan Ack)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(duration)*time.Second)
 	defer cancel()
 	go sendRequestsForever(ctx, ack_channel, requests, resolverClient, rateLimit)
 	Ops, Err := getResponses(ctx, ack_channel)
-	fmt.Println("Ops/s, Err")
-	fmt.Println(Ops, Err)
+	if !warmup {
+
+		fmt.Println("Ops/s, Err")
+		fmt.Println(Ops, Err)
+
+	}
 }
 
 func main() {
@@ -93,15 +97,23 @@ func main() {
 		fmt.Printf("Connected to Resolver on %s \n", resolverAddr)
 	}
 
-	requests := []Query{}
+	requestsWarmup := []Query{}
 
-	for len(requests) < 500000 {
-		requests = append(requests, getTestCases()...)
+	for len(requestsWarmup) < 500000 {
+		requestsWarmup = append(requestsWarmup, getTestCases()...)
+	}
+	requestsBench := []Query{}
+
+	for len(requestsBench) < 500000 {
+		requestsBench = append(requestsBench, getTestCases()...)
 	}
 
 	rateLimit := NewRateLimit(*sPtr)
 	fmt.Println("In-Flight Requests:", *sPtr)
 	defer conn.Close()
 
-	runBenchmark(resolverClient, requests, rateLimit, *tPtr)
+	runBenchmark(resolverClient, requestsWarmup, rateLimit, 10, true)
+
+	runBenchmark(resolverClient, requestsBench, rateLimit, *tPtr, false)
+
 }
