@@ -68,6 +68,7 @@ func main() {
 	hPtr := flag.String("h", "localhost", "Resolver Host")
 	pPtr := flag.String("p", "9900", "Resolver Host")
 	sPtr := flag.Int("s", 2000, "Maximum in-flight requests")
+	tPtr := flag.Int("t", 10, "Duration to run benchmark (in seconds)")
 
 	flag.Parse()
 
@@ -102,5 +103,5 @@ func main() {
 	fmt.Println("In-Flight Requests:", *sPtr)
 	defer conn.Close()
 
-	runBenchmark(resolverClient, requests, rateLimit, 10)
+	runBenchmark(resolverClient, requests, rateLimit, *tPtr)
 }
