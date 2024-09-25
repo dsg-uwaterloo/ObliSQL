@@ -72,7 +72,7 @@ func main() {
 	flag.Parse()
 
 	resolverAddr := *hPtr + ":" + *pPtr
-	fmt.Println(resolverAddr)
+
 	conn, err := grpc.NewClient(resolverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(
 		grpc.MaxCallRecvMsgSize(644000*300),
 		grpc.MaxCallSendMsgSize(644000*300),
@@ -89,7 +89,7 @@ func main() {
 		log.Fatalf("Could not connect to Resolver")
 		return
 	} else {
-		fmt.Println("Connected to Resolver!")
+		fmt.Printf("Connected to Resolver on %s \n", resolverAddr)
 	}
 
 	requests := []Query{}
@@ -99,7 +99,7 @@ func main() {
 	}
 
 	rateLimit := NewRateLimit(*sPtr)
-
+	fmt.Println("In-Flight Requests:", *sPtr)
 	defer conn.Close()
 
 	runBenchmark(resolverClient, requests, rateLimit, 10)
