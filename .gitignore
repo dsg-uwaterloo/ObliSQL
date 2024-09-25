@@ -13,3 +13,4 @@ loadbalancer_*.log
 loadbalancer_*.pid
 proxy_*.log
 proxy_*.pid
+output.txt
