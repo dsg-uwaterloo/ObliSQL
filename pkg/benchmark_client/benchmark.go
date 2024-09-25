@@ -112,7 +112,10 @@ func main() {
 	fmt.Println("In-Flight Requests:", *sPtr)
 	defer conn.Close()
 
+	fmt.Println("Starting Warmup")
 	runBenchmark(resolverClient, requestsWarmup, rateLimit, 10, true)
+
+	fmt.Println("Starting Benchmark")
 
 	runBenchmark(resolverClient, requestsBench, rateLimit, *tPtr, false)
 

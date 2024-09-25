@@ -22,7 +22,7 @@ R=800
 NUM=1
 Z=500
 INFLIGHT=2000
-DURATION=20
+DURATION=30
 
 # Get current time
 current_time=$(date +"%Y%m%d_%H%M%S")
