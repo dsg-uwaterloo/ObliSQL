@@ -457,6 +457,7 @@ func main() {
 	nCPtr := flag.Int("N", 1, "Number of Cores for Executor (Waffle)")
 	dPtr := flag.Int("D", 100000, "Number of Dummy Values")
 	tPtr := flag.String("T", "Waffle", "Executor Type")
+	numCPtr := flag.Int("X", 1, "Number of clients to Waffle")
 	hostsPtr := flag.String("hosts", "localhost", "Comma-separated list of host addresses (e.g., 'localhost,host2,host3')")
 	portsPtr := flag.String("ports", "9090", "Comma-separated list of port numbers (e.g., '9090,9091,9092')")
 
@@ -525,7 +526,7 @@ func main() {
 	//Load Trace
 	traceLoc := "../../tracefiles/serverInput.txt"
 	//Connect to Executors
-	service.connectToExecutors(hosts, ports, traceLoc, 1)
+	service.connectToExecutors(hosts, ports, traceLoc, *numCPtr)
 
 	//Launch Thread to check Queues
 	go service.checkQueues(ctx)
