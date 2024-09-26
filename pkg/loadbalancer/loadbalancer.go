@@ -517,8 +517,8 @@ func main() {
 	service.requestNumber.Store(0)
 
 	// Print the variables used for initialization
-	fmt.Printf("Initialization with:  - R: %d, Z: %d, num: %d, B: %d, F: %d, C: %d, N: %d, D: %d, T: %s\n",
-		*rPtr, *timeOutPtr, *nPtr, *bPtr, *fPtr, *cPtr, *nCPtr, *dPtr, *tPtr)
+	fmt.Printf("Initialization with:  - R: %d, Z: %d, num: %d, B: %d, F: %d, C: %d, N: %d, D: %d, X: %d, T: %s\n",
+		*rPtr, *timeOutPtr, *nPtr, *bPtr, *fPtr, *cPtr, *nCPtr, *dPtr, *numCPtr, *tPtr)
 
 	serverRegister := grpc.NewServer()
 	loadbalancer.RegisterLoadBalancerServer(serverRegister, &service)
