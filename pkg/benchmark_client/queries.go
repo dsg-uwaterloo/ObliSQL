@@ -251,6 +251,34 @@ func getTestCases() []Query {
 				AggregateType: []string{"avg"},
 			},
 		},
+		{
+			name: "Update using two filters with index (AND)",
+			//Update review set comment = "This is the new comment" where a_id =10 and i_id = 7;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "update",
+				TableName:  "review",
+				ColToGet:   []string{"rank", "comment"},
+				SearchCol:  []string{"a_id", "i_id"},
+				SearchVal:  []string{getRandomValue(0, 1273), getRandomValue(0, 999)},
+				SearchType: []string{"point", "point"},
+				UpdateVal:  []string{"1", "This is the new comment"},
+			},
+		},
+		{
+			name: "Update without index",
+			//Select title from item where i_id = 500;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "update",
+				TableName:  "item",
+				ColToGet:   []string{"title"},
+				SearchCol:  []string{"i_id"},
+				SearchVal:  []string{getRandomValue(0, 999)},
+				SearchType: []string{"point"},
+				UpdateVal:  []string{"New Title for testing!"},
+			},
+		},
 	}
 	return testCases
 }
