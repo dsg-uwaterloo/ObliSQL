@@ -1,29 +1,28 @@
 package oram
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 	"sort"
 
 	"pathOram/pkg/oram/block"
 	"pathOram/pkg/oram/bucket"
+	"pathOram/pkg/oram/bucketRequest"
 	"pathOram/pkg/oram/crypto"
 	"pathOram/pkg/oram/redis"
 	"pathOram/pkg/oram/request"
-	"pathOram/pkg/oram/bucketRequest"
 )
 
 //  Core ORAM functions
 
 type ORAM struct {
-	LogCapacity   int // height of the tree or logarithm base 2 of capacity (i.e. capacity is 2 to the power of this value)
-	Z             int // number of blocks in a bucket (typically, 3 to 7)
-	RedisClient   *redis.RedisClient
-	StashMap      map[int]block.Block
-	StashSize     int // Maximum number of blocks the stash can hold
-	keyMap        map[int]int
+	LogCapacity int // height of the tree or logarithm base 2 of capacity (i.e. capacity is 2 to the power of this value)
+	Z           int // number of blocks in a bucket (typically, 3 to 7)
+	RedisClient *redis.RedisClient
+	StashMap    map[string]block.Block
+	StashSize   int // Maximum number of blocks the stash can hold
+	keyMap      map[string]int
 }
-
 
 func NewORAM(LogCapacity, Z, StashSize int, redisAddr string) (*ORAM, error) {
 	key, err := crypto.GenerateRandomKey()
@@ -37,17 +36,17 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string) (*ORAM, error) {
 	}
 
 	// Clear the Redis database to ensure a fresh start
-    if err := client.FlushDB(); err != nil {
-        return nil, fmt.Errorf("failed to flush Redis database: %v", err)
-    }
+	if err := client.FlushDB(); err != nil {
+		return nil, fmt.Errorf("failed to flush Redis database: %v", err)
+	}
 
 	oram := &ORAM{
 		RedisClient: client,
 		LogCapacity: LogCapacity,
 		Z:           Z,
 		StashSize:   StashSize,
-		StashMap:    make(map[int]block.Block),
-		keyMap:      make(map[int]int),
+		StashMap:    make(map[string]block.Block),
+		keyMap:      make(map[string]int),
 	}
 
 	oram.initialize()
@@ -62,11 +61,23 @@ func (o *ORAM) initialize() {
 			Blocks: make([]block.Block, o.Z),
 		}
 		for j := range bucket.Blocks {
-			bucket.Blocks[j].Key = -1
+			bucket.Blocks[j].Key = "-1"
 			bucket.Blocks[j].Value = ""
 		}
 		o.RedisClient.WriteBucketToDb(i, bucket) // initialize dosen't use redis batching mechanism to write: NOTE: don't run this initialize formally for experiments
 	}
+}
+
+// ClearStash clears the ORAM stash by resetting it to an empty state.
+func (o *ORAM) ClearStash() {
+	o.StashMap = make(map[string]block.Block) // Resets the stash (assuming stash is a map of block indices to data).
+	fmt.Println("Stash has been cleared.")
+}
+
+// ClearKeymap clears the ORAM keymap by resetting it to an empty state.
+func (o *ORAM) ClearKeymap() {
+	o.keyMap = make(map[string]int) // Resets the stash (assuming stash is a map of block indices to data).
+	fmt.Println("KeyMap has been cleared.")
 }
 
 // getDepth calculates the depth of a bucket in the tree
@@ -88,10 +99,9 @@ func (o *ORAM) canInclude(entryLeaf, leaf, level int) bool {
 	return entryLeaf>>(o.LogCapacity-level) == leaf>>(o.LogCapacity-level)
 }
 
-
 // ReadPath reads the paths from the root to the given leaves and optionally populates the stash.
 func (o *ORAM) ReadPaths(leafs []int) {
-	
+
 	// Calculate the maximum valid leaf value
 	maxLeaf := (1 << o.LogCapacity) - 1
 
@@ -110,7 +120,7 @@ func (o *ORAM) ReadPaths(leafs []int) {
 			if exists {
 				break
 			}
-			uniqueBuckets[bucket] = struct{}{}	
+			uniqueBuckets[bucket] = struct{}{}
 		}
 	}
 
@@ -119,7 +129,7 @@ func (o *ORAM) ReadPaths(leafs []int) {
 	for _, bucketData := range bucketsData {
 		for _, block := range bucketData.Blocks {
 			// Skip "empty" blocks
-			if block.Key != -1 {
+			if block.Key != "-1" {
 				// fmt.Println("Read block from Tree and put in stash with key: ", block.Key)
 				o.StashMap[block.Key] = block
 			}
@@ -127,7 +137,6 @@ func (o *ORAM) ReadPaths(leafs []int) {
 	}
 
 }
-
 
 func (o *ORAM) WritePath(bucketInfo []int, requests *[]bucketRequest.BucketRequest) {
 
@@ -137,17 +146,17 @@ func (o *ORAM) WritePath(bucketInfo []int, requests *[]bucketRequest.BucketReque
 
 	//newBucketsWritten := make(map[int]struct{})
 
-    // Step 1: Get all blocks from stash
-    currentStash := make(map[int]block.Block)
+	// Step 1: Get all blocks from stash
+	currentStash := make(map[string]block.Block)
 	for blockId, block := range o.StashMap {
 		currentStash[blockId] = block
 	}
 
-    toDelete := make(map[int]struct{}) // track blocks that need to be deleted from stash
+	toDelete := make(map[string]struct{}) // track blocks that need to be deleted from stash
 
-	toInsert := make(map[int]block.Block) // blocks to be inserted in the bucket (up to Z)
+	toInsert := make(map[string]block.Block) // blocks to be inserted in the bucket (up to Z)
 
-    toDeleteLocal := make([]int, 0)   // indices/blockIds/keys of blocks in currentStash to delete
+	toDeleteLocal := make([]string, 0) // indices/blockIds/keys of blocks in currentStash to delete
 
 	for key, currentBlock := range currentStash {
 		currentBlockLeaf := o.keyMap[currentBlock.Key]
@@ -168,7 +177,7 @@ func (o *ORAM) WritePath(bucketInfo []int, requests *[]bucketRequest.BucketReque
 	}
 
 	// Prepare the bucket for writing
-	
+
 	bkt := bucket.Bucket{
 		Blocks: make([]block.Block, o.Z),
 	}
@@ -184,7 +193,7 @@ func (o *ORAM) WritePath(bucketInfo []int, requests *[]bucketRequest.BucketReque
 
 	// If there are fewer blocks than o.Z, fill the remaining slots with dummy blocks
 	for i < o.Z {
-		bkt.Blocks[i] = block.Block{Key: -1, Value: ""}
+		bkt.Blocks[i] = block.Block{Key: "-1", Value: ""}
 		i++
 	}
 
@@ -193,19 +202,19 @@ func (o *ORAM) WritePath(bucketInfo []int, requests *[]bucketRequest.BucketReque
 		Bucket:   bkt,
 	})
 
-    // Update the stash map by removing the newly inserted blocks
-    for key := range toDelete {
-        delete(o.StashMap, key)
-    }
+	// Update the stash map by removing the newly inserted blocks
+	for key := range toDelete {
+		delete(o.StashMap, key)
+	}
 
 }
 
 func (o *ORAM) WritePaths(previousPositionLeaves []int) {
 
-    requests := make([]bucketRequest.BucketRequest, 0)
-    bucketsToFillMap := make(map[int][]int) // Map to store bucketId and its associated [leaf, level]
+	requests := make([]bucketRequest.BucketRequest, 0)
+	bucketsToFillMap := make(map[int][]int) // Map to store bucketId and its associated [leaf, level]
 
-    for _, leaf := range previousPositionLeaves {
+	for _, leaf := range previousPositionLeaves {
 		for level := o.LogCapacity; level >= 0; level-- {
 			bucketId := o.bucketForLevelLeaf(level, leaf)
 			bucketsToFillMap[bucketId] = []int{leaf, level} // Store leaf and level for each bucketId
@@ -238,7 +247,6 @@ func (o *ORAM) WritePaths(previousPositionLeaves []int) {
 		o.WritePath(entry, &requests)
 	}
 
-
 	// Set the requests in Redis
 	if err := o.RedisClient.WriteBucketsToDb(requests); err != nil {
 		fmt.Println("Error writing buckets : ", err)
@@ -258,7 +266,7 @@ write/read stashmap[key] for all 50
 
 writepath to 50 previousPositionLeafs and try to clear out stash -  1 redis request
 
-many batches come in; go routines? 
+many batches come in; go routines?
 */
 
 func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, error) {
@@ -268,7 +276,7 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 	}
 
 	// fakeReadMap = {key: fakeRead?, key: fakeRead? , ...}
-	fakeReadMap := make(map[int]bool)
+	fakeReadMap := make(map[string]bool)
 
 	//determine keys from position map for all of them ; if something doesn't exist, add it to keymap and stash as done in Access()
 	previousPositionLeavesMap := make(map[int]struct{})
@@ -276,21 +284,34 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 
 	for _, req := range requests {
 
+		// TODO: if it's a get request, don't add the new block in
 		_, keyReadBefore := fakeReadMap[req.Key]
 		var previousPositionLeaf = -1
 
 		if !keyReadBefore {
 			var exists bool
 			previousPositionLeaf, exists = o.keyMap[req.Key]
+			// if !exists {
+			// 	previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
+			// 	o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
+			// }
+			// fakeReadMap[req.Key] = true
 			if !exists {
-				previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
-				o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
+				if req.Value == "" {
+					// GET request for a new key, perform a random fake read, don't add a block
+					previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
+					fakeReadMap[req.Key] = true
+					// Skip adding to stash
+				} else {
+					// PUT request for a new key, add block to stash
+					previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
+					o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
+					fakeReadMap[req.Key] = true
+				}
 			}
-			fakeReadMap[req.Key] = true
 		} else {
 			previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
 		}
-		
 
 		// ensure there are no duplicates in previousPositionLeaves - otherwise writepaths may overwrite content
 		if _, alreadyExists := previousPositionLeavesMap[previousPositionLeaf]; !alreadyExists {
@@ -309,16 +330,18 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 	// Retrieve values from stash map for all keys in requests and load them into an array
 	values := make([]string, len(requests))
 
-	// write to all stash blocks that have associated PUT reqeusts
+	// Craft reply to requests
 	for i, req := range requests {
-		if req.Type == "PUT" {
+		if req.Value != "" {
+			// Replying to PUT requests
 			o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
 			values[i] = o.StashMap[req.Key].Value
 		} else if block, exists := o.StashMap[req.Key]; exists {
-			// THIS WORKS
+			// Replying to GET requests that access existing data
 			values[i] = block.Value
 		} else {
-			values[i] = "" // or some default value to indicate missing key
+			// Replying to GET requests trying to access non-existent keys
+			values[i] = "-1"
 		}
 	}
 
@@ -330,7 +353,6 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 	// becuase all buckets above have already been considered for all elements of the stash
 	// no point in redoing, this is an optmization. also, the other path may write -1s into
 	// already filled buckets
-
 
 	o.WritePaths(previousPositionLeaves)
 
