@@ -2,7 +2,6 @@ package request
 
 // Request represents incoming PUT/GET requests
 type Request struct {
-	Type string
-	Key int
+	Key   string
 	Value string
 }
