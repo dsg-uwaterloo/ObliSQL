@@ -1,18 +1,18 @@
 package crypto
 
 import (
-	mathrand "math/rand"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"errors"
 	"io"
+	mathrand "math/rand"
 )
 
 // Cryptography functions
 
 func GetRandomInt(max int) int {
-    return mathrand.Intn(max)
+	return mathrand.Intn(max)
 }
 
 func GenerateRandomKey() ([]byte, error) {

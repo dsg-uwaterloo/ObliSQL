@@ -1,10 +1,10 @@
 package bucketRequest
 
-import(
+import (
 	"pathOram/pkg/oram/bucket"
 )
 
 type BucketRequest struct {
-    BucketId int
-    Bucket   bucket.Bucket
+	BucketId int
+	Bucket   bucket.Bucket
 }

@@ -6,6 +6,6 @@ import (
 
 // Bucket represents a collection of blocks
 type Bucket struct {
-	Blocks        []block.Block
+	Blocks         []block.Block
 	RealBlockCount int
 }
