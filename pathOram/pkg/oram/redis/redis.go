@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/go-redis/redis/v8"
 	"pathOram/pkg/oram/bucket"
-	"pathOram/pkg/oram/crypto"
 	"pathOram/pkg/oram/bucketRequest"
+	"pathOram/pkg/oram/crypto"
+
+	"github.com/go-redis/redis/v8"
 )
 
 /*
@@ -38,7 +39,12 @@ func NewRedisClient(redisAddr string, encryptionKey []byte) (*RedisClient, error
 }
 
 func (r *RedisClient) FlushDB() error {
-    return r.Client.FlushDB(r.Ctx).Err()
+	return r.Client.FlushDB(r.Ctx).Err()
+}
+
+func (r *RedisClient) FlushData() {
+	ctx := context.Background()
+	r.Client.FlushAll(ctx)
 }
 
 // type BucketRequest struct {
@@ -47,29 +53,28 @@ func (r *RedisClient) FlushDB() error {
 // }
 
 func (r *RedisClient) WriteBucketsToDb(requests []bucketRequest.BucketRequest) error {
-    // Prepare data for MSET
-    msetArgs := make([]interface{}, 0, len(requests)*2)
+	// Prepare data for MSET
+	msetArgs := make([]interface{}, 0, len(requests)*2)
 
-    for _, req := range requests {
-        data, err := json.Marshal(req.Bucket)
-        if err != nil {
-            return err
-        }
+	for _, req := range requests {
+		data, err := json.Marshal(req.Bucket)
+		if err != nil {
+			return err
+		}
 
-        encryptedData, err := crypto.Encrypt(data, r.EncryptionKey)
-        if err != nil {
-            return err
-        }
+		encryptedData, err := crypto.Encrypt(data, r.EncryptionKey)
+		if err != nil {
+			return err
+		}
 
-        key := fmt.Sprintf("bucket:%d", req.BucketId)
-        msetArgs = append(msetArgs, key, encryptedData)
-    }
+		key := fmt.Sprintf("bucket:%d", req.BucketId)
+		msetArgs = append(msetArgs, key, encryptedData)
+	}
 
-    // Use MSET to set multiple key-value pairs at once
-    _, err := r.Client.MSet(r.Ctx, msetArgs...).Result() // Use MSet method directly
-    return err
+	// Use MSET to set multiple key-value pairs at once
+	_, err := r.Client.MSet(r.Ctx, msetArgs...).Result() // Use MSet method directly
+	return err
 }
-
 
 func (r *RedisClient) ReadBucketsFromDb(indices map[int]struct{}) (map[int]bucket.Bucket, error) {
 	// Convert map keys to slice for MGET
