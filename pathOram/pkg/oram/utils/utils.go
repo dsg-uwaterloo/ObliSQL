@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"pathOram/pkg/oram/oram"
 	"pathOram/pkg/oram/bucket"
+	"pathOram/pkg/oram/oram"
 )
 
 // PrintTree prints the ORAM tree structure by reading the file sequentially
@@ -16,9 +16,9 @@ func PrintTree(o *oram.ORAM) {
 		b, _ := o.RedisClient.ReadBucketFromDb(i)
 		indent := strings.Repeat("  ", o.GetDepth(i))
 		for _, blk := range b.Blocks {
-			if blk.Key!=-1 {
+			if blk.Key != "-1" {
 				fmt.Printf("%sBucket %d:\n", indent, i)
-				fmt.Printf("%s  Key=%d, Value=%s\n", indent, blk.Key, blk.Value)
+				fmt.Printf("%s  Key=%s, Value=%s\n", indent, blk.Key, blk.Value)
 			}
 		}
 	}
@@ -27,8 +27,8 @@ func PrintTree(o *oram.ORAM) {
 // PrintStashMap prints the contents of the stash map
 func PrintStashMap(o *oram.ORAM) {
 	fmt.Println("Stash Map contents:")
-	for blockId, blk := range o.StashMap {
-		fmt.Printf("BlockId: %d, Key: %d, Value: %s\n", blockId, blk.Key, blk.Value)
+	for _, blk := range o.StashMap {
+		fmt.Printf("Key: %s, Value: %s\n", blk.Key, blk.Value)
 	}
 }
 

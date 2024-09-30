@@ -79,8 +79,8 @@ func TestORAMReadWrite(t *testing.T) {
 
 	writeProgress.Finish()
 
-	//fmt.Println("Printing the tree")
-	//utils.PrintTree(o)
+	// fmt.Println("Printing the tree")
+	// utils.PrintTree(o)
 
 	fmt.Println("Printing the stash...")
 	utils.PrintStashMap(o)
