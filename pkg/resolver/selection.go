@@ -12,6 +12,7 @@ import (
 
 	"github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
 	"github.com/Haseeb1399/WorkingThesis/api/resolver"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func (c *myResolver) orderTuples(orderBy string, tableName string, keys []string, values []string) ([]string, []string) {
@@ -326,9 +327,19 @@ func (c *myResolver) filterPkUsingIndex(q *resolver.ParsedQuery, localRequestID 
 }
 
 func (c *myResolver) doSelect(q *resolver.ParsedQuery, localRequestID int64) (*queryResponse, error) {
+	ctx := context.Background()
+	tracer := c.tracer.Tracer("Selection")
+	ctx, span := tracer.Start(ctx, "selection")
+	defer span.End()
+	span.SetAttributes(
+		attribute.Int64("request_id", localRequestID),
+		attribute.String("query", q.String()),
+	)
 
 	var filteredPks []string
 	var err error
+
+	span.AddEvent("Starting Selection")
 
 	if c.checkAllIndexExists([]string{q.TableName}, q.SearchCol) {
 		//If all searchColumns have an index on them.
@@ -345,6 +356,7 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery, localRequestID int64) (*q
 			filteredPks, err = c.filterPkFromColumns(columData, q, localRequestID)
 		}
 	}
+	span.AddEvent("Finished Indexing")
 
 	if err != nil {
 		return nil, fmt.Errorf("error filtering primary keys: %w", err)
@@ -358,6 +370,8 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery, localRequestID int64) (*q
 	if err != nil {
 		return nil, fmt.Errorf("error constructing request and fetching: %w", err)
 	}
+
+	span.AddEvent("Finished Selection")
 
 	//If there is an OrderBy
 	if len(q.OrderBy) > 0 {

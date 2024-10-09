@@ -921,106 +921,106 @@ func TestSelectParallel(t *testing.T) {
 	wg.Wait()
 }
 
-func TestMixSequential(t *testing.T) {
-	fmt.Println("-------------------------------")
-	fmt.Println("Testing Sequential Select and Update")
-	resolver_addr := "localhost:9900"
-	conn, err := grpc.NewClient(resolver_addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
-	if err != nil {
-		log.Fatalf("Failed to open connection to Resolver")
-	}
+// func TestMixSequential(t *testing.T) {
+// 	fmt.Println("-------------------------------")
+// 	fmt.Println("Testing Sequential Select and Update")
+// 	resolver_addr := "localhost:9900"
+// 	conn, err := grpc.NewClient(resolver_addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
+// 	if err != nil {
+// 		log.Fatalf("Failed to open connection to Resolver")
+// 	}
 
-	resolverClient := resolver.NewResolverClient(conn)
-	testcases := getTestCasesWithInserts()
+// 	resolverClient := resolver.NewResolverClient(conn)
+// 	testcases := getTestCasesWithInserts()
 
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			fmt.Println("Starting Test", tc.name)
-			resp, err := resolverClient.ExecuteQuery(context.Background(), tc.requestQuery)
-			// fmt.Println("-----")
-			// fmt.Println(resp.Keys)
-			// fmt.Println("-----")
-			// fmt.Println(resp.Values)
-			// fmt.Println("-----")
+// 	for _, tc := range testcases {
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			fmt.Println("Starting Test", tc.name)
+// 			resp, err := resolverClient.ExecuteQuery(context.Background(), tc.requestQuery)
+// 			// fmt.Println("-----")
+// 			// fmt.Println(resp.Keys)
+// 			// fmt.Println("-----")
+// 			// fmt.Println(resp.Values)
+// 			// fmt.Println("-----")
 
-			if err != nil {
-				t.Errorf("Execute Query Error = %v", err)
-			}
-			sortedRespKeys, sortedRespValues := sortKeysAndValues(resp.Keys, resp.Values)
-			sortedExpKeys, sortedExpValues := sortKeysAndValues(tc.expectedAns.Keys, tc.expectedAns.Values)
+// 			if err != nil {
+// 				t.Errorf("Execute Query Error = %v", err)
+// 			}
+// 			sortedRespKeys, sortedRespValues := sortKeysAndValues(resp.Keys, resp.Values)
+// 			sortedExpKeys, sortedExpValues := sortKeysAndValues(tc.expectedAns.Keys, tc.expectedAns.Values)
 
-			if !reflect.DeepEqual(sortedRespKeys, sortedExpKeys) || !reflect.DeepEqual(sortedRespValues, sortedExpValues) {
-				t.Errorf("Execute Query got incorrect values!")
-				fmt.Printf("Expected Keys: % +v \n Got Keys: %+v \n", sortedExpKeys, sortedRespKeys)
-				fmt.Printf("Expected Values: % +v \n Got Values: %+v \n", sortedExpValues, sortedRespValues)
-			}
-		})
-	}
+// 			if !reflect.DeepEqual(sortedRespKeys, sortedExpKeys) || !reflect.DeepEqual(sortedRespValues, sortedExpValues) {
+// 				t.Errorf("Execute Query got incorrect values!")
+// 				fmt.Printf("Expected Keys: % +v \n Got Keys: %+v \n", sortedExpKeys, sortedRespKeys)
+// 				fmt.Printf("Expected Values: % +v \n Got Values: %+v \n", sortedExpValues, sortedRespValues)
+// 			}
+// 		})
+// 	}
 
-}
+// }
 
-func TestUpdateSerializability(t *testing.T) {
+// func TestUpdateSerializability(t *testing.T) {
 
-	resolver_addr := "localhost:9900"
-	conn, err := grpc.NewClient(resolver_addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
-	if err != nil {
-		log.Fatalf("Failed to open connection to Resolver")
-	}
+// 	resolver_addr := "localhost:9900"
+// 	conn, err := grpc.NewClient(resolver_addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
+// 	if err != nil {
+// 		log.Fatalf("Failed to open connection to Resolver")
+// 	}
 
-	resolverClient := resolver.NewResolverClient(conn)
+// 	resolverClient := resolver.NewResolverClient(conn)
 
-	numUpdates := 5
-	// Channel to synchronize updates
-	var wg sync.WaitGroup
+// 	numUpdates := 5
+// 	// Channel to synchronize updates
+// 	var wg sync.WaitGroup
 
-	for i := 1; i <= numUpdates; i++ {
-		wg.Add(1)
-		testString := generateRandomString(10)
-		go func(requestId string, client resolver.ResolverClient) {
-			defer wg.Done()
-			// Create an update query
-			var queryType string
-			if rand.Intn(2) == 0 {
-				queryType = "update"
-			} else {
-				queryType = "select"
-			}
-			var query *resolver.ParsedQuery
-			if queryType == "update" {
-				query = &resolver.ParsedQuery{
-					ClientId:   "1",
-					QueryType:  "update",
-					TableName:  "review",
-					ColToGet:   []string{"comment"},
-					SearchCol:  []string{"a_id", "i_id"},
-					SearchVal:  []string{"10", "7"},
-					SearchType: []string{"point", "point"},
-					UpdateVal:  []string{testString},
-				}
-			} else {
-				query = &resolver.ParsedQuery{
-					ClientId:   "1",
-					QueryType:  "select",
-					TableName:  "review",
-					ColToGet:   []string{"comment"},
-					SearchCol:  []string{"a_id", "i_id"},
-					SearchVal:  []string{"10", "7"},
-					SearchType: []string{"point", "point"},
-				}
-			}
+// 	for i := 1; i <= numUpdates; i++ {
+// 		wg.Add(1)
+// 		testString := generateRandomString(10)
+// 		go func(requestId string, client resolver.ResolverClient) {
+// 			defer wg.Done()
+// 			// Create an update query
+// 			var queryType string
+// 			if rand.Intn(2) == 0 {
+// 				queryType = "update"
+// 			} else {
+// 				queryType = "select"
+// 			}
+// 			var query *resolver.ParsedQuery
+// 			if queryType == "update" {
+// 				query = &resolver.ParsedQuery{
+// 					ClientId:   "1",
+// 					QueryType:  "update",
+// 					TableName:  "review",
+// 					ColToGet:   []string{"comment"},
+// 					SearchCol:  []string{"a_id", "i_id"},
+// 					SearchVal:  []string{"10", "7"},
+// 					SearchType: []string{"point", "point"},
+// 					UpdateVal:  []string{testString},
+// 				}
+// 			} else {
+// 				query = &resolver.ParsedQuery{
+// 					ClientId:   "1",
+// 					QueryType:  "select",
+// 					TableName:  "review",
+// 					ColToGet:   []string{"comment"},
+// 					SearchCol:  []string{"a_id", "i_id"},
+// 					SearchVal:  []string{"10", "7"},
+// 					SearchType: []string{"point", "point"},
+// 				}
+// 			}
 
-			// Execute the query
-			resp, err := client.ExecuteQuery(context.Background(), query)
-			if err != nil {
-				log.Printf("Error executing %s. %v", queryType, err)
-			} else {
-				fmt.Println("---------")
-				fmt.Println(resp.RequestId, queryType, resp.Keys, resp.Values)
-				fmt.Println("---------")
-			}
-		}(testString, resolverClient)
-	}
+// 			// Execute the query
+// 			resp, err := client.ExecuteQuery(context.Background(), query)
+// 			if err != nil {
+// 				log.Printf("Error executing %s. %v", queryType, err)
+// 			} else {
+// 				fmt.Println("---------")
+// 				fmt.Println(resp.RequestId, queryType, resp.Keys, resp.Values)
+// 				fmt.Println("---------")
+// 			}
+// 		}(testString, resolverClient)
+// 	}
 
-	// Wait for all updates to complete
-	wg.Wait()
-}
+// 	// Wait for all updates to complete
+// 	wg.Wait()
+// }

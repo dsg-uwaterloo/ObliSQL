@@ -19,7 +19,48 @@ import (
 	resolver "github.com/Haseeb1399/WorkingThesis/api/resolver"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	// OpenTelemetry imports
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
+
+func initTracer() (*sdktrace.TracerProvider, error) {
+	ctx := context.Background()
+
+	// Create the OTLP exporter over gRPC
+	exporter, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithInsecure(),
+		otlptracegrpc.WithEndpoint("localhost:4317"), // Adjust endpoint for Grafana
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create exporter: %w", err)
+	}
+
+	// Create a resource to identify this application
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceNameKey.String("my-resolver"),
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	// Create the TracerProvider with the exporter and resource
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+	)
+
+	// Set the global TracerProvider
+	otel.SetTracerProvider(tp)
+
+	return tp, nil
+}
 
 func (c *myResolver) ExecuteQuery(ctx context.Context, q *resolver.ParsedQuery) (*resolver.QueryResponse, error) {
 	requestID := c.localRequestID.Add(1)
@@ -46,6 +87,7 @@ func (c *myResolver) ExecuteQuery(ctx context.Context, q *resolver.ParsedQuery) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute %s query with id:%d. error: %w", q.QueryType, requestID, err)
 	} else {
+		c.requestsDone.Add(1)
 		return &resolver.QueryResponse{
 			ClientId:  int64(clientId),
 			RequestId: requestID,
@@ -129,6 +171,17 @@ func main() {
 	}
 	fmt.Println("Starting Resolver on: localhost:9900")
 
+	// Initialize OpenTelemetry Tracer
+	tp, err := initTracer()
+	if err != nil {
+		log.Fatalf("Failed to initialize tracer: %v", err)
+	}
+	defer func() {
+		if err := tp.Shutdown(context.Background()); err != nil {
+			log.Fatalf("Error shutting down tracer provider: %v", err)
+		}
+	}()
+
 	metaDataLoc := "./metadata.txt"
 	joinMapLoc := "./JoinMaps/join_map.json"
 
@@ -158,6 +211,8 @@ func main() {
 		requestId:      atomic.Int64{},
 		recvChan:       make(chan int32),
 		localRequestID: atomic.Int64{},
+		tracer:         tp,
+		requestsDone:   atomic.Int64{},
 	}
 	service.readMetaData(metaDataLoc)
 	service.readJoinMap(joinMapLoc)
@@ -181,6 +236,7 @@ func main() {
 	go func() {
 		<-sigChan
 		fmt.Println("Received interrupt signal. Shutting down the resolver...")
+		fmt.Printf("Total Requests Done: %d\n", service.requestsDone.Load())
 		lis.Close()
 		serverRegister.GracefulStop()
 		os.Exit(0)

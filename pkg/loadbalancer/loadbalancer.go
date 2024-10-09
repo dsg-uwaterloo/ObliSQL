@@ -1,6 +1,7 @@
 package main
 
 import (
+	// Existing imports
 	"bufio"
 	"context"
 	"flag"
@@ -26,6 +27,15 @@ import (
 	waffle_client "github.com/Haseeb1399/WorkingThesis/pkg/waffle_executor"
 	queue "github.com/golang-collections/collections/queue"
 	"google.golang.org/grpc"
+
+	// OpenTelemetry imports
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 type KVPair struct {
@@ -80,12 +90,12 @@ func contains(slice []string, value string) bool {
 	}
 	return false
 }
+
 func separateKeysValues(pairs []string) ([]string, []string) {
 	var keys []string
 	var values []string
 
 	for _, pair := range pairs {
-		// Split the pair into two parts on the first occurrence of ':'
 		parts := strings.SplitN(pair, ":", 2)
 		if len(parts) == 2 {
 			keys = append(keys, parts[0])
@@ -107,7 +117,22 @@ func (lb *myLoadBalancer) ConnectPing(ctx context.Context, req *loadbalancer.Cli
 }
 
 func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBalanceRequest) (*loadbalancer.LoadBalanceResponse, error) {
-	// fmt.Printf("Got Request for Size: %d \n", len(req.Keys))
+	// Initialize tracer and start a span
+	tracer := otel.Tracer("my-loadbalancer")
+	ctx, span := tracer.Start(ctx, "AddKeys")
+	defer span.End()
+	// Add attributes to the span
+
+	firstKey := ""
+	if len(req.Keys) > 0 {
+		firstKey = req.Keys[0]
+	}
+	span.SetAttributes(
+		attribute.Int64("request_id", req.RequestId),
+		attribute.Int("num_keys", len(req.Keys)),
+		attribute.String("first_key", firstKey),
+	)
+
 	reqNum := lb.requestNumber.Add(1)
 	recv_resp := make([]KVPair, 0, len(req.Keys))
 	localUpdateMap := make(map[string]int)
@@ -124,29 +149,32 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 
 	for i := 0; i < len(req.Keys); i++ {
 
-		//Insert Operation
+		// Insert Operation
 		if req.Values[i] != "" {
-			//Insert if a higher version does not exist.
+			// Insert if a higher version does not exist.
 			err := lb.updateCacheMap.Set(req.Keys[i], req.Values[i], req.RequestId)
-			//Error only happens when trying to overwrite a newer value in the cache. Abort request.
 			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
 				return nil, fmt.Errorf("update request aborted: %w", err)
 			}
-			localUpdateMap[req.Keys[i]] = 1 //Local state that I (the thread) added this to the cache and have to remove it.
-
+			localUpdateMap[req.Keys[i]] = 1
 		} else {
-			//Get Operation
+			// Get Operation
 			cachedVal, version, isPresent := lb.updateCacheMap.Get(req.Keys[i], req.RequestId)
 			if isPresent {
 				recv_resp = append(recv_resp, KVPair{
 					Key:   req.Keys[i],
 					Value: cachedVal.(string),
 				})
-				continue //No need to request key from the Server.
+				continue // No need to request key from the Server.
 			}
 
 			if version == -2 {
-				return nil, fmt.Errorf("get failed due to lower version, retry request")
+				err := fmt.Errorf("get failed due to lower version, retry request")
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+				return nil, err
 			}
 		}
 
@@ -159,15 +187,16 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 		}
 		localMap[int(hashVal)] = append(localMap[int(hashVal)], currentPair)
 	}
+
+	span.AddEvent("Adding to Queue")
 	for i := 0; i < lb.executorNumber; i++ {
 		lb.executorQueueList[i].m.Lock()
-
 		for j := 0; j < len(localMap[i]); j++ {
 			lb.executorQueueList[i].queue.Enqueue(localMap[i][j])
 		}
-
 		lb.executorQueueList[i].m.Unlock()
 	}
+	span.AddEvent("Enqueu is complete")
 
 	lb.channelLock.Lock()
 	responseStruct := lb.channelMap[channelId]
@@ -177,11 +206,14 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 	myChan := responseStruct.channel
 	responseStruct.m.Unlock()
 
+	span.AddEvent("Got relevant channel info")
+
 	expectedNonCachedResp := len(req.Keys) - len(recv_resp)
 	for i := 0; i < expectedNonCachedResp; i++ {
 		item := <-myChan
 		recv_resp = append(recv_resp, item)
 	}
+	span.AddEvent("Got back responses from Queue")
 
 	close(myChan)
 	lb.channelLock.Lock()
@@ -196,14 +228,12 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 	sendVal := make([]string, 0, len(req.Keys))
 
 	for _, v := range recv_resp {
-		// _, ok := localUpdateMap[v.Key]
-		// if ok {
-		// 	//Delete the version that I added.
-		// 	lb.updateCacheMap.DeleteVersion(v.Key, req.RequestId)
-		// }
 		sendKeys = append(sendKeys, v.Key)
 		sendVal = append(sendVal, v.Value)
 	}
+
+	// Set the span status to OK
+	span.SetStatus(codes.Ok, "Success")
 
 	return &loadbalancer.LoadBalanceResponse{
 		RequestId:    req.RequestId,
@@ -212,12 +242,16 @@ func (lb *myLoadBalancer) AddKeys(ctx context.Context, req *loadbalancer.LoadBal
 		Keys:         sendKeys,
 		Values:       sendVal,
 	}, nil
-
 }
 
-func (lb *myLoadBalancer) executeBatch(elements []KVPair, executorNumber int) {
+func (lb *myLoadBalancer) executeBatch(ctx context.Context, elements []KVPair, executorNumber int) {
+	tracer := otel.Tracer("my-loadbalancer")
+	ctx, span := tracer.Start(ctx, "executeBatch")
+	defer span.End()
+
 	var client *waffle_client.ProxyClient
 	var clientIndex int
+	span.AddEvent("Trying to find client to use")
 	// Try to find an available client
 	for {
 		found := false
@@ -235,9 +269,10 @@ func (lb *myLoadBalancer) executeBatch(elements []KVPair, executorNumber int) {
 		// If no client is available, wait a bit and try again
 		time.Sleep(10 * time.Millisecond)
 	}
-	// fmt.Println("Using Client Index: ", clientIndex)
+	span.AddEvent("Found client to use")
 	defer lb.clientMutexes[executorNumber][clientIndex].Unlock()
 
+	span.AddEvent("Constructing request")
 	channelIds := make([]string, 0, len(elements))
 	executeKeys := make([]string, 0, len(elements))
 	executeVals := make([]string, 0, len(elements))
@@ -259,24 +294,26 @@ func (lb *myLoadBalancer) executeBatch(elements []KVPair, executorNumber int) {
 		Keys:   []string{},
 		Values: []string{},
 	}
+	span.AddEvent("Finished Making Request")
 
 	if lb.executorType == "Waffle" {
+		span.AddEvent("Sending to Waffle")
 		execResp, err := client.MixBatch(req.Keys, req.Values)
+		span.AddEvent("Got Response from Waffle")
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			log.Fatalf("Failed to Fetch Values! Error: %s", err)
 		}
 		Keys, Values := separateKeysValues(execResp)
 		resp.Keys = Keys
 		resp.Values = Values
 	} else {
-		// resp, err := client.ExecuteBatch(context.Background(), req)
-		// if err != nil {
-		// 	log.Fatalf("Failed to Fetch Values! Error: %s", err)
-		// }
+		// Handle other executor types
 	}
 
 	for i, v := range channelIds {
-		//Drop fake requests.
+		// Drop fake requests.
 		if v == "noChannel" {
 			continue
 		}
@@ -297,8 +334,6 @@ func (lb *myLoadBalancer) executeBatch(elements []KVPair, executorNumber int) {
 		responseStruct.channel <- newKVPair
 		responseStruct.m.Unlock()
 	}
-
-	//Delegate any assumptions for the ORAM proxy Executor(Ordering of keys Etc)
 }
 
 func (lb *myLoadBalancer) checkQueues(ctx context.Context) {
@@ -311,7 +346,6 @@ func (lb *myLoadBalancer) checkQueues(ctx context.Context) {
 			fmt.Println("Exiting out of CheckQueues")
 			return
 		case <-timer.C:
-			// fmt.Println("Timer Click")
 			localMap := make(map[int][]KVPair)
 			localAdded := make(map[int]int)
 			elements := []KVPair{}
@@ -340,14 +374,13 @@ func (lb *myLoadBalancer) checkQueues(ctx context.Context) {
 			}
 			toSend := false
 			for i := 0; i < lb.executorNumber; i++ {
-				//fmt.Println(len(localMap[i]))
 				if localAdded[i] != lb.R {
 					toSend = true
 				}
 			}
 			if toSend {
 				for i := 0; i < lb.executorNumber; i++ {
-					go lb.executeBatch(localMap[i], i)
+					go lb.executeBatch(ctx, localMap[i], i)
 				}
 			}
 			timer.Reset(waitTime)
@@ -366,7 +399,7 @@ func (lb *myLoadBalancer) checkQueues(ctx context.Context) {
 								elements = append(elements, currEle.(KVPair))
 							}
 							lb.executorQueueList[j].m.Unlock()
-							go lb.executeBatch(elements, j)
+							go lb.executeBatch(ctx, elements, j)
 						}
 						timer.Reset(waitTime)
 					}
@@ -446,20 +479,54 @@ func (lb *myLoadBalancer) connectToExecutors(hosts []string, ports []string, fil
 	log.Println("Connected to Executors!")
 }
 
+func initTracer() (*sdktrace.TracerProvider, error) {
+	ctx := context.Background()
+
+	// Create the OTLP exporter over gRPC
+	exporter, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithInsecure(),
+		otlptracegrpc.WithEndpoint("localhost:4317"), // Adjust endpoint for Grafana
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create exporter: %w", err)
+	}
+
+	// Create a resource to identify this application
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceNameKey.String("my-loadbalancer"),
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	// Create the TracerProvider with the exporter and resource
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+	)
+
+	// Set the global TracerProvider
+	otel.SetTracerProvider(tp)
+
+	return tp, nil
+}
+
 func main() {
-	//CLI arguments
-	rPtr := flag.Int("R", 800, "Real Number of Requests")
+	// CLI arguments
+	rPtr := flag.Int("R", 1000, "Real Number of Requests")
 	timeOutPtr := flag.Int("Z", 500, "Queue Wait time in Milliseconds")
-	nPtr := flag.Int("num", 1, "Numer of Executors")
+	nPtr := flag.Int("num", 1, "Number of Executors")
 	bPtr := flag.Int("B", 1200, "Batch Size for Executors (Waffle)")
-	fPtr := flag.Int("F", 100, "Fake request size for Exectors (Waffle)")
+	fPtr := flag.Int("F", 100, "Fake request size for Executors (Waffle)")
 	cPtr := flag.Int("C", 2, "Cache Size for Executors (Waffle)")
-	nCPtr := flag.Int("N", 1, "Number of Cores for Executor (Waffle)")
-	dPtr := flag.Int("D", 100000, "Number of Dummy Values")
+	nCPtr := flag.Int("N", 4, "Number of Cores for Executor (Waffle)")
+	dPtr := flag.Int("D", 20000, "Number of Dummy Values")
 	tPtr := flag.String("T", "Waffle", "Executor Type")
-	numCPtr := flag.Int("X", 1, "Number of clients to Waffle")
-	hostsPtr := flag.String("hosts", "localhost", "Comma-separated list of host addresses (e.g., 'localhost,host2,host3')")
-	portsPtr := flag.String("ports", "9090", "Comma-separated list of port numbers (e.g., '9090,9091,9092')")
+	numCPtr := flag.Int("X", 4, "Number of clients to Waffle")
+	hostsPtr := flag.String("hosts", "localhost", "Comma-separated list of host addresses")
+	portsPtr := flag.String("ports", "9090", "Comma-separated list of port numbers")
 
 	flag.Parse()
 
@@ -471,30 +538,37 @@ func main() {
 		}
 	}()
 
-	//Gracefully exist go routines by passing in main context
-
 	ctx, cancel := context.WithCancel(context.Background())
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	lis, err := net.Listen("tcp", ":9500")
 	if err != nil {
 		log.Fatalf("Cannot create listener on port :9500 %s", err)
-
 	}
 	fmt.Println("Starting Load Balancer on: localhost:9500")
 
-	//Executor Information
 	// Split hosts and ports based on user input
 	hosts := strings.Split(*hostsPtr, ",")
 	ports := strings.Split(*portsPtr, ",")
 
-	// Check if the number of hosts and ports match the number of executors
 	if len(hosts) != *nPtr || len(ports) != *nPtr {
 		log.Fatalf("The number of hosts (%d) or ports (%d) does not match the number of executors (%d).", len(hosts), len(ports), *nPtr)
 	}
 
-	//Define Service
+	// Initialize OpenTelemetry Tracer
+	tp, err := initTracer()
+	if err != nil {
+		log.Fatalf("Failed to initialize tracer: %v", err)
+	}
+	defer func() {
+		if err := tp.Shutdown(context.Background()); err != nil {
+			log.Fatalf("Error shutting down tracer provider: %v", err)
+		}
+	}()
+
+	// Define Service
 	service := myLoadBalancer{
 		done:              false,
 		R:                 *rPtr,
@@ -516,19 +590,18 @@ func main() {
 	}
 	service.requestNumber.Store(0)
 
-	// Print the variables used for initialization
 	fmt.Printf("Initialization with:  - R: %d, Z: %d, num: %d, B: %d, F: %d, C: %d, N: %d, D: %d, X: %d, T: %s\n",
 		*rPtr, *timeOutPtr, *nPtr, *bPtr, *fPtr, *cPtr, *nCPtr, *dPtr, *numCPtr, *tPtr)
 
 	serverRegister := grpc.NewServer()
 	loadbalancer.RegisterLoadBalancerServer(serverRegister, &service)
 
-	//Load Trace
+	// Load Trace
 	traceLoc := "../../tracefiles/serverInput.txt"
-	//Connect to Executors
+	// Connect to Executors
 	service.connectToExecutors(hosts, ports, traceLoc, *numCPtr)
 
-	//Launch Thread to check Queues
+	// Launch Thread to check Queues
 	go service.checkQueues(ctx)
 
 	time.AfterFunc(200*time.Second, func() {
@@ -539,7 +612,7 @@ func main() {
 		os.Exit(0)
 	})
 
-	//Launch routine to listen to sig events.
+	// Launch routine to listen to sig events.
 	go func() {
 		<-sigChan
 		cancel()
@@ -547,11 +620,10 @@ func main() {
 		serverRegister.GracefulStop()
 		os.Exit(0)
 	}()
-	//Start serving
-	err = serverRegister.Serve(lis)
 
+	// Start serving
+	err = serverRegister.Serve(lis)
 	if err != nil {
 		log.Fatalf("Error! %s", err)
 	}
-
 }

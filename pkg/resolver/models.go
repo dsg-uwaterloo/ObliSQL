@@ -5,6 +5,7 @@ import (
 
 	"github.com/Haseeb1399/WorkingThesis/api/loadbalancer"
 	"github.com/Haseeb1399/WorkingThesis/api/resolver"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type myResolver struct {
@@ -16,6 +17,8 @@ type myResolver struct {
 	metaData       map[string]MetaData
 	JoinMap        map[string]interface{}
 	localRequestID atomic.Int64
+	tracer         trace.TracerProvider
+	requestsDone   atomic.Int64
 }
 
 type parsedQuery struct {

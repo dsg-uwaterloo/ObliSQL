@@ -54,7 +54,7 @@ func getResponses(ctx context.Context, ack_channel chan Ack) (int, int) {
 	}
 }
 
-func runBenchmark(resolverClient resolver.ResolverClient, requests []Query, rateLimit *RateLimit, duration int, warmup bool) {
+func runBenchmark(resolverClient resolver.ResolverClient, requests []Query, rateLimit *RateLimit, duration int, warmup bool) (int, int) {
 	ack_channel := make(chan Ack)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(duration)*time.Second)
 	defer cancel()
@@ -65,13 +65,14 @@ func runBenchmark(resolverClient resolver.ResolverClient, requests []Query, rate
 		fmt.Printf("Ops/s,%d,Err,%d\n", Ops, Err)
 
 	}
+	return Ops, Err
 }
 
 func main() {
 	hPtr := flag.String("h", "localhost", "Resolver Host")
 	pPtr := flag.String("p", "9900", "Resolver Host")
 	sPtr := flag.Int("s", 2000, "Maximum in-flight requests")
-	tPtr := flag.Int("t", 10, "Duration to run benchmark (in seconds)")
+	tPtr := flag.Int("t", 30, "Duration to run benchmark (in seconds)")
 
 	flag.Parse()
 
@@ -96,23 +97,27 @@ func main() {
 		fmt.Printf("Connected to Resolver on %s \n", resolverAddr)
 	}
 
-	requestsWarmup := []Query{}
+	// requestsWarmup := []Query{}
 
-	for len(requestsWarmup) < 500000 {
-		requestsWarmup = append(requestsWarmup, getTestCases()...)
-	}
+	// for len(requestsWarmup) < 10000 {
+	// 	requestsWarmup = append(requestsWarmup, getTestCases()...)
+	// }
+
 	requestsBench := []Query{}
 
-	for len(requestsBench) < 500000 {
+	for len(requestsBench) < 50000 {
 		requestsBench = append(requestsBench, getTestCases()...)
 	}
 
-	rateLimit := NewRateLimit(*sPtr)
+	// rateLimit := NewRateLimit(*sPtr)
+	// Ops1, Err1 := runBenchmark(resolverClient, requestsWarmup, rateLimit, 10, true)
+
 	fmt.Println("In-Flight Requests:", *sPtr)
 	defer conn.Close()
 
-	runBenchmark(resolverClient, requestsWarmup, rateLimit, 10, true)
+	rateLimitNew := NewRateLimit(*sPtr)
+	Ops2, Err2 := runBenchmark(resolverClient, requestsBench, rateLimitNew, *tPtr, false)
 
-	runBenchmark(resolverClient, requestsBench, rateLimit, *tPtr, false)
-
+	fmt.Printf("Total Ops: %d\n", Ops2)
+	fmt.Printf("Total Err: %d\n", Err2)
 }
