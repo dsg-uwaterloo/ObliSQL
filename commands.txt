@@ -1,0 +1,6 @@
+LB:
+go run ./main.go -p 9500 -R 1000 -Z 500 -num 1 -T Waffle -X 4 -hosts localhost -ports 9090 -t true
+
+waffle:
+./bin/proxy_server -h localhost -p 6379 -r 1000 -f 100 -d 20000 -b 1200 -c 2 -n 4
+
