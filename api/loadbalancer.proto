@@ -2,6 +2,8 @@ syntax = "proto3";
 
 option go_package = "loadBalancer/service;loadBalancer";
 
+import "google/protobuf/wrappers.proto";
+
 message loadBalanceRequest{
     int64 request_id = 1;
     int64 object_num = 2;
@@ -25,4 +27,5 @@ message clientConnect{
 service LoadBalancer{
     rpc addKeys(loadBalanceRequest) returns (loadBalanceResponse);
     rpc connectPing(clientConnect) returns (clientConnect);
+    rpc initDB(loadBalanceRequest) returns (google.protobuf.BoolValue);
 }

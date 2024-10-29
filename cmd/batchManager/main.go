@@ -45,9 +45,6 @@ func main() {
 
 	tracer := otel.Tracer("")
 
-	// Trace Location
-	traceLoc := "../../tracefiles/serverInputNew.txt"
-
 	// Define the address where the gRPC server will be listening
 	serverAddress := "0.0.0.0:" + *addrPort
 
@@ -62,30 +59,30 @@ func main() {
 
 	// Create a new gRPC server
 	grpcServer := grpc.NewServer(
-		grpc.MaxRecvMsgSize(644000*300),
-		grpc.MaxSendMsgSize(644000*300),
+		grpc.MaxRecvMsgSize(600*1024*1024), // 600 MB
+		grpc.MaxSendMsgSize(600*1024*1024), // 600 MB
 	)
 
 	// Initialize the batcher service with Redis connection and tracingProvider
-	batchService := batcher.NewBatcher(ctx, *rPtr, *nPtr, *timeOutPtr, *tPtr, *hostsPtr, *portsPtr, *numCPtr, tracer, traceLoc)
+	batchService := batcher.NewBatcher(ctx, *rPtr, *nPtr, *timeOutPtr, *tPtr, *hostsPtr, *portsPtr, *numCPtr, tracer)
 
 	// Register the service with the gRPC server
 	loadBalancer.RegisterLoadBalancerServer(grpcServer, batchService)
 
-	startTime := time.Now()
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+	// startTime := time.Now()
+	// ticker := time.NewTicker(1 * time.Second)
+	// defer ticker.Stop()
 
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				log.Info().Msgf("Total Non-Fake Keys Seen by Resolver after %d Seconds: %d", int(time.Since(startTime).Seconds()), batchService.TotalKeysSeen.Load())
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
+	// go func() {
+	// 	for {
+	// 		select {
+	// 		case <-ticker.C:
+	// 			log.Info().Msgf("Total Non-Fake Keys Seen by Resolver after %d Seconds: %d", int(time.Since(startTime).Seconds()), batchService.TotalKeysSeen.Load())
+	// 		case <-ctx.Done():
+	// 			return
+	// 		}
+	// 	}
+	// }()
 
 	// Handle graceful shutdown
 	go func() {

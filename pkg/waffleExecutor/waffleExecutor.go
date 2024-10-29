@@ -21,8 +21,8 @@ func (p *ProxyClient) Init(host string, port int, traceObj trace.Tracer) error {
 	// Create a configuration for the socket
 	conf := &thrift.TConfiguration{
 		// Set your configuration options here (if needed)
-		MaxFrameSize:   int32(512 * 1024 * 1024),
-		MaxMessageSize: int32(512 * 1024 * 1024),
+		MaxFrameSize:   int32(600 * 1024 * 1024),
+		MaxMessageSize: int32(600 * 1024 * 1024),
 	}
 
 	// Use NewTSocketConf instead of NewTSocket

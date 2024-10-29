@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -21,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion8
 const (
 	LoadBalancer_AddKeys_FullMethodName     = "/LoadBalancer/addKeys"
 	LoadBalancer_ConnectPing_FullMethodName = "/LoadBalancer/connectPing"
+	LoadBalancer_InitDB_FullMethodName      = "/LoadBalancer/initDB"
 )
 
 // LoadBalancerClient is the client API for LoadBalancer service.
@@ -29,6 +31,7 @@ const (
 type LoadBalancerClient interface {
 	AddKeys(ctx context.Context, in *LoadBalanceRequest, opts ...grpc.CallOption) (*LoadBalanceResponse, error)
 	ConnectPing(ctx context.Context, in *ClientConnect, opts ...grpc.CallOption) (*ClientConnect, error)
+	InitDB(ctx context.Context, in *LoadBalanceRequest, opts ...grpc.CallOption) (*wrapperspb.BoolValue, error)
 }
 
 type loadBalancerClient struct {
@@ -59,12 +62,23 @@ func (c *loadBalancerClient) ConnectPing(ctx context.Context, in *ClientConnect,
 	return out, nil
 }
 
+func (c *loadBalancerClient) InitDB(ctx context.Context, in *LoadBalanceRequest, opts ...grpc.CallOption) (*wrapperspb.BoolValue, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(wrapperspb.BoolValue)
+	err := c.cc.Invoke(ctx, LoadBalancer_InitDB_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // LoadBalancerServer is the server API for LoadBalancer service.
 // All implementations must embed UnimplementedLoadBalancerServer
 // for forward compatibility
 type LoadBalancerServer interface {
 	AddKeys(context.Context, *LoadBalanceRequest) (*LoadBalanceResponse, error)
 	ConnectPing(context.Context, *ClientConnect) (*ClientConnect, error)
+	InitDB(context.Context, *LoadBalanceRequest) (*wrapperspb.BoolValue, error)
 	mustEmbedUnimplementedLoadBalancerServer()
 }
 
@@ -77,6 +91,9 @@ func (UnimplementedLoadBalancerServer) AddKeys(context.Context, *LoadBalanceRequ
 }
 func (UnimplementedLoadBalancerServer) ConnectPing(context.Context, *ClientConnect) (*ClientConnect, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ConnectPing not implemented")
+}
+func (UnimplementedLoadBalancerServer) InitDB(context.Context, *LoadBalanceRequest) (*wrapperspb.BoolValue, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InitDB not implemented")
 }
 func (UnimplementedLoadBalancerServer) mustEmbedUnimplementedLoadBalancerServer() {}
 
@@ -127,6 +144,24 @@ func _LoadBalancer_ConnectPing_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _LoadBalancer_InitDB_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LoadBalanceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LoadBalancerServer).InitDB(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LoadBalancer_InitDB_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LoadBalancerServer).InitDB(ctx, req.(*LoadBalanceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // LoadBalancer_ServiceDesc is the grpc.ServiceDesc for LoadBalancer service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -141,6 +176,10 @@ var LoadBalancer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "connectPing",
 			Handler:    _LoadBalancer_ConnectPing_Handler,
+		},
+		{
+			MethodName: "initDB",
+			Handler:    _LoadBalancer_InitDB_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
