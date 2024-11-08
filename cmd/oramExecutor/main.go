@@ -24,9 +24,10 @@ func main() {
 	redisHost := flag.String("rh", "127.0.0.1", "Redis Host")
 	redisPort := flag.String("rp", "6379", "Redis Host")
 	addrPort := flag.String("p", "9090", "Executor Port")
-	logCap := flag.Int("l", 10, "Logarithm base 2 of capacity")
+	logCap := flag.Int("l", 16, "Logarithm base 2 of capacity")
 	zVal := flag.Int("z", 5, "Number of blocks per bucket")
-	stashSize := flag.Int("s", 2000, "Maximum number of blocks in Stash")
+	stashSize := flag.Int("s", 100000, "Maximum number of blocks in Stash")
+	traceLocation := flag.String("tl", "/home/nsrao/URA/RelationalWaffle/tracefiles/serverInput.txt", "Location to tracefile for initializing DB")
 
 	flag.Parse()
 
@@ -46,7 +47,7 @@ func main() {
 
 	// Initialize the executor service with Redis connection and tracingProvider
 
-	executor, err := oramexecutor.NewORAM(*logCap, *zVal, *stashSize, redisAddress)
+	executor, err := oramexecutor.NewORAM(*logCap, *zVal, *stashSize, redisAddress, *traceLocation)
 
 	if err != nil {
 		log.Fatal().Msgf("Failed to initialize ORAM! %s \n", err)
