@@ -78,45 +78,6 @@ func (e MyOram) ExecuteBatch(ctx context.Context, req *executor.RequestBatchORAM
 	}, nil
 }
 
-// func (e MyOram) InitDb(ctx context.Context, req *executor.RequestBatchORAM) (*wrappers.BoolValue, error) {
-// 	fmt.Printf("Initialize DB with Key Size: %d \n", len(req.Keys))
-
-// 	e.o.RedisClient.FlushData()
-// 	e.o.ClearKeymap()
-// 	e.o.ClearStash()
-
-// 	// set batchsize
-// 	batchSize := 50
-
-// 	for start := 0; start < len(req.Values); start += batchSize {
-// 		var requestList []Request
-
-// 		end := start + batchSize
-// 		if end > len(req.Values) {
-// 			end = len(req.Values) // Ensure we don't go out of bounds
-// 		}
-
-// 		// Slice the keys and values for the current batch
-// 		batchKeys := req.Keys[start:end]
-// 		batchValues := req.Values[start:end]
-
-// 		for i := range batchKeys {
-// 			//pairs = append(pairs, req.Keys[i], req.Values[i])
-// 			// Read operation
-// 			currentRequest := Request{
-// 				Key:   batchKeys[i],
-// 				Value: batchValues[i],
-// 			}
-
-// 			requestList = append(requestList, currentRequest)
-// 		}
-// 		e.o.Batching(requestList, batchSize)
-// 	}
-// 	fmt.Println("Finished Initializing DB!")
-// 	return &wrappers.BoolValue{Value: true}, nil
-
-// }
-
 func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string) (*MyOram, error) {
 	key, err := GenerateRandomKey()
 	if err != nil {
@@ -173,7 +134,7 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string) 
 
 	// Initialize DB with tracefile contents and display a progress bar
 	batchSize := 10
-	bar := progressbar.Default(len(requests), "Setting values...")
+	bar := progressbar.Default(int64(len(requests)), "Setting values...")
 
 	for start := 0; start < len(requests); start += batchSize {
 		end := start + batchSize
