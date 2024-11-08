@@ -9,6 +9,7 @@ import (
 
 	executor "github.com/project/ObliSql/api/oramExecutor"
 	// "github.com/redis/go-redis/v9"
+	"github.com/schollz/progressbar/v3"
 )
 
 const (
@@ -116,7 +117,7 @@ func (e MyOram) ExecuteBatch(ctx context.Context, req *executor.RequestBatchORAM
 
 // }
 
-func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string) (*MyOram, error) { // pass in tracefile
+func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string) (*MyOram, error) {
 	key, err := GenerateRandomKey()
 	if err != nil {
 		return nil, err
@@ -170,18 +171,23 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string) 
 		return nil, fmt.Errorf("error reading tracefile: %v", err)
 	}
 
-	// Initialize DB with tracefile contents
+	// Initialize DB with tracefile contents and display a progress bar
 	batchSize := 10
+	bar := progressbar.Default(len(requests), "Setting values...")
 
 	for start := 0; start < len(requests); start += batchSize {
-
 		end := start + batchSize
 		if end > len(requests) {
 			end = len(requests) // Ensure we don't go out of bounds
 		}
 
 		oram.Batching(requests[start:end], batchSize)
+
+		// Increment the progress bar by the batch size or remaining items
+		_ = bar.Add(end - start)
 	}
+
+	bar.Finish()
 	fmt.Println("Finished Initializing DB!")
 
 	myOram := &MyOram{
