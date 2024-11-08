@@ -248,7 +248,6 @@ func (o *ORAM) Batching(requests []Request, batchSize int) ([]string, error) {
 
 	for _, req := range requests {
 
-		// TODO: if it's a get request, don't add the new block in
 		_, keyReadBefore := fakeReadMap[req.Key]
 		var previousPositionLeaf = -1
 
