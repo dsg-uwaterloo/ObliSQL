@@ -27,7 +27,7 @@ func main() {
 	logCap := flag.Int("l", 16, "Logarithm base 2 of capacity")
 	zVal := flag.Int("z", 5, "Number of blocks per bucket")
 	stashSize := flag.Int("s", 100000, "Maximum number of blocks in Stash")
-	traceLocation := flag.String("tl", "/home/nsrao/URA/RelationalWaffle/tracefiles/serverInput.txt", "Location to tracefile for initializing DB")
+	traceLocation := flag.String("tl", "../../tracefiles/serverInput.txt", "Location to tracefile for initializing DB")
 
 	flag.Parse()
 
