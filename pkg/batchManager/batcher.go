@@ -12,7 +12,7 @@ import (
 
 	loadBalancer "github.com/project/ObliSql/api/loadbalancer"
 	executor "github.com/project/ObliSql/api/plaintextExecutor"
-	"github.com/project/ObliSql/pkg/waffleExecutor"
+	"github.com/project/ObliSql/pkg/oramClient"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -49,7 +49,7 @@ type myBatcher struct {
 	waitTime          int
 	executorType      string
 	executorNum       int
-	executors         map[int][]*waffleExecutor.ProxyClient
+	executors         map[int][]*oramClient.OramClient
 	numClients        int
 	tracer            trace.Tracer
 	executorChannels  map[int]chan *KVPair // Per-executor channels
@@ -108,10 +108,10 @@ func (lb *myBatcher) connectToExecutors(ctx context.Context, hosts []string, por
 	ctx, span := lb.tracer.Start(ctx, "Connecting")
 	defer span.End()
 
-	lb.executors = make(map[int][]*waffleExecutor.ProxyClient)
+	lb.executors = make(map[int][]*oramClient.OramClient)
 	workerId := 0
 	for i := range hosts {
-		lb.executors[i] = make([]*waffleExecutor.ProxyClient, numClient)
+		lb.executors[i] = make([]*oramClient.OramClient, numClient)
 		lb.executorWorkerIds[i] = []int{}
 		for j := 0; j < numClient; j++ {
 			// Initialize batchChannel[workerId] before starting batchWorker
@@ -129,13 +129,14 @@ func (lb *myBatcher) connectToExecutors(ctx context.Context, hosts []string, por
 		}
 		span.AddEvent(fmt.Sprintf("Launching Clients for: %d", i))
 		for j := 0; j < numClient; j++ {
-			client := &waffleExecutor.ProxyClient{}
-			err := client.Init(v, port, lb.tracer)
+			client := &oramClient.OramClient{}
+			// err := client.Init(v, port, lb.tracer)
+			err := client.CreateClient(v, port)
 			if err != nil {
 				log.Fatal().Msgf("Couldn't Connect to Executor Proxy %d-%d. Error: %s", i, j, err)
 			}
 
-			client.GetClientID()
+			// client.GetClientID()
 			lb.executors[i][j] = client
 			go lb.batchWorker(client, i, workerId)
 			workerId++
@@ -392,7 +393,7 @@ func (lb *myBatcher) executeBatch(executorNumber int, batch []*KVPair) {
 
 }
 
-func (lb *myBatcher) batchWorker(client *waffleExecutor.ProxyClient, idx int, workerId int) {
+func (lb *myBatcher) batchWorker(client *oramClient.OramClient, idx int, workerId int) {
 	log.Info().Msgf("Batch Worker for executor: %d is up.", idx)
 
 	for {
