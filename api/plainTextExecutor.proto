@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+option go_package = "plainTextExecutor/service;plainTextExecutor";
+
+import "google/protobuf/wrappers.proto";
+
+message requestBatch {
+    int64 requestId = 1;
+    repeated string keys = 2;
+    repeated string values = 3;
+}
+
+message respondBatch {
+    int64 requestId = 1;
+    repeated string keys =2;
+    repeated string values =3;
+}
+
+service plainTextExecutor{
+    rpc executeBatch(requestBatch) returns (respondBatch);
+    rpc initDb(requestBatch) returns (google.protobuf.BoolValue);
+}
