@@ -1,3 +1,4 @@
+#include <cassert>
 #include <unordered_map>
 #include <iostream>
 
@@ -8,24 +9,8 @@
 
 #define HOST "127.0.0.1"
 #define PROXY_PORT 9090
-#define NUM_EXECUTOR 2
 
 typedef std::vector<std::pair<std::vector<std::string>, std::vector<std::string>>> trace_vector;
-int myId;
-
-uint64_t fnv1a_hash(const std::string &str) {
-    const uint64_t FNV_prime = 1099511628211u;
-    const uint64_t offset_basis = 14695981039346656037u;
-
-    uint64_t hash = offset_basis;
-    for (char c : str) {
-        hash ^= static_cast<uint64_t>(c);
-        hash *= FNV_prime;
-    }
-
-    return hash;
-}
-
 
 void getKeysValues(const std::string &trace_location, std::vector<std::string>& keys, std::vector<std::string>& values) {
     std::ifstream in_workload_file;
@@ -38,6 +23,7 @@ void getKeysValues(const std::string &trace_location, std::vector<std::string>& 
     }
     std::string line;
     std::string op, key, val;
+    int i=0;
     while (std::getline(in_workload_file, line)) {
         op = line.substr(0, line.find(" "));
         key = line.substr(line.find(" ")+1);
@@ -47,12 +33,10 @@ void getKeysValues(const std::string &trace_location, std::vector<std::string>& 
             val = key.substr(key.find(" ")+1);
             key = key.substr(0, key.find(" "));
         }
+        assert(val != "");
 
-        int hashVal = fnv1a_hash(key) % NUM_EXECUTOR;
-        if(hashVal == myId){
-            keys.push_back(key);
-            values.push_back(val);
-        }
+        keys.push_back(key);
+        values.push_back(val);
         assert (key != "SET");
     }
     in_workload_file.close();
@@ -86,6 +70,7 @@ void usage() {
 };
 
 int main(int argc, char *argv[]) {
+    int waffle_port = PROXY_PORT;
     int client_batch_size = 50;
     std::atomic<int> xput;
     std::atomic_init(&xput, 0);
@@ -94,13 +79,10 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<proxy> proxy_ = std::make_shared<waffle_proxy>();
     int o;
     std::string proxy_type_ = "waffle";
-    while ((o = getopt(argc, argv, "h:i:p:s:n:v:b:c:t:o:d:z:q:l:m:r:y:f:a")) != -1) {
+    while ((o = getopt(argc, argv, "h:p:s:n:v:b:c:t:o:d:z:q:l:m:r:y:f:a")) != -1) {
         switch (o) {
             case 'h':
                 dynamic_cast<waffle_proxy&>(*proxy_).server_host_name_ = std::string(optarg);
-                break;
-            case 'i':
-                myId = std::atoi(optarg);
                 break;
             case 'p':
                 dynamic_cast<waffle_proxy&>(*proxy_).server_port_ = std::atoi(optarg);
@@ -118,7 +100,8 @@ int main(int argc, char *argv[]) {
                 dynamic_cast<waffle_proxy&>(*proxy_).cacheBatches = std::atoi(optarg);
                 break;
             case 'z':
-                dynamic_cast<waffle_proxy&>(*proxy_).security_batch_size_ = std::atoi(optarg);
+            waffle_port = std::atoi(optarg);
+                // dynamic_cast<waffle_proxy&>(*proxy_).security_batch_size_ = std::atoi(optarg);
                 break;
             // case 'c':
             //     dynamic_cast<waffle_proxy&>(*proxy_).storage_batch_size_ = std::atoi(optarg);
@@ -152,25 +135,41 @@ int main(int argc, char *argv[]) {
                 exit(-1);
         }
     }
-    std::cout<<"My ID:"<<myId<<std::endl;
+
     void *arguments[1];
     assert(dynamic_cast<waffle_proxy&>(*proxy_).trace_location_ != "");
+    std::vector<std::string> keys;
+    std::vector<std::string> values;
+    getKeysValues(dynamic_cast<waffle_proxy&>(*proxy_).trace_location_, keys, values);
+    std::cout << "Keys size before init is " << keys.size() << std::endl;
+    auto id_to_client = std::make_shared<thrift_response_client_map>();
+    arguments[0] = &id_to_client;
+    std::string dummy(object_size_, '0');
+    std::cout <<"Initializing Waffle" << std::endl;
+    dynamic_cast<waffle_proxy&>(*proxy_).init(keys, values, arguments);
+    std::cout << "Initialized Waffle" << std::endl;
+    auto proxy_server = thrift_server::create(proxy_, "waffle", id_to_client, waffle_port, 1);
+    std::thread proxy_serve_thread([&proxy_server] { proxy_server->serve(); });
+    std::cout << "Proxy server is reachable" << std::endl;
+    sleep(600);
+
+    // void *arguments[1];
+    // assert(dynamic_cast<waffle_proxy&>(*proxy_).trace_location_ != "");
     // std::vector<std::string> keys;
     // std::vector<std::string> values;
     // getKeysValues(dynamic_cast<waffle_proxy&>(*proxy_).trace_location_, keys, values);
     // std::cout << "Keys size before init is " << keys.size() << std::endl;
-    auto id_to_client = std::make_shared<thrift_response_client_map>();
-    arguments[0] = &id_to_client;
-    dynamic_cast<waffle_proxy&>(*proxy_).init_map(arguments);
+    // auto id_to_client = std::make_shared<thrift_response_client_map>();
+    // arguments[0] = &id_to_client;
     // std::string dummy(object_size_, '0');
     // std::cout <<"Initializing Waffle" << std::endl;
+    // dynamic_cast<waffle_proxy&>(*proxy_).init_map(arguments);
+
+
     // dynamic_cast<waffle_proxy&>(*proxy_).init(keys, values, arguments);
     // std::cout << "Initialized Waffle" << std::endl;
-    auto proxy_server = thrift_server::create(proxy_, "waffle", id_to_client, PROXY_PORT+myId, 1);
-    std::thread proxy_serve_thread([&proxy_server] { proxy_server->serve(); });
-    std::cout << "Proxy server is reachable at: "<<PROXY_PORT+myId << std::endl;
-    sleep(250);
-    //flush_thread(proxy_);
-    //proxy_->close();
-    //proxy_server->stop();
+    // auto proxy_server = thrift_server::create(proxy_, "waffle", id_to_client, waffle_port, 1);
+    // std::thread proxy_serve_thread([&proxy_server] { proxy_server->serve(); });
+    // std::cout << "Proxy server is reachable:" <<waffle_port<< std::endl;
+    // sleep(200);
 }

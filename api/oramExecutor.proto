@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+option go_package = "oramExecutor/service;oramExecutor";
+
+import "google/protobuf/wrappers.proto";
+
+message requestBatchORAM {
+    int64 requestId = 1;
+    repeated string keys = 2;
+    repeated string values = 3;
+}
+
+message respondBatchORAM {
+    int64 requestId = 1;
+    repeated string keys =2;
+    repeated string values =3;
+}
+
+service Executor{
+    rpc executeBatch(requestBatchORAM) returns (respondBatchORAM);
+    rpc initDb(requestBatchORAM) returns (google.protobuf.BoolValue);
+}

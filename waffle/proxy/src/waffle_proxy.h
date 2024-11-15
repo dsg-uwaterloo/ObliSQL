@@ -2,6 +2,7 @@
 #define WAFFLE_PROXY_H
 
 #include <atomic>
+#include <opentelemetry/nostd/shared_ptr.h>
 #include <unordered_map>
 #include <vector>
 #include <unistd.h>
@@ -35,6 +36,16 @@
 #include "storage_interface.h"
 //#include "memcached.h"
 
+#include "opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h"
+#include "opentelemetry/exporters/otlp/otlp_grpc_exporter_options.h"
+#include "opentelemetry/sdk/trace/processor.h"
+#include "opentelemetry/sdk/trace/batch_span_processor_factory.h"
+#include "opentelemetry/sdk/trace/batch_span_processor_options.h"
+#include "opentelemetry/sdk/trace/tracer_provider_factory.h"
+#include "opentelemetry/trace/provider.h"
+#include "opentelemetry/sdk/trace/tracer_provider.h"
+
+
 
 class waffle_proxy : public proxy {
 public:
@@ -49,6 +60,9 @@ public:
     std::string get(int queue_id, const std::string &key) override;
     void put(int queue_id, const std::string &key, const std::string &value) override;
     std::vector<std::string> get_batch(int queue_id, const std::vector<std::string> &keys) override;
+    std::vector<std::string> mix_batch(int queue_id, const std::vector<std::string> &keys, const std::vector<std::string> &values) override;
+    // void init_db(const std::vector<std::string> & keys, const std::vector<std::string> & values) override;
+    void init_args(const int64_t B, const int64_t R, const int64_t F, const int64_t D, const int64_t C, const int64_t N) override;
     void put_batch(int queue_id, const std::vector<std::string> &keys, const std::vector<std::string> &values) override;
 
     void async_get(const sequence_id &seq_id, const std::string &key);
@@ -103,7 +117,7 @@ public:
 private:
     void create_security_batch(std::shared_ptr<queue <std::pair<operation, std::shared_ptr<std::promise<std::string>>>>> &op_queue,
                                           std::vector<operation> &storage_batch,
-                                          std::unordered_map<std::string, std::vector<std::shared_ptr<std::promise<std::string>>>> &keyToPromiseMap, int& cacheMisses);
+                                          std::unordered_map<std::string, std::vector<std::shared_ptr<std::promise<std::string>>>> &keyToPromiseMap, int& cacheMisses,int queueID);
 
     void execute_batch(const std::vector<operation> &operations, std::unordered_map<std::string, std::vector<std::shared_ptr<std::promise<std::string>>>> &keyToPromiseMap, std::shared_ptr<storage_interface> storage_interface, encryption_engine *enc_engine, int id, int& cacheMisses);
     void consumer_thread(int id, encryption_engine *enc_engine);
@@ -126,7 +140,8 @@ private:
     encryption_engine encryption_engine_;
     Cache cache;
     evictedItems EvictedItems;
-    queue<std::pair<int, std::pair<const sequence_id&, std::vector<std::future<std::string>>>>> respond_queue_;
+    // queue<std::pair<int, std::pair<const sequence_id&, std::vector<std::future<std::string>>>>> respond_queue_;
+    queue<std::pair<int, std::pair<const sequence_id&, std::vector<std::pair<std::string, std::future<std::string>>>>>> respond_queue_;
     queue<sequence_id> sequence_queue_;
     queue<std::vector<std::string>> keysNotUsed;
 };

@@ -11,6 +11,8 @@ std::shared_ptr<TServer> thrift_server::create(std::shared_ptr<proxy> proxy_ptr,
     auto proc_factory = std::make_shared<waffle_thriftProcessorFactory>(clone_factory);
     auto socket = std::make_shared<TNonblockingServerSocket>(port);
     socket->setSendTimeout(1200000);
+    const int64_t max_frame_size = 512 * 1024 * 1024;
+    // socket->setTcpRecvBuffer(max_frame_size);
 
     std::shared_ptr<ThreadManager> threadManager = ThreadManager::newSimpleThreadManager(15);
     std::shared_ptr<PosixThreadFactory> threadFactory = std::shared_ptr<PosixThreadFactory>(new PosixThreadFactory());

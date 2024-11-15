@@ -12,9 +12,11 @@ service waffle_thrift{
   oneway void async_get_batch(1:sequence_id seq_id, 2:list<string> keys);
   oneway void async_put_batch(1:sequence_id seq_id, 2:list<string> keys, 3:list<string> values);
   void init_db(1:list<string> keys, 2:list<string> values);
+  void init_args(1: i64 B, 2:i64 R, 3:i64 F, 4:i64 D, 5:i64 C, 6:i64 N);
   string get(1:string key);
   void put(1:string key, 2:string value);
   list<string> get_batch(1:list<string> keys);
+  list<string> mix_batch(1:list<string> keys, 2:list<string> values);
   void put_batch(1:list<string> keys, 2:list<string> values);
 }
 

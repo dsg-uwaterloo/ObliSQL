@@ -1,4 +1,5 @@
 #include "encryption_engine.h"
+#include <bits/types/cookie_io_functions_t.h>
 #include <iostream>
 
 std::string encryption_engine::extractKey(const std::string& encryptedKey) {
@@ -518,8 +519,24 @@ int encryption_engine::hmac_it(const byte* msg, size_t mlen, byte** val, size_t*
     return !!result;
 };
 
+// std::string encryption_engine::encrypt(const std::string &plain_text) {
+//     int cipher_text_len = plain_text.length() + EVP_CIPHER_block_size(EVP_aes_256_cbc());
+//     std::vector<unsigned char> cipher_text(cipher_text_len);
+//     int text_len = encrypt((unsigned char *)plain_text.c_str(), plain_text.length(), encryption_key_, iv_, cipher_text.data());
+//     assert(text_len > 0);
+//     return std::string((const char *)cipher_text.data(), text_len);
+// };
+
+// std::string encryption_engine::decrypt(const std::string &cipher_text) {
+//     std::vector<unsigned char> text(cipher_text.length());
+//     int text_len = decrypt((unsigned char *)cipher_text.c_str(), cipher_text.length(), encryption_key_, iv_, text.data());
+//     assert(text_len > 0);
+//     return std::string(text.data(), text.data() + text_len);
+// };
+
 std::string encryption_engine::encrypt(const std::string &plain_text) {
-    unsigned char cipher_text[4096];
+    // std::cout<<plain_text.length()<<std::endl;
+    unsigned char cipher_text[4096*50];
     int text_len = encrypt((unsigned char *)plain_text.c_str(), plain_text.length(), encryption_key_, iv_, cipher_text);
     assert(text_len > 0);
     std::string str((const char *)cipher_text, text_len);
@@ -527,7 +544,7 @@ std::string encryption_engine::encrypt(const std::string &plain_text) {
 };
 
 std::string encryption_engine::decrypt(const std::string &cipher_text) {
-    unsigned char text[4096];
+    unsigned char text[4096*50];
     int text_len = decrypt((unsigned char *)cipher_text.c_str(), cipher_text.length(), encryption_key_, iv_, text);
     assert(text_len > 0);
     return std::string(text, std::find(text, text + text_len, '\0'));

@@ -29,9 +29,11 @@ class waffle_thriftIf {
   virtual void async_get_batch(const sequence_id& seq_id, const std::vector<std::string> & keys) = 0;
   virtual void async_put_batch(const sequence_id& seq_id, const std::vector<std::string> & keys, const std::vector<std::string> & values) = 0;
   virtual void init_db(const std::vector<std::string> & keys, const std::vector<std::string> & values) = 0;
+  virtual void init_args(const int64_t B, const int64_t R, const int64_t F, const int64_t D, const int64_t C, const int64_t N) = 0;
   virtual void get(std::string& _return, const std::string& key) = 0;
   virtual void put(const std::string& key, const std::string& value) = 0;
   virtual void get_batch(std::vector<std::string> & _return, const std::vector<std::string> & keys) = 0;
+  virtual void mix_batch(std::vector<std::string> & _return, const std::vector<std::string> & keys, const std::vector<std::string> & values) = 0;
   virtual void put_batch(const std::vector<std::string> & keys, const std::vector<std::string> & values) = 0;
 };
 
@@ -84,6 +86,9 @@ class waffle_thriftNull : virtual public waffle_thriftIf {
   void init_db(const std::vector<std::string> & /* keys */, const std::vector<std::string> & /* values */) override {
     return;
   }
+  void init_args(const int64_t /* B */, const int64_t /* R */, const int64_t /* F */, const int64_t /* D */, const int64_t /* C */, const int64_t /* N */) override {
+    return;
+  }
   void get(std::string& /* _return */, const std::string& /* key */) override {
     return;
   }
@@ -91,6 +96,9 @@ class waffle_thriftNull : virtual public waffle_thriftIf {
     return;
   }
   void get_batch(std::vector<std::string> & /* _return */, const std::vector<std::string> & /* keys */) override {
+    return;
+  }
+  void mix_batch(std::vector<std::string> & /* _return */, const std::vector<std::string> & /* keys */, const std::vector<std::string> & /* values */) override {
     return;
   }
   void put_batch(const std::vector<std::string> & /* keys */, const std::vector<std::string> & /* values */) override {
@@ -620,6 +628,133 @@ class waffle_thrift_init_db_presult {
 
 };
 
+typedef struct _waffle_thrift_init_args_args__isset {
+  _waffle_thrift_init_args_args__isset() : B(false), R(false), F(false), D(false), C(false), N(false) {}
+  bool B :1;
+  bool R :1;
+  bool F :1;
+  bool D :1;
+  bool C :1;
+  bool N :1;
+} _waffle_thrift_init_args_args__isset;
+
+class waffle_thrift_init_args_args {
+ public:
+
+  waffle_thrift_init_args_args(const waffle_thrift_init_args_args&) noexcept;
+  waffle_thrift_init_args_args& operator=(const waffle_thrift_init_args_args&) noexcept;
+  waffle_thrift_init_args_args() noexcept
+                               : B(0),
+                                 R(0),
+                                 F(0),
+                                 D(0),
+                                 C(0),
+                                 N(0) {
+  }
+
+  virtual ~waffle_thrift_init_args_args() noexcept;
+  int64_t B;
+  int64_t R;
+  int64_t F;
+  int64_t D;
+  int64_t C;
+  int64_t N;
+
+  _waffle_thrift_init_args_args__isset __isset;
+
+  void __set_B(const int64_t val);
+
+  void __set_R(const int64_t val);
+
+  void __set_F(const int64_t val);
+
+  void __set_D(const int64_t val);
+
+  void __set_C(const int64_t val);
+
+  void __set_N(const int64_t val);
+
+  bool operator == (const waffle_thrift_init_args_args & rhs) const
+  {
+    if (!(B == rhs.B))
+      return false;
+    if (!(R == rhs.R))
+      return false;
+    if (!(F == rhs.F))
+      return false;
+    if (!(D == rhs.D))
+      return false;
+    if (!(C == rhs.C))
+      return false;
+    if (!(N == rhs.N))
+      return false;
+    return true;
+  }
+  bool operator != (const waffle_thrift_init_args_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const waffle_thrift_init_args_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class waffle_thrift_init_args_pargs {
+ public:
+
+
+  virtual ~waffle_thrift_init_args_pargs() noexcept;
+  const int64_t* B;
+  const int64_t* R;
+  const int64_t* F;
+  const int64_t* D;
+  const int64_t* C;
+  const int64_t* N;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class waffle_thrift_init_args_result {
+ public:
+
+  waffle_thrift_init_args_result(const waffle_thrift_init_args_result&) noexcept;
+  waffle_thrift_init_args_result& operator=(const waffle_thrift_init_args_result&) noexcept;
+  waffle_thrift_init_args_result() noexcept {
+  }
+
+  virtual ~waffle_thrift_init_args_result() noexcept;
+
+  bool operator == (const waffle_thrift_init_args_result & /* rhs */) const
+  {
+    return true;
+  }
+  bool operator != (const waffle_thrift_init_args_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const waffle_thrift_init_args_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class waffle_thrift_init_args_presult {
+ public:
+
+
+  virtual ~waffle_thrift_init_args_presult() noexcept;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 typedef struct _waffle_thrift_get_args__isset {
   _waffle_thrift_get_args__isset() : key(false) {}
   bool key :1;
@@ -925,6 +1060,117 @@ class waffle_thrift_get_batch_presult {
 
 };
 
+typedef struct _waffle_thrift_mix_batch_args__isset {
+  _waffle_thrift_mix_batch_args__isset() : keys(false), values(false) {}
+  bool keys :1;
+  bool values :1;
+} _waffle_thrift_mix_batch_args__isset;
+
+class waffle_thrift_mix_batch_args {
+ public:
+
+  waffle_thrift_mix_batch_args(const waffle_thrift_mix_batch_args&);
+  waffle_thrift_mix_batch_args& operator=(const waffle_thrift_mix_batch_args&);
+  waffle_thrift_mix_batch_args() noexcept {
+  }
+
+  virtual ~waffle_thrift_mix_batch_args() noexcept;
+  std::vector<std::string>  keys;
+  std::vector<std::string>  values;
+
+  _waffle_thrift_mix_batch_args__isset __isset;
+
+  void __set_keys(const std::vector<std::string> & val);
+
+  void __set_values(const std::vector<std::string> & val);
+
+  bool operator == (const waffle_thrift_mix_batch_args & rhs) const
+  {
+    if (!(keys == rhs.keys))
+      return false;
+    if (!(values == rhs.values))
+      return false;
+    return true;
+  }
+  bool operator != (const waffle_thrift_mix_batch_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const waffle_thrift_mix_batch_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class waffle_thrift_mix_batch_pargs {
+ public:
+
+
+  virtual ~waffle_thrift_mix_batch_pargs() noexcept;
+  const std::vector<std::string> * keys;
+  const std::vector<std::string> * values;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _waffle_thrift_mix_batch_result__isset {
+  _waffle_thrift_mix_batch_result__isset() : success(false) {}
+  bool success :1;
+} _waffle_thrift_mix_batch_result__isset;
+
+class waffle_thrift_mix_batch_result {
+ public:
+
+  waffle_thrift_mix_batch_result(const waffle_thrift_mix_batch_result&);
+  waffle_thrift_mix_batch_result& operator=(const waffle_thrift_mix_batch_result&);
+  waffle_thrift_mix_batch_result() noexcept {
+  }
+
+  virtual ~waffle_thrift_mix_batch_result() noexcept;
+  std::vector<std::string>  success;
+
+  _waffle_thrift_mix_batch_result__isset __isset;
+
+  void __set_success(const std::vector<std::string> & val);
+
+  bool operator == (const waffle_thrift_mix_batch_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const waffle_thrift_mix_batch_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const waffle_thrift_mix_batch_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _waffle_thrift_mix_batch_presult__isset {
+  _waffle_thrift_mix_batch_presult__isset() : success(false) {}
+  bool success :1;
+} _waffle_thrift_mix_batch_presult__isset;
+
+class waffle_thrift_mix_batch_presult {
+ public:
+
+
+  virtual ~waffle_thrift_mix_batch_presult() noexcept;
+  std::vector<std::string> * success;
+
+  _waffle_thrift_mix_batch_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 typedef struct _waffle_thrift_put_batch_args__isset {
   _waffle_thrift_put_batch_args__isset() : keys(false), values(false) {}
   bool keys :1;
@@ -1060,6 +1306,9 @@ class waffle_thriftClient : virtual public waffle_thriftIf {
   void init_db(const std::vector<std::string> & keys, const std::vector<std::string> & values) override;
   void send_init_db(const std::vector<std::string> & keys, const std::vector<std::string> & values);
   void recv_init_db();
+  void init_args(const int64_t B, const int64_t R, const int64_t F, const int64_t D, const int64_t C, const int64_t N) override;
+  void send_init_args(const int64_t B, const int64_t R, const int64_t F, const int64_t D, const int64_t C, const int64_t N);
+  void recv_init_args();
   void get(std::string& _return, const std::string& key) override;
   void send_get(const std::string& key);
   void recv_get(std::string& _return);
@@ -1069,6 +1318,9 @@ class waffle_thriftClient : virtual public waffle_thriftIf {
   void get_batch(std::vector<std::string> & _return, const std::vector<std::string> & keys) override;
   void send_get_batch(const std::vector<std::string> & keys);
   void recv_get_batch(std::vector<std::string> & _return);
+  void mix_batch(std::vector<std::string> & _return, const std::vector<std::string> & keys, const std::vector<std::string> & values) override;
+  void send_mix_batch(const std::vector<std::string> & keys, const std::vector<std::string> & values);
+  void recv_mix_batch(std::vector<std::string> & _return);
   void put_batch(const std::vector<std::string> & keys, const std::vector<std::string> & values) override;
   void send_put_batch(const std::vector<std::string> & keys, const std::vector<std::string> & values);
   void recv_put_batch();
@@ -1094,9 +1346,11 @@ class waffle_thriftProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_async_get_batch(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_async_put_batch(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_init_db(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_init_args(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_get(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_put(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_get_batch(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_mix_batch(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_put_batch(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
   waffle_thriftProcessor(::std::shared_ptr<waffle_thriftIf> iface) :
@@ -1108,9 +1362,11 @@ class waffle_thriftProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["async_get_batch"] = &waffle_thriftProcessor::process_async_get_batch;
     processMap_["async_put_batch"] = &waffle_thriftProcessor::process_async_put_batch;
     processMap_["init_db"] = &waffle_thriftProcessor::process_init_db;
+    processMap_["init_args"] = &waffle_thriftProcessor::process_init_args;
     processMap_["get"] = &waffle_thriftProcessor::process_get;
     processMap_["put"] = &waffle_thriftProcessor::process_put;
     processMap_["get_batch"] = &waffle_thriftProcessor::process_get_batch;
+    processMap_["mix_batch"] = &waffle_thriftProcessor::process_mix_batch;
     processMap_["put_batch"] = &waffle_thriftProcessor::process_put_batch;
   }
 
@@ -1203,6 +1459,15 @@ class waffle_thriftMultiface : virtual public waffle_thriftIf {
     ifaces_[i]->init_db(keys, values);
   }
 
+  void init_args(const int64_t B, const int64_t R, const int64_t F, const int64_t D, const int64_t C, const int64_t N) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->init_args(B, R, F, D, C, N);
+    }
+    ifaces_[i]->init_args(B, R, F, D, C, N);
+  }
+
   void get(std::string& _return, const std::string& key) override {
     size_t sz = ifaces_.size();
     size_t i = 0;
@@ -1229,6 +1494,16 @@ class waffle_thriftMultiface : virtual public waffle_thriftIf {
       ifaces_[i]->get_batch(_return, keys);
     }
     ifaces_[i]->get_batch(_return, keys);
+    return;
+  }
+
+  void mix_batch(std::vector<std::string> & _return, const std::vector<std::string> & keys, const std::vector<std::string> & values) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->mix_batch(_return, keys, values);
+    }
+    ifaces_[i]->mix_batch(_return, keys, values);
     return;
   }
 
@@ -1290,6 +1565,9 @@ class waffle_thriftConcurrentClient : virtual public waffle_thriftIf {
   void init_db(const std::vector<std::string> & keys, const std::vector<std::string> & values) override;
   int32_t send_init_db(const std::vector<std::string> & keys, const std::vector<std::string> & values);
   void recv_init_db(const int32_t seqid);
+  void init_args(const int64_t B, const int64_t R, const int64_t F, const int64_t D, const int64_t C, const int64_t N) override;
+  int32_t send_init_args(const int64_t B, const int64_t R, const int64_t F, const int64_t D, const int64_t C, const int64_t N);
+  void recv_init_args(const int32_t seqid);
   void get(std::string& _return, const std::string& key) override;
   int32_t send_get(const std::string& key);
   void recv_get(std::string& _return, const int32_t seqid);
@@ -1299,6 +1577,9 @@ class waffle_thriftConcurrentClient : virtual public waffle_thriftIf {
   void get_batch(std::vector<std::string> & _return, const std::vector<std::string> & keys) override;
   int32_t send_get_batch(const std::vector<std::string> & keys);
   void recv_get_batch(std::vector<std::string> & _return, const int32_t seqid);
+  void mix_batch(std::vector<std::string> & _return, const std::vector<std::string> & keys, const std::vector<std::string> & values) override;
+  int32_t send_mix_batch(const std::vector<std::string> & keys, const std::vector<std::string> & values);
+  void recv_mix_batch(std::vector<std::string> & _return, const int32_t seqid);
   void put_batch(const std::vector<std::string> & keys, const std::vector<std::string> & values) override;
   int32_t send_put_batch(const std::vector<std::string> & keys, const std::vector<std::string> & values);
   void recv_put_batch(const int32_t seqid);
@@ -1317,4 +1598,3 @@ class waffle_thriftConcurrentClient : virtual public waffle_thriftIf {
 
 
 #endif
-  

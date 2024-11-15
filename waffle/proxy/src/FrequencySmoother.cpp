@@ -67,7 +67,13 @@ void FrequencySmoother::addKey(std::string key) {
 
 int FrequencySmoother::getFrequency(std::string key) {
 	std::lock_guard<std::mutex> lock(m_mutex_);
-	return accessFreqs[key];
+	auto it = accessFreqs.find(key);
+	if (it != accessFreqs.end()) {
+		return it->second;
+	}else{
+		return -1;
+	}
+	// return accessFreqs[key];
 }
 
 int FrequencySmoother::size() {

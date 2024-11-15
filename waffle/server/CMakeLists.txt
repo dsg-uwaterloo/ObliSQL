@@ -7,6 +7,10 @@ find_package(Threads REQUIRED)
 
 include_directories(${STORAGE_INCLUDE} ${PROXY_INCLUDE} ${SERVICE_INCLUDE} ${SERVER_INCLUDE})
 
+# set(opentelemetry-cpp_DIR /usr/local/lib/cmake/opentelemetry-cpp)
+# find_package(absl CONFIG)
+# find_package(protobuf)
+# find_package(opentelemetry-cpp CONFIG REQUIRED NO_DEFAULT_PATH)
 
 add_executable(proxy_server
         src/proxy_server.cpp
@@ -73,4 +77,9 @@ target_link_libraries(proxy_server
         ${BENCHMARK_INCLUDE_LIBRARIES}
         ${SERVICE_INCLUDE_LIBRARIES}
         ${CLIENT_INCLUDE_LIBRARIES}
+        # ${OPENTELEMETRY_CPP_LIBRARIES}
+        # opentelemetry_common
+        # opentelemetry_resources
+        # opentelemetry_exporter_otlp_grpc
+        # opentelemetry_trace
         Threads::Threads)

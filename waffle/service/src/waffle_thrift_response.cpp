@@ -54,14 +54,14 @@ uint32_t waffle_thrift_response_async_response_args::read(::apache::thrift::prot
         if (ftype == ::apache::thrift::protocol::T_LIST) {
           {
             this->result.clear();
-            uint32_t _size69;
-            ::apache::thrift::protocol::TType _etype72;
-            xfer += iprot->readListBegin(_etype72, _size69);
-            this->result.resize(_size69);
-            uint32_t _i73;
-            for (_i73 = 0; _i73 < _size69; ++_i73)
+            uint32_t _size94;
+            ::apache::thrift::protocol::TType _etype97;
+            xfer += iprot->readListBegin(_etype97, _size94);
+            this->result.resize(_size94);
+            uint32_t _i98;
+            for (_i98 = 0; _i98 < _size94; ++_i98)
             {
-              xfer += iprot->readString(this->result[_i73]);
+              xfer += iprot->readString(this->result[_i98]);
             }
             xfer += iprot->readListEnd();
           }
@@ -98,10 +98,10 @@ uint32_t waffle_thrift_response_async_response_args::write(::apache::thrift::pro
   xfer += oprot->writeFieldBegin("result", ::apache::thrift::protocol::T_LIST, 3);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRING, static_cast<uint32_t>(this->result.size()));
-    std::vector<std::string> ::const_iterator _iter74;
-    for (_iter74 = this->result.begin(); _iter74 != this->result.end(); ++_iter74)
+    std::vector<std::string> ::const_iterator _iter99;
+    for (_iter99 = this->result.begin(); _iter99 != this->result.end(); ++_iter99)
     {
-      xfer += oprot->writeString((*_iter74));
+      xfer += oprot->writeString((*_iter99));
     }
     xfer += oprot->writeListEnd();
   }
@@ -133,10 +133,10 @@ uint32_t waffle_thrift_response_async_response_pargs::write(::apache::thrift::pr
   xfer += oprot->writeFieldBegin("result", ::apache::thrift::protocol::T_LIST, 3);
   {
     xfer += oprot->writeListBegin(::apache::thrift::protocol::T_STRING, static_cast<uint32_t>((*(this->result)).size()));
-    std::vector<std::string> ::const_iterator _iter75;
-    for (_iter75 = (*(this->result)).begin(); _iter75 != (*(this->result)).end(); ++_iter75)
+    std::vector<std::string> ::const_iterator _iter100;
+    for (_iter100 = (*(this->result)).begin(); _iter100 != (*(this->result)).end(); ++_iter100)
     {
-      xfer += oprot->writeString((*_iter75));
+      xfer += oprot->writeString((*_iter100));
     }
     xfer += oprot->writeListEnd();
   }

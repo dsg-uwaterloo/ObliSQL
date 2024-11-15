@@ -3,7 +3,6 @@
 #include "waffle_thrift.h"
 #include "proxy.h"
 #include "waffle_proxy.h"
-#include <string>
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/server/TSimpleServer.h>
 #include <thrift/transport/TServerSocket.h>
@@ -11,7 +10,6 @@
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/server/TServer.h>
 #include <thrift/server/TNonblockingServer.h>
-#include <vector>
 // #include <thrift_response_client.h>
 
 using namespace ::apache::thrift;
@@ -48,9 +46,14 @@ public:
 
     void put_batch(const std::vector<std::string> & keys, const std::vector<std::string> & values);
 
+    void mix_batch(std::vector<std::string> & _return, const std::vector<std::string> & keys, const std::vector<std::string> & values);
+
     void async_put_batch(const sequence_id& seq_id, const std::vector<std::string> & keys, const std::vector<std::string> & values);
 
-    void init_db(const std::vector<std::string>& keys, const std::vector<std::string>& values);
+    void init_db(const std::vector<std::string> & keys, const std::vector<std::string> & values);
+    
+    void init_args(const int64_t B, const int64_t R, const int64_t F, const int64_t D, const int64_t C, const int64_t N);
+
 private:
     int operation_count_ = 0;
     std::shared_ptr<proxy> proxy_;

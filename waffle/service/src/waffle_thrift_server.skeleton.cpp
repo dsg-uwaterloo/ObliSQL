@@ -53,6 +53,11 @@ class waffle_thriftHandler : virtual public waffle_thriftIf {
     printf("init_db\n");
   }
 
+  void init_args(const int64_t B, const int64_t R, const int64_t F, const int64_t D, const int64_t C, const int64_t N) {
+    // Your implementation goes here
+    printf("init_args\n");
+  }
+
   void get(std::string& _return, const std::string& key) {
     // Your implementation goes here
     printf("get\n");
@@ -66,6 +71,11 @@ class waffle_thriftHandler : virtual public waffle_thriftIf {
   void get_batch(std::vector<std::string> & _return, const std::vector<std::string> & keys) {
     // Your implementation goes here
     printf("get_batch\n");
+  }
+
+  void mix_batch(std::vector<std::string> & _return, const std::vector<std::string> & keys, const std::vector<std::string> & values) {
+    // Your implementation goes here
+    printf("mix_batch\n");
   }
 
   void put_batch(const std::vector<std::string> & keys, const std::vector<std::string> & values) {

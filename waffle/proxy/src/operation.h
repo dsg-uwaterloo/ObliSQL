@@ -2,6 +2,7 @@
 #define WAFFLE_OPERATION_H
 
 #include <string>
+#include <vector>
 
 class operation {
 public:
@@ -9,12 +10,13 @@ public:
     operation& operator=(const operation&){
         return *this;
     };
-    operation() : key(), value(){
+    operation() : key(), value(), enqueueTime(){
     }
 
     ~operation() = default;
     std::string key;
     std::string value;
+    int enqueueTime;
 
     bool operator == (const operation & rhs) const
     {

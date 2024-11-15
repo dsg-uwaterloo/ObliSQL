@@ -74,6 +74,14 @@ void thrift_handler::put_batch(const std::vector<std::string> & keys, const std:
     proxy_->put_batch(operation_count_++, keys, values);
 }
 
-void thrift_handler::init_db(const std::vector<std::string> &keys, const std::vector<std::string> &values){
+void thrift_handler::mix_batch(std::vector<std::string> &_return, const std::vector<std::string> &keys, const std::vector<std::string> &values) {
+    _return = proxy_->mix_batch(operation_count_++, keys, values);
+}
+
+void thrift_handler::init_db(const std::vector<std::string> & keys, const std::vector<std::string> & values){
     proxy_->init(keys, values, nullptr);
+}
+
+void thrift_handler::init_args(const int64_t B, const int64_t R, const int64_t F, const int64_t D, const int64_t C, const int64_t N){
+proxy_->init_args(B, R, F, D, C, N);
 }

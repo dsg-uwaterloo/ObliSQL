@@ -164,7 +164,7 @@ include_directories(SYSTEM ${Boost_INCLUDE_DIR})
 message(STATUS "Boost include dirs: ${Boost_INCLUDE_DIR}")
 message(STATUS "Boost program options library: ${Boost_PROGRAM_OPTIONS_LIBRARY}")
 
-set(LIBEVENT_VERSION "2.1.8")
+set(LIBEVENT_VERSION "2.1.12")
 set(LIBEVENT_BUILD ON)
 
 if (DEFINED ENV{LIBEVENT_ROOT} AND EXISTS $ENV{LIBEVENT_ROOT})
@@ -195,9 +195,11 @@ if (LIBEVENT_BUILD)
             "-DBUILD_SHARED_LIBS=OFF"
             "-DEVENT__DISABLE_OPENSSL=ON"
             "-DEVENT__DISABLE_BENCHMARK=ON"
+            "-DLIBEVENT_DISABLE_ARC4RANDOM=ON"
             "-DEVENT__DISABLE_TESTS=ON")
     ExternalProject_Add(libevent_ep
-            URL https://github.com/nmathewson/Libevent/archive/release-${LIBEVENT_VERSION}-stable.tar.gz
+            # URL https://github.com/nmathewson/Libevent/archive/release-${LIBEVENT_VERSION}-stable.tar.gz
+            URL https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz
             CMAKE_ARGS ${LIBEVENT_CMAKE_ARGS}
             LOG_DOWNLOAD ON
             LOG_CONFIGURE ON

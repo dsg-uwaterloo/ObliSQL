@@ -31,7 +31,6 @@ class async_proxy_client : client {
 public:
 
     void init(const std::string &host_name, int port);
-    void initDb(const std::vector<std::string>& keys, const std::vector<std::string>& values);
     int64_t get_client_id();
     command_response_reader get_command_response_reader(int64_t client_id);
     std::string get(const std::string &key) override;

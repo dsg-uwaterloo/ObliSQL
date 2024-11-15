@@ -1,14 +1,61 @@
 #include "waffle_proxy.h"
+#include <cstddef>
+#include <fstream>
+#include <opentelemetry/trace/tracer.h>
+#include <string>
+#include <unistd.h>
+
+
+// #include "opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h"
+// #include "opentelemetry/exporters/otlp/otlp_grpc_exporter_options.h"
+// #include "opentelemetry/sdk/trace/processor.h"
+// #include "opentelemetry/sdk/trace/batch_span_processor_factory.h"
+// #include "opentelemetry/sdk/trace/batch_span_processor_options.h"
+// #include "opentelemetry/sdk/trace/tracer_provider_factory.h"
+// #include "opentelemetry/trace/provider.h"
+// #include "opentelemetry/sdk/trace/tracer_provider.h"
+
+// #include "opentelemetry/exporters/otlp/otlp_grpc_metric_exporter_factory.h"
+// #include "opentelemetry/exporters/otlp/otlp_grpc_metric_exporter_options.h"
+// #include "opentelemetry/metrics/provider.h"
+// #include "opentelemetry/sdk/metrics/aggregation/default_aggregation.h"
+// #include "opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader.h"
+// #include "opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader_factory.h"
+
+
+// namespace trace_api = opentelemetry::trace;
+// namespace trace_sdk = opentelemetry::sdk::trace;
+
+// namespace otlp = opentelemetry::exporter::otlp;
+
+// void InitTracer()
+// {
+//   trace_sdk::BatchSpanProcessorOptions bspOpts{};
+//   opentelemetry::exporter::otlp::OtlpGrpcExporterOptions opts;
+//   opts.endpoint = "localhost:4317";
+//   opts.use_ssl_credentials = false;
+//   auto exporter  = otlp::OtlpGrpcExporterFactory::Create(opts);
+//   auto processor = trace_sdk::BatchSpanProcessorFactory::Create(std::move(exporter), bspOpts);
+//   std::shared_ptr<trace_api::TracerProvider> provider =
+//       trace_sdk::TracerProviderFactory::Create(std::move(processor));
+//   // Set the global trace provider
+//   trace_api::Provider::SetTracerProvider(provider);
+// }
+
+// void CleanupTracer() {
+//     std::shared_ptr<opentelemetry::trace::TracerProvider> none;
+//     trace_api::Provider::SetTracerProvider(none);
+// }
 
 void randomize_map(const std::unordered_map<std::string, std::string>& input_map, std::vector<std::string>& keys, std::vector<std::string>& values) {
     for (const auto& it : input_map) {
         keys.push_back(it.first);
         values.push_back(it.second);
     }
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(keys.begin(), keys.end(), g);
-    std::shuffle(values.begin(), values.end(), g);
+    // std::random_device rd;
+    // std::mt19937 g(rd());
+    // std::shuffle(keys.begin(), keys.end(), g);
+    // std::shuffle(values.begin(), values.end(), g);
 }
 
 #define rdtscllProxy(val) do { \
@@ -80,15 +127,44 @@ unsigned long long rdtscuhzProxy(void) {
 
 void waffle_proxy::init_map(void **args){
     id_to_client_ = *(static_cast<std::shared_ptr<thrift_response_client_map>*>(args[0]));
+    
+}
+
+int get_current_timestamp() {
+    auto now = std::chrono::system_clock::now();
+    int timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    return timestamp;
+}
+
+int calculate_time_difference(int start_timestamp, int end_timestamp) {
+    return end_timestamp - start_timestamp; // The difference in milliseconds
+}
+
+
+void waffle_proxy::init_args(const int64_t B, const int64_t R, const int64_t F, const int64_t D, const int64_t C, const int64_t N){
+    this->B=B;
+    this->R=R;
+    this->F=F;
+    this->D=D;
+    this->cacheBatches=C;
+    this->num_cores=N;
+    
+    std::cout<<"Arguments Initialized \n";
 }
 
 void waffle_proxy::init(const std::vector<std::string> &keys, const std::vector<std::string> &values, void ** args){
+    std::cout<<"Init Called with Key Size: "<<keys.size()<<std::endl;
+    // InitTracer();
+    // CleanupTracer();
+    std::cout<<keys.size()<<":"<<values.size()<<std::endl;
     std::unordered_set<std::string> allKeys;
     std::unordered_set<std::string> tempFakeKeys;
     realBst = FrequencySmoother();
     fakeBst = FrequencySmoother();
     std::vector<std::string> keysCache;
     std::vector<std::string> keysCacheUnencrypted;
+    
+    id_to_client_ = *(static_cast<std::shared_ptr<thrift_response_client_map>*>(args[0]));
 
     if (server_type_ == "redis") {
         storage_interface_ = std::make_shared<redis>(server_host_name_, server_port_);
@@ -100,7 +176,7 @@ void waffle_proxy::init(const std::vector<std::string> &keys, const std::vector<
         storage_interface_->add_server(server_host_name_, server_port_+i);
     }
 
-    // id_to_client_ = *(static_cast<std::shared_ptr<thrift_response_client_map>*>(args[0]));
+
     //int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
     std::cout << "max cores is " << sysconf(_SC_NPROCESSORS_ONLN) << std::endl << " and current cores used is " << num_cores;
     std::vector<std::thread> threads;
@@ -116,6 +192,9 @@ void waffle_proxy::init(const std::vector<std::string> &keys, const std::vector<
     //Adding the data to Database
     std::cout << "Keys size in init() is " << keys.size() << std::endl;
     for(int i = 0; i<keys.size(); ++i) {
+        if(values[i]==""){
+            std::cout<<keys[i]<<std::endl;
+        }
         realBst.insert(keys[i]);
         keyValueMap[encryption_engine_.prf(keys[i] + "#" + std::to_string(realBst.getFrequency(keys[i])))] = encryption_engine_.encryptNonDeterministic(values[i]);
     }
@@ -219,13 +298,15 @@ void waffle_proxy::init(const std::vector<std::string> &keys, const std::vector<
     }
     
     ticks_per_ns = static_cast<double>(rdtscuhzProxy()) / 1000;
+    // keyValueMap.clear();
 
     std::cout << "Successfully initialized waffle with keys size " << keys.size() << " and cache with " << cache.size() << " Fake keys size is " << D << " batch size is " << B << " F is" << F << " FakeBST size is " << fakeBst.size() << std::endl;
+    keyValueMap.clear();
 }
 
 void waffle_proxy::create_security_batch(std::shared_ptr<queue <std::pair<operation, std::shared_ptr<std::promise<std::string>>>>> &op_queue,
                                           std::vector<operation> &storage_batch,
-                                          std::unordered_map<std::string, std::vector<std::shared_ptr<std::promise<std::string>>>> &keyToPromiseMap, int& cacheMisses) {
+                                          std::unordered_map<std::string, std::vector<std::shared_ptr<std::promise<std::string>>>> &keyToPromiseMap, int& cacheMisses,int queueID) {
 
     if (op_queue->size() == 0) {
         std::cout << "WARNING: You should never see this line on console! Queue size is 0" << std::endl;
@@ -233,12 +314,19 @@ void waffle_proxy::create_security_batch(std::shared_ptr<queue <std::pair<operat
         struct operation operat;
         auto operation_promise_pair = op_queue->pop();
         auto currentKey = operation_promise_pair.first.key;
+
+        auto isPresentInRealBST = realBst.getFrequency(currentKey);
+      
         if(operation_promise_pair.first.value == "") {
             // It's a GET request
             bool isPresentInCache = false;
             auto val = cache.getValueWithoutPositionChangeNew(currentKey, isPresentInCache);
             auto valEvicted = EvictedItems.getValue(currentKey);
-            if(isPresentInCache == true) {
+            
+            if (isPresentInRealBST == -1){
+                operation_promise_pair.second->set_value("-1");
+            }
+            else if(isPresentInCache == true) {
                 operation_promise_pair.second->set_value(val);
             }
             else if(valEvicted != "") {
@@ -253,11 +341,16 @@ void waffle_proxy::create_security_batch(std::shared_ptr<queue <std::pair<operat
         } else {
             // It's a PUT request
             if(cache.checkIfKeyExists(currentKey) == false && EvictedItems.checkIfKeyExists(currentKey) == false) {
-                auto isPresentInRunningKeys = runningKeys.insertIfNotPresent(currentKey);
-                if(isPresentInRunningKeys == false) {
-                    storage_batch.push_back(operation_promise_pair.first);
+                if(isPresentInRealBST == -1) {
+                   realBst.insert(currentKey);
+                }else {
+                    auto isPresentInRunningKeys = runningKeys.insertIfNotPresent(currentKey);
+                    if(isPresentInRunningKeys == false) {
+                        storage_batch.push_back(operation_promise_pair.first);
+                    }
+                    ++cacheMisses;
                 }
-                ++cacheMisses;
+
             }
             cache.insertIntoCache(currentKey, operation_promise_pair.first.value);
             operation_promise_pair.second->set_value(cache.getValueWithoutPositionChange(currentKey));
@@ -284,16 +377,24 @@ void waffle_proxy::execute_batch(const std::vector<operation> &operations, std::
         out_cache_miss.flush();
         rdtscllProxy(start);
     }
-
+    // std::string tempName= "set_frequency"+std::to_string(id)+".log";
+    // std::ofstream logFile(tempName, std::ios_base::app);
     // std::cout << "r is " << operations.size() << " f_r is " <<  B-(operations.size()+F) << std::endl;
     for(int i = 0; i < operations.size(); i++){
         std::string key = operations[i].key;
+        // std::cout<<"key: "<<key<<":"<<realBst.getFrequency(key)<<std::endl;
         auto stKey = enc_engine->prf(key + "#" + std::to_string(realBst.getFrequency(key)));
         readBatchMap[stKey] = key;
         storage_keys.push_back(stKey);
+        // int t1 = get_current_timestamp();
         realBst.setFrequency(key, timeStamp.load());
+        // int t2 = get_current_timestamp();
+        // int tdelta = calculate_time_difference(t1, t2);
+        // logFile<< ", Time Difference: " << tdelta << std::endl;
     }
-
+    // logFile.close();
+    
+    // std::cout<<"----------------"<<std::endl;
     std::vector<std::string> realKeysNotInCache;
     auto& bstMutex = realBst.getMutex();
     {
@@ -343,6 +444,7 @@ void waffle_proxy::execute_batch(const std::vector<operation> &operations, std::
 
     std::unordered_set<std::string> tempEvictedItems;
     auto responses = storage_interface->get_batch(storage_keys);
+    
     for(int i = 0 ; i < storage_keys.size(); i++){
         if(i < (operations.size() + realKeysNotInCache.size())) {
             std::vector<std::string> kv_pair;
@@ -444,8 +546,8 @@ std::string waffle_proxy::get(int queue_id, const std::string &key) {
 
 void waffle_proxy::async_get(const sequence_id &seq_id, int queue_id, const std::string &key) {
     // Send to responder thread
-    std::vector<std::future<std::string>> waiters;
-    waiters.push_back(get_future(queue_id, key));
+    std::vector<std::pair<std::string, std::future<std::string>>> waiters;
+    waiters.push_back(std::make_pair(key,get_future(queue_id, key)));
 
     respond_queue_.push(std::make_pair(GET, std::make_pair(seq_id, std::move(waiters))));
 };
@@ -456,29 +558,31 @@ void waffle_proxy::put(int queue_id, const std::string &key, const std::string &
 
 void waffle_proxy::async_put(const sequence_id &seq_id, int queue_id, const std::string &key, const std::string &value) {
     // Send to responder thread
-    std::vector<std::future<std::string>> waiters;
-    waiters.push_back(put_future(queue_id, key, value));
+    std::vector<std::pair<std::string, std::future<std::string>>> waiters;
+    waiters.push_back(std::make_pair(key,get_future(queue_id, key)));
 
     respond_queue_.push(std::make_pair(GET, std::make_pair(seq_id, std::move(waiters))));
 };
 
 std::vector<std::string> waffle_proxy::get_batch(int queue_id, const std::vector<std::string> &keys) {
     std::vector<std::string> _return;
-    std::vector<std::future<std::string>> waiters;
+    std::vector<std::pair<std::string, std::future<std::string>>> waiters;
     for (const auto &key: keys) {
-        waiters.push_back((get_future(queue_id, key)));
+        waiters.push_back(std::make_pair(key,get_future(queue_id, key)));
     }
     for (int i = 0; i < waiters.size(); i++){
-        _return.push_back(waiters[i].get());
+        std::string val = waiters[i].second.get();
+        std::string key = waiters[i].first;
+        _return.push_back(key+":"+val);
     }
     return _return;
 };
 
 void waffle_proxy::async_get_batch(const sequence_id &seq_id, int queue_id, const std::vector<std::string> &keys) {
     std::vector<std::string> _return;
-    std::vector<std::future<std::string>> waiters;
+    std::vector<std::pair<std::string, std::future<std::string>>> waiters;
     for (const auto &key: keys) {
-        waiters.push_back((get_future(queue_id, key)));
+        waiters.push_back(std::make_pair(key,get_future(queue_id, key)));
     }
     // std::cout << "async_get_batch client ID is " << seq_id.client_id << std::endl;
     respond_queue_.push(std::make_pair(GET_BATCH, std::make_pair(seq_id, std::move(waiters))));
@@ -498,13 +602,47 @@ void waffle_proxy::put_batch(int queue_id, const std::vector<std::string> &keys,
     }
 };
 
+std::vector<std::string> waffle_proxy::mix_batch(int queue_id, const std::vector<std::string> &keys, const std::vector<std::string> &values){
+    // std::cout<<"Queue: "<<queue_id<<" "<<"Got Request Size:"<<keys.size()<<std::endl;
+    // auto tracer = opentelemetry::trace::Provider::GetTracerProvider()->GetTracer("MixBatchRPC");
+    // auto span = tracer->StartSpan("MixBatch");
+
+    // span->SetAttribute("Num_Keys", keys.size());
+    std::vector<std::string> _return;
+    std::vector<std::pair<std::string, std::future<std::string>>> waiters;
+    int i=0;
+    // span->AddEvent("Adding to Queues");
+    for (const auto &key: keys) {
+        //Create a GET future
+        if(values[i] == ""){
+            waiters.push_back(std::make_pair(key,get_future(queue_id, key)));
+        }else if(values[i] != ""){
+        //Create a PUT future
+            waiters.push_back(std::make_pair(key,put_future(queue_id, key, values[i])));
+        }
+        i++;
+    }
+    // span->AddEvent("Added to Queues");
+    // span->AddEvent("Waiting for Promise");
+    for (int i = 0; i < waiters.size(); i++){
+        std::string val = waiters[i].second.get();
+        std::string key = waiters[i].first;
+        _return.push_back(key+":"+val);
+    }
+    // span->AddEvent("Waited for Promise. Sending Back Response");
+    // sleep(10);
+    // std::cout<<keys[0]<<"Hello"<<std::endl;
+    // std::cout<<"Sending Back"<<_return.size()<<std::endl;
+    return _return;
+}
+
 void waffle_proxy::async_put_batch(const sequence_id &seq_id, int queue_id, const std::vector<std::string> &keys, const std::vector<std::string> &values) {
     // Send waiters to responder thread
-    std::vector<std::future<std::string>> waiters;
+    std::vector<std::pair<std::string, std::future<std::string>>> waiters;
     // std::cout << "async_put_batch client ID is " << seq_id.client_id << std::endl;
     int i = 0;
     for (const auto &key: keys) {
-        waiters.push_back((put_future(queue_id, key, values[i])));
+        waiters.push_back(std::make_pair(key,get_future(queue_id, key)));
         i++;
     }
 
@@ -518,6 +656,7 @@ std::future<std::string> waffle_proxy::get_future(int queue_id, const std::strin
     struct operation operat;
     operat.key = key;
     operat.value = "";
+    operat.enqueueTime = get_current_timestamp();
     operation_queues_[queue_id % operation_queues_.size()]->push(std::make_pair(operat, prom));
     return waiter;
 };
@@ -528,6 +667,7 @@ std::future<std::string> waffle_proxy::put_future(int queue_id, const std::strin
     struct operation operat;
     operat.key = key;
     operat.value = value;
+    operat.enqueueTime = get_current_timestamp();
     operation_queues_[queue_id % operation_queues_.size()]->push(std::make_pair(operat, prom));
     return waiter;
 };
@@ -537,19 +677,28 @@ void waffle_proxy::consumer_thread(int id, encryption_engine *enc_engine){
     int previous_total_operations = 0;
     int total_operations = 0;
     std::cout << "Entering here to consumer thread" << std::endl;
+    // auto tracer = opentelemetry::trace::Provider::GetTracerProvider()->GetTracer("Consumer Thread");
     while (!finished_) {
+        // auto span = tracer->StartSpan("ConsumerThread");
+
         std::vector <operation> storage_batch;
         std::unordered_map<std::string, std::vector<std::shared_ptr<std::promise<std::string>>>> keyToPromiseMap;
         //std::unordered_set<std::string> tempSet;
         int i=0;
         int cacheMisses = 0;
+        // span->AddEvent("Waiting for R Requests");
         while (i < R && !finished_) {
             if(operation_queues_[id]->size() > 0) {
-                create_security_batch(operation_queues_[id], storage_batch, keyToPromiseMap, cacheMisses);
+                create_security_batch(operation_queues_[id], storage_batch, keyToPromiseMap, cacheMisses, id);
                 ++i;
             }
         }
+        // span->AddEvent("Processed R requests");
+        // logFile.close();
+        // span->AddEvent("Executing Batch");
         execute_batch(storage_batch, keyToPromiseMap, storage_interface_, enc_engine, id, cacheMisses);
+        // span->AddEvent("Executed Batch");
+        // span->End();
     }
 
 };
@@ -562,7 +711,9 @@ void waffle_proxy::responder_thread(){
         seq = sequence_queue_.pop();
         std::vector<std::string>results;
         for (int i = 0; i < tuple.second.second.size(); i++) {
-            results.push_back(tuple.second.second[i].get());
+            std::string key = tuple.second.second[i].first;
+            std::string val = tuple.second.second[i].second.get();
+            results.push_back(key+":"+val);
         }
         id_to_client_->async_respond_client(seq, op_code, results);
     }
@@ -574,6 +725,7 @@ void waffle_proxy::clearThread(){
         auto keyVectorNotUsed = keysNotUsed.pop();
         if(keyVectorNotUsed.size() > 0)
             storage_interface_->delete_batch(keyVectorNotUsed);
+        
     }
 }
 

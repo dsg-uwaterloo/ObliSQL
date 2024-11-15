@@ -107,9 +107,6 @@ void async_proxy_client::read_responses() {
 int async_proxy_client::num_requests_satisfied(){
     return total_->load();
 }
-void async_proxy_client::initDb(const std::vector<std::string> &keys, const std::vector<std::string> &values){
-    client_->init_db(keys, values);
-}
 
 void async_proxy_client::finish(){
     done_->store(true);
