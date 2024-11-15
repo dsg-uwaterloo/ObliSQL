@@ -2,7 +2,6 @@
 #define WAFFLE_PROXY_H
 
 #include <atomic>
-#include <opentelemetry/nostd/shared_ptr.h>
 #include <unordered_map>
 #include <vector>
 #include <unistd.h>
@@ -36,14 +35,6 @@
 #include "storage_interface.h"
 //#include "memcached.h"
 
-#include "opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h"
-#include "opentelemetry/exporters/otlp/otlp_grpc_exporter_options.h"
-#include "opentelemetry/sdk/trace/processor.h"
-#include "opentelemetry/sdk/trace/batch_span_processor_factory.h"
-#include "opentelemetry/sdk/trace/batch_span_processor_options.h"
-#include "opentelemetry/sdk/trace/tracer_provider_factory.h"
-#include "opentelemetry/trace/provider.h"
-#include "opentelemetry/sdk/trace/tracer_provider.h"
 
 
 

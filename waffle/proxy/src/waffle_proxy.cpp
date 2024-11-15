@@ -1,7 +1,6 @@
 #include "waffle_proxy.h"
 #include <cstddef>
 #include <fstream>
-#include <opentelemetry/trace/tracer.h>
 #include <string>
 #include <unistd.h>
 
