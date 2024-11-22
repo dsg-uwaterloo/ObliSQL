@@ -21,7 +21,7 @@ const (
 
 func TestORAMFakeReadDuplicateKeys(t *testing.T) {
 	// Initialize ORAM structure
-	o, err := oram.NewORAM(logCapacity, Z, stashSize, "127.0.0.1:6379")
+	o, err := oram.NewORAM(logCapacity, Z, stashSize, "127.0.0.1:6379", false, nil)
 	if err != nil {
 		t.Fatalf("Error initializing ORAM: %v", err)
 	}

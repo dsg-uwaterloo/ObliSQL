@@ -165,3 +165,15 @@ func (r *RedisClient) ReadBucketFromDb(index int) (bucket.Bucket, error) {
 func (r *RedisClient) Close() error {
 	return r.Client.Close()
 }
+
+// TriggerSnapshot will invoke the BGSAVE command to take a snapshot and update the dump.rdb
+func (r *RedisClient) TriggerSnapshot() error {
+	// Trigger an asynchronous background save (BGSAVE)
+	err := r.Client.BgSave(r.Ctx).Err()
+	if err != nil {
+		return fmt.Errorf("failed to trigger BGSAVE: %w", err)
+	}
+
+	fmt.Println("BGSAVE triggered. The dump.rdb file will be updated.")
+	return nil
+}
