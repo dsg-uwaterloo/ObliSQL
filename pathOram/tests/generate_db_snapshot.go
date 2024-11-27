@@ -1,12 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"strconv"
+	"strings"
 
 	"pathOram/pkg/oram/oram"
 	"pathOram/pkg/oram/request"
@@ -30,7 +31,7 @@ const (
 
 // This function simulates operations on ORAM and stores snapshots of internal data.
 func main() {
-	key_input := "ura"
+	key_input := "oblisqloram"
 	// Generate the SHA-256 hash of the input string
 	hash := sha256.New()
 	hash.Write([]byte(key_input))
@@ -47,37 +48,69 @@ func main() {
 	}
 	defer o.RedisClient.Close()
 
-	totalOperations := 1000 // Number of operations you plan to perform
+	// totalOperations := 1000 // Number of operations you plan to perform
 
+	// Use for testing:
 	// Create PUT requests
-	putRequests := make([]request.Request, totalOperations)
-	for i := 0; i < totalOperations; i++ {
-		key := strconv.Itoa(i)
-		putRequests[i] = request.Request{
-			Key:   key,
-			Value: fmt.Sprintf("Value%d", i),
+	// putRequests := make([]request.Request, totalOperations)
+	// for i := 0; i < totalOperations; i++ {
+	// 	key := strconv.Itoa(i)
+	// 	putRequests[i] = request.Request{
+	// 		Key:   key,
+	// 		Value: fmt.Sprintf("Value%d", i),
+	// 	}
+	// }
+
+	// Load data from tracefile and create Request objects
+	var requests []request.Request
+	file, err := os.Open(tracefile) // TODO: define tracefile path here
+	if err != nil {
+		log.Fatalf("failed to open tracefile: %v", err)
+	}
+	defer file.Close()
+
+	const maxBufferSize = 1024 * 1024 // 1MB
+
+	scanner := bufio.NewScanner(file)
+	buffer := make([]byte, maxBufferSize)
+	scanner.Buffer(buffer, maxBufferSize)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Only process lines that start with "SET"
+		if strings.HasPrefix(line, "SET") {
+			parts := strings.SplitN(line, " ", 3)
+			if len(parts) != 3 {
+				continue // skip lines that don't have exactly 3 parts
+			}
+			key := parts[1]
+			value := parts[2]
+			requests = append(requests, request.Request{Key: key, Value: value})
 		}
 	}
 
-	// Batch size for processing requests
-	batchSize := 50 // Adjust batch size as needed
-
-	// Process PUT requests in batches with a progress bar
-	writeProgress := progressbar.Default(int64(totalOperations), "Writing: ")
-
-	for i := 0; i < totalOperations; i += batchSize {
-		end := i + batchSize
-		if end > totalOperations {
-			end = totalOperations
-		}
-		_, err := o.Batching(putRequests[i:end], batchSize)
-		if err != nil {
-			log.Fatalf("Error during PUT batching: %v", err)
-		}
-		writeProgress.Add(end - i)
+	if err := scanner.Err(); err != nil {
+		log.Fatalf("error reading tracefile: %v", err)
 	}
 
-	writeProgress.Finish()
+	// Initialize DB with tracefile contents and display a progress bar
+	batchSize := 10
+	bar := progressbar.Default(int64(len(requests)), "Setting values...")
+
+	for start := 0; start < len(requests); start += batchSize {
+		end := start + batchSize
+		if end > len(requests) {
+			end = len(requests) // Ensure we don't go out of bounds
+		}
+
+		o.Batching(requests[start:end], batchSize)
+
+		// Increment the progress bar by the batch size or remaining items
+		_ = bar.Add(end - start)
+	}
+
+	bar.Finish()
+	fmt.Println("Finished Initializing DB!")
 
 	// Optionally print the ORAM's internal tree (this might be useful for debugging)
 	// utils.PrintTree(o)
@@ -98,7 +131,7 @@ func main() {
 	}
 
 	// Open or create the snapshot file
-	file, err := os.Create("proxy_snapshot.json")
+	file, err = os.Create("proxy_snapshot.json")
 	if err != nil {
 		log.Fatalf("Error creating file: %v", err)
 	}
