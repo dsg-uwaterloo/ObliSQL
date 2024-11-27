@@ -108,8 +108,6 @@ func (o *ORAM) WritePath(bucketInfo []int, requests *[]BucketRequest) {
 	leaf := bucketInfo[1]
 	level := bucketInfo[2]
 
-	//newBucketsWritten := make(map[int]struct{})
-
 	// Step 1: Get all blocks from stash
 	currentStash := make(map[string]Block)
 	for blockId, block := range o.StashMap {
@@ -125,7 +123,6 @@ func (o *ORAM) WritePath(bucketInfo []int, requests *[]BucketRequest) {
 	for key, currentBlock := range currentStash {
 		currentBlockLeaf := o.keyMap[currentBlock.Key]
 		if o.canInclude(currentBlockLeaf, leaf, level) {
-			// fmt.Println("This block can be written to Tree with key: ", currentBlock.Key)
 			toInsert[currentBlock.Key] = currentBlock
 			toDelete[currentBlock.Key] = struct{}{}
 			toDeleteLocal = append(toDeleteLocal, key) // add the key for block we want to delete
@@ -218,21 +215,17 @@ func (o *ORAM) WritePaths(previousPositionLeaves []int) {
 
 }
 
+// ORAM batching mechanism
 /*
-initialize fully for now beforehand
+	write path 50 previous position leafs at once to redis - MGET vs pipeline - use MGET 180X faster than GET, pipeline is 12x faster than GET. pipeline allows batching, non blocking for other clients
+	pipeline also allows different types of commands.
 
-create separate repo for base pathoram
-
-batching optimization is kind of like:
-run readpath on 50 - but maintain set and fetch every block only once, one redis request for all 50
-
-write/read stashmap[key] for all 50
-
-writepath to 50 previousPositionLeafs and try to clear out stash -  1 redis request
-
-many batches come in; go routines?
+	for each batch, as we writepath, keep a track of all buckets already touched/altered
+	if a bucket is already changed, we dont' write that bucket or any of the buckets above it
+	becuase all buckets above have already been considered for all elements of the stash
+	no point in redoing, this is an optmization. also, the other path may write -1s into
+	already filled buckets
 */
-
 func (o *ORAM) Batching(requests []Request, batchSize int) ([]string, error) {
 
 	if len(requests) > batchSize {
@@ -254,11 +247,6 @@ func (o *ORAM) Batching(requests []Request, batchSize int) ([]string, error) {
 		if !keyReadBefore {
 			var exists bool
 			previousPositionLeaf, exists = o.keyMap[req.Key]
-			// if !exists {
-			// 	previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
-			// 	o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
-			// }
-			// fakeReadMap[req.Key] = true
 			if !exists {
 				if req.Value == "" {
 					// GET request for a new key, perform a random fake read, don't add a block
@@ -268,7 +256,7 @@ func (o *ORAM) Batching(requests []Request, batchSize int) ([]string, error) {
 				} else {
 					// PUT request for a new key, add block to stash
 					previousPositionLeaf = GetRandomInt(1 << (o.LogCapacity - 1))
-					o.StashMap[req.Key] = Block{Key: req.Key, Value: req.Value}
+					o.StashMap[req.Key] = Block(req)
 					fakeReadMap[req.Key] = true
 				}
 			}
@@ -297,7 +285,7 @@ func (o *ORAM) Batching(requests []Request, batchSize int) ([]string, error) {
 	for i, req := range requests {
 		if req.Value != "" {
 			// Replying to PUT requests
-			o.StashMap[req.Key] = Block{Key: req.Key, Value: req.Value}
+			o.StashMap[req.Key] = Block(req)
 			values[i] = o.StashMap[req.Key].Value
 		} else if block, exists := o.StashMap[req.Key]; exists {
 			// Replying to GET requests that access existing data
@@ -307,15 +295,6 @@ func (o *ORAM) Batching(requests []Request, batchSize int) ([]string, error) {
 			values[i] = "-1"
 		}
 	}
-
-	// write path 50 previous position leafs at once to redis - MGET vs pipeline - use MGET 180X faster than GET, pipeline is 12x faster than GET. pipeline allows batching, non blocking for other clients
-	// pipeline also allows different types of commands.
-
-	// for each batch, as we writepath, keep a track of all buckets already touched/altered
-	// if a bucket is already changed, we dont' write that bucket or any of the buckets above it
-	// becuase all buckets above have already been considered for all elements of the stash
-	// no point in redoing, this is an optmization. also, the other path may write -1s into
-	// already filled buckets
 
 	o.WritePaths(previousPositionLeaves)
 
