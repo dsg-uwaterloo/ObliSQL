@@ -24,9 +24,9 @@ The batching mechanism returns a -1 for any key it didn't find.
 */
 
 const (
-	logCapacity = 10 // Logarithm base 2 of capacity (1024 buckets)
-	Z           = 5  // Number of blocks per bucket
-	stashSize   = 20 // Maximum number of blocks in stash
+	logCapacity = 16      // Logarithm base 2 of capacity (1024 buckets)
+	Z           = 5       // Number of blocks per bucket
+	stashSize   = 7000000 // Maximum number of blocks in stash
 )
 
 // This function simulates operations on ORAM and stores snapshots of internal data.
@@ -61,9 +61,11 @@ func main() {
 	// 	}
 	// }
 
+	fmt.Println("Loading data from tracefile now:")
+
 	// Load data from tracefile and create Request objects
 	var requests []request.Request
-	file, err := os.Open(tracefile) // TODO: define tracefile path here
+	file, err := os.Open("/Users/nachiketrao/Desktop/URA/testServerInput.txt") // TODO: define tracefile path here
 	if err != nil {
 		log.Fatalf("failed to open tracefile: %v", err)
 	}
@@ -92,6 +94,10 @@ func main() {
 	if err := scanner.Err(); err != nil {
 		log.Fatalf("error reading tracefile: %v", err)
 	}
+
+	fmt.Println("Finished scanning tracefile")
+
+	fmt.Println("Setting values in DB...")
 
 	// Initialize DB with tracefile contents and display a progress bar
 	batchSize := 10
