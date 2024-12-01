@@ -13,6 +13,8 @@ import (
 	"pathOram/pkg/oram/crypto"
 	"pathOram/pkg/oram/redis"
 	"pathOram/pkg/oram/request"
+
+	"github.com/schollz/progressbar/v3"
 )
 
 //  Core ORAM functions
@@ -133,7 +135,10 @@ func (oram *ORAM) loadSnapshotMaps() {
 
 // Initializing ORAM and populating with key = -1
 func (o *ORAM) initialize() {
+
 	totalBuckets := (1 << (o.LogCapacity + 1)) - 1
+	bar := progressbar.Default(int64(totalBuckets), "Setting values...")
+
 	for i := 0; i < totalBuckets; i++ {
 		bucket := bucket.Bucket{
 			Blocks: make([]block.Block, o.Z),
@@ -143,7 +148,11 @@ func (o *ORAM) initialize() {
 			bucket.Blocks[j].Value = ""
 		}
 		o.RedisClient.WriteBucketToDb(i, bucket) // initialize dosen't use redis batching mechanism to write: NOTE: don't run this initialize formally for experiments
+
+		bar.Add(1)
 	}
+
+	bar.Finish()
 }
 
 // ClearStash clears the ORAM stash by resetting it to an empty state.

@@ -24,7 +24,7 @@ The batching mechanism returns a -1 for any key it didn't find.
 */
 
 const (
-	logCapacity = 16      // Logarithm base 2 of capacity (1024 buckets)
+	logCapacity = 22      // Logarithm base 2 of capacity (1024 buckets)
 	Z           = 5       // Number of blocks per bucket
 	stashSize   = 7000000 // Maximum number of blocks in stash
 )
@@ -65,7 +65,7 @@ func main() {
 
 	// Load data from tracefile and create Request objects
 	var requests []request.Request
-	file, err := os.Open("/Users/nachiketrao/Desktop/URA/testServerInput.txt") // TODO: define tracefile path here
+	file, err := os.Open("/Users/nachiketrao/Desktop/URA/serverInput.txt") // TODO: define tracefile path here
 	if err != nil {
 		log.Fatalf("failed to open tracefile: %v", err)
 	}
