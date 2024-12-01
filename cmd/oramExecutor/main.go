@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"net"
@@ -24,10 +25,11 @@ func main() {
 	redisHost := flag.String("rh", "127.0.0.1", "Redis Host")
 	redisPort := flag.String("rp", "6379", "Redis Host")
 	addrPort := flag.String("p", "9090", "Executor Port")
-	logCap := flag.Int("l", 16, "Logarithm base 2 of capacity")
+	logCap := flag.Int("l", 22, "Logarithm base 2 of capacity")
 	zVal := flag.Int("z", 5, "Number of blocks per bucket")
-	stashSize := flag.Int("s", 100000, "Maximum number of blocks in Stash")
+	stashSize := flag.Int("s", 8000000, "Maximum number of blocks in Stash")
 	traceLocation := flag.String("tl", "../../tracefiles/serverInputTEST.txt", "Location to tracefile for initializing DB")
+	useSnapshot := flag.Bool("snapshot", false, "Use database snapshot") // use flag like -snapshot
 
 	flag.Parse()
 
@@ -45,9 +47,18 @@ func main() {
 	// Create a new gRPC server
 	grpcServer := grpc.NewServer()
 
+	// Use a standard key for encryption
+	key_input := "oblisqloram"
+	// Generate the SHA-256 hash of the input string
+	hash := sha256.New()
+	hash.Write([]byte(key_input))
+
+	// Return the 256-bit (32-byte) hash as a byte slice
+	key := hash.Sum(nil)
+
 	// Initialize the executor service with Redis connection and tracingProvider
 
-	executor, err := oramexecutor.NewORAM(*logCap, *zVal, *stashSize, redisAddress, *traceLocation)
+	executor, err := oramexecutor.NewORAM(*logCap, *zVal, *stashSize, redisAddress, *traceLocation, *useSnapshot, key)
 
 	if err != nil {
 		log.Fatal().Msgf("Failed to initialize ORAM! %s \n", err)

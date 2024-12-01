@@ -8,9 +8,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-/*
-MGET is faster than GET only because its 1RTT + redis processing time, with GET, there is 1RTT for each GET request
-*/
 type RedisClient struct {
 	Client        *redis.Client
 	EncryptionKey []byte
@@ -42,11 +39,6 @@ func (r *RedisClient) FlushData() {
 	ctx := context.Background()
 	r.Client.FlushAll(ctx)
 }
-
-// type BucketRequest struct {
-//     bucketId int
-//     bucket   bucket.Bucket
-// }
 
 func (r *RedisClient) WriteBucketsToDb(requests []BucketRequest) error {
 	// Prepare data for MSET
@@ -133,7 +125,6 @@ func (r *RedisClient) WriteBucketToDb(index int, bucket Bucket) error {
 
 	key := fmt.Sprintf("bucket:%d", index)
 	err = r.Client.Set(r.Ctx, key, encryptedData, 0).Err()
-	//fmt.Println("writing current request to redis; redis side ")
 	return err
 }
 
