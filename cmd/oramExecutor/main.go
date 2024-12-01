@@ -25,9 +25,9 @@ func main() {
 	redisHost := flag.String("rh", "127.0.0.1", "Redis Host")
 	redisPort := flag.String("rp", "6379", "Redis Host")
 	addrPort := flag.String("p", "9090", "Executor Port")
-	logCap := flag.Int("l", 16, "Logarithm base 2 of capacity")
+	logCap := flag.Int("l", 22, "Logarithm base 2 of capacity")
 	zVal := flag.Int("z", 5, "Number of blocks per bucket")
-	stashSize := flag.Int("s", 100000, "Maximum number of blocks in Stash")
+	stashSize := flag.Int("s", 8000000, "Maximum number of blocks in Stash")
 	traceLocation := flag.String("tl", "../../tracefiles/serverInputTEST.txt", "Location to tracefile for initializing DB")
 	useSnapshot := flag.Bool("snapshot", false, "Use database snapshot") // use flag like -snapshot
 
