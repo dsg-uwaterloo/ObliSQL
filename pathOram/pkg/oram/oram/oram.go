@@ -54,12 +54,16 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, useSnapshot bool, 
 		// Load the Stashmap and Keymap into memory
 		// Allow redis to update state using dump.rdb
 		oram.loadSnapshotMaps()
+		fmt.Println("ORAM initialized with provided snapshot")
 	} else {
+		fmt.Println("Flushing Redis DB and initializing ORAM")
 		// Clear the Redis database to ensure a fresh start
 		if err := client.FlushDB(); err != nil {
 			return nil, fmt.Errorf("failed to flush Redis database: %v", err)
 		}
 		oram.initialize()
+
+		fmt.Println("ORAM DB is ready for opeartions!")
 	}
 
 	return oram, nil

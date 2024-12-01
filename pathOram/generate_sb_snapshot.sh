@@ -10,6 +10,7 @@ fi
 if [ "$1" == "gen" ]; then
   echo "Generating db snapshot..."
   go run ./tests/generate_db_snapshot.go
+  mv ./dump.rdb ./snapshot_redis.rdbb # Save file differently to avoid redis interference
   if [ $? -ne 0 ]; then
     echo "Generating db snapshot failed."
     exit 1
