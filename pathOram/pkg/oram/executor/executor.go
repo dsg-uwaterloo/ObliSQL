@@ -150,7 +150,7 @@ func main() {
 
 	addr := *redisHost + ":" + *redisPort
 
-	oram_object, err := oram.NewORAM(logCapacity, Z, stashSize, addr)
+	oram_object, err := oram.NewORAM(logCapacity, Z, stashSize, addr, false, nil)
 	if err != nil {
 		log.Fatalf("Error initializing ORAM: %v", err)
 	}

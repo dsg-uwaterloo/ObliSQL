@@ -1,8 +1,10 @@
 package oram
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 
 	"pathOram/pkg/oram/block"
@@ -21,23 +23,22 @@ type ORAM struct {
 	RedisClient *redis.RedisClient
 	StashMap    map[string]block.Block
 	StashSize   int // Maximum number of blocks the stash can hold
-	keyMap      map[string]int
+	Keymap      map[string]int
 }
 
-func NewORAM(LogCapacity, Z, StashSize int, redisAddr string) (*ORAM, error) {
-	key, err := crypto.GenerateRandomKey()
-	if err != nil {
-		return nil, err
+func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, useSnapshot bool, key []byte) (*ORAM, error) {
+	// If key is not provided (nil or empty), generate a random key
+	if len(key) == 0 {
+		var err error
+		key, err = crypto.GenerateRandomKey()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	client, err := redis.NewRedisClient(redisAddr, key)
 	if err != nil {
 		return nil, err
-	}
-
-	// Clear the Redis database to ensure a fresh start
-	if err := client.FlushDB(); err != nil {
-		return nil, fmt.Errorf("failed to flush Redis database: %v", err)
 	}
 
 	oram := &ORAM{
@@ -46,11 +47,88 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string) (*ORAM, error) {
 		Z:           Z,
 		StashSize:   StashSize,
 		StashMap:    make(map[string]block.Block),
-		keyMap:      make(map[string]int),
+		Keymap:      make(map[string]int),
 	}
 
-	oram.initialize()
+	if useSnapshot {
+		// Load the Stashmap and Keymap into memory
+		// Allow redis to update state using dump.rdb
+		oram.loadSnapshotMaps()
+		fmt.Println("ORAM initialized with provided snapshot")
+	} else {
+		fmt.Println("Flushing Redis DB and initializing ORAM")
+		// Clear the Redis database to ensure a fresh start
+		if err := client.FlushDB(); err != nil {
+			return nil, fmt.Errorf("failed to flush Redis database: %v", err)
+		}
+		oram.initialize()
+
+		fmt.Println("ORAM DB is ready for opeartions!")
+	}
+
 	return oram, nil
+}
+
+// Load Keymap and Stashmap into memory
+func (oram *ORAM) loadSnapshotMaps() {
+	// Read from snapshot.json
+	// Open the file for reading
+	file, err := os.Open("proxy_snapshot.json")
+	if err != nil {
+		fmt.Printf("Error opening file: %v\n", err)
+		return // No need to return anything here, just exit the function
+	}
+	defer file.Close()
+
+	// Decode JSON data into a map
+	var data map[string]interface{}
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&data); err != nil {
+		fmt.Printf("Error decoding JSON data: %v\n", err)
+		return // No need to return anything here, just exit the function
+	}
+
+	// Load Keymap
+	if keymap, ok := data["Keymap"].(map[string]interface{}); ok {
+		// Convert map[string]interface{} to map[string]int for Keymap
+		for key, value := range keymap {
+			if val, ok := value.(float64); ok { // JSON numbers are decoded as float64
+				oram.Keymap[key] = int(val) // Convert float64 to int
+			}
+		}
+	} else {
+		fmt.Println("Error: Keymap data is not of expected type")
+	}
+
+	// Load StashMap
+	if stashmap, ok := data["StashMap"].(map[string]interface{}); ok {
+		// Convert map[string]interface{} to map[string]block.Block for StashMap
+		for key, value := range stashmap {
+			// Assuming block.Block is a struct, and you need to decode the value into that type
+			stashBlock, ok := value.(map[string]interface{}) // Assuming stash block is a map
+			if !ok {
+				fmt.Println("Error: StashMap block is not of expected type")
+				continue
+			}
+
+			// Marshal and unmarshal to convert the stash block map to block.Block
+			stashBlockData, err := json.Marshal(stashBlock)
+			if err != nil {
+				fmt.Printf("Error marshaling stash block data: %v\n", err)
+				continue
+			}
+			var blockData block.Block
+			err = json.Unmarshal(stashBlockData, &blockData)
+			if err != nil {
+				fmt.Printf("Error unmarshaling stash block: %v\n", err)
+				continue
+			}
+			// Add the block to StashMap
+			oram.StashMap[key] = blockData
+		}
+	} else {
+		fmt.Println("Error: StashMap data is not of expected type")
+	}
 }
 
 // Initializing ORAM and populating with key = -1
@@ -74,10 +152,10 @@ func (o *ORAM) ClearStash() {
 	fmt.Println("Stash has been cleared.")
 }
 
-// ClearKeymap clears the ORAM keymap by resetting it to an empty state.
+// ClearKeymap clears the ORAM Keymap by resetting it to an empty state.
 func (o *ORAM) ClearKeymap() {
-	o.keyMap = make(map[string]int) // Resets the stash (assuming stash is a map of block indices to data).
-	fmt.Println("KeyMap has been cleared.")
+	o.Keymap = make(map[string]int) // Resets the stash (assuming stash is a map of block indices to data).
+	fmt.Println("Keymap has been cleared.")
 }
 
 // getDepth calculates the depth of a bucket in the tree
@@ -159,7 +237,7 @@ func (o *ORAM) WritePath(bucketInfo []int, requests *[]bucketRequest.BucketReque
 	toDeleteLocal := make([]string, 0) // indices/blockIds/keys of blocks in currentStash to delete
 
 	for key, currentBlock := range currentStash {
-		currentBlockLeaf := o.keyMap[currentBlock.Key]
+		currentBlockLeaf := o.Keymap[currentBlock.Key]
 		if o.canInclude(currentBlockLeaf, leaf, level) {
 			// fmt.Println("This block can be written to Tree with key: ", currentBlock.Key)
 			toInsert[currentBlock.Key] = currentBlock
@@ -278,7 +356,7 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 	// fakeReadMap = {key: fakeRead?, key: fakeRead? , ...}
 	fakeReadMap := make(map[string]bool)
 
-	//determine keys from position map for all of them ; if something doesn't exist, add it to keymap and stash as done in Access()
+	//determine keys from position map for all of them ; if something doesn't exist, add it to Keymap and stash as done in Access()
 	previousPositionLeavesMap := make(map[int]struct{})
 	var previousPositionLeaves []int
 
@@ -290,7 +368,7 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 
 		if !keyReadBefore {
 			var exists bool
-			previousPositionLeaf, exists = o.keyMap[req.Key]
+			previousPositionLeaf, exists = o.Keymap[req.Key]
 			// if !exists {
 			// 	previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
 			// 	o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
@@ -320,7 +398,7 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 		}
 
 		// randomly remap key
-		o.keyMap[req.Key] = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
+		o.Keymap[req.Key] = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
 	}
 
 	// perform read path, go through all paths at once and find non overlapping buckets, fetch all from redis at once - read path use redis MGET
