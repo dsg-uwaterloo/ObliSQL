@@ -17,7 +17,7 @@ type PlainTextClient struct {
 func (p *PlainTextClient) CreateClient(address string, port int) error {
 	// Establish a connection to the gRPC server
 	fullAddr := address + ":" + fmt.Sprintf("%d", port)
-	conn, err := grpc.NewClient(fullAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
+	conn, err := grpc.NewClient(fullAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(600*1024*1024), grpc.MaxCallSendMsgSize(600*1024*1024)))
 	if err != nil {
 		return fmt.Errorf("failed to connect: %v", err)
 	}
@@ -48,7 +48,7 @@ func (p *PlainTextClient) MixBatch(keys []string, values []string, batchID int64
 	newReq := executor.RequestBatch{
 		Keys:      keys,
 		Values:    values,
-		RequestId: 1,
+		RequestId: batchID,
 	}
 
 	resp, err := p.client.ExecuteBatch(ctx, &newReq)

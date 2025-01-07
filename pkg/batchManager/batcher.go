@@ -140,7 +140,6 @@ func (lb *myBatcher) connectToExecutors(ctx context.Context, hosts []string, por
 }
 
 func (lb *myBatcher) AddKeys(ctx context.Context, req *loadBalancer.LoadBalanceRequest) (*loadBalancer.LoadBalanceResponse, error) {
-
 	ctx, span := lb.tracer.Start(ctx, "Add Keys")
 	defer span.End()
 
@@ -430,6 +429,7 @@ func (lb *myBatcher) batchWorker(client ExecutorClient, idx int, workerId int) {
 		// Send all the aggregated keys and values to MixBatch in one call
 		// log.Info().Msg("Sending all aggregated keys and values to MixBatch")
 		// log.Debug().Msgf("Sending Request to Waffle: %d. WorkerID: %d", idx, workerId)
+		// log.Info().Msgf("Sending Key Length: %d, ID: %d", len(aggregatedKeys), workerId)
 		execResp, err := client.MixBatch(aggregatedKeys, aggregatedValues, aggregateBatchId)
 		finishTime := time.Since(startTime)
 		if err != nil {
