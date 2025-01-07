@@ -53,7 +53,10 @@ func main() {
 	log.Info().Msgf("gRPC server listening on %s", serverAddress)
 
 	// Create a new gRPC server
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.MaxRecvMsgSize(600*1024*1024),
+		grpc.MaxSendMsgSize(600*1024*1024),
+	)
 
 	// Initialize the executor service with Redis connection and tracingProvider
 	executor := executorPlaintxt.NewExecutor(*redisHost, *redisPort, tracer)
@@ -69,7 +72,7 @@ func main() {
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 		// Create a timer for 1 minute
-		timer := time.NewTimer(1 * time.Minute)
+		timer := time.NewTimer(10 * time.Minute)
 
 		select {
 		case sig := <-sigCh:

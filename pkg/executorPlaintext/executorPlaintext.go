@@ -1,7 +1,11 @@
 package executorPlaintxt
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"os"
+	"strings"
 
 	"github.com/golang/protobuf/ptypes/wrappers"
 	executorPlaintxt "github.com/project/ObliSql/api/plaintextExecutor"
@@ -22,7 +26,7 @@ type StringPair struct {
 }
 
 func (e Executor) ExecuteBatch(ctx context.Context, req *executorPlaintxt.RequestBatch) (*executorPlaintxt.RespondBatch, error) {
-	log.Info().Msgf("Got a request with ID: %d", req.RequestId)
+	// log.Info().Msgf("Got a request with ID: %d", req.RequestId)
 	threadCtx := context.Background()
 	var runningKeys []StringPair
 	localCache := make(map[string]string)
@@ -115,12 +119,46 @@ func (e Executor) InitDb(ctx context.Context, req *executorPlaintxt.RequestBatch
 
 	_, err := redisServerResp.Result()
 
+	log.Info().Msg("Initialization finished! \n")
+
 	if err != nil {
 		return &wrappers.BoolValue{Value: false}, err
 	} else {
 		return &wrappers.BoolValue{Value: true}, nil
 	}
 
+}
+
+func loadTrace(tracefile string) (*executorPlaintxt.RequestBatch, error) {
+	req := &executorPlaintxt.RequestBatch{}
+
+	file, err := os.Open(tracefile)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to open tracefiles!: %v", err)
+	}
+	defer file.Close()
+
+	const maxBufferSize = 1024 * 1024 // 1MB
+
+	scanner := bufio.NewScanner(file)
+	buffer := make([]byte, maxBufferSize)
+	scanner.Buffer(buffer, maxBufferSize)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if strings.HasPrefix(line, "SET") {
+			parts := strings.SplitN(line, " ", 3)
+			if len(parts) != 3 {
+				continue // Skip lines that don't have exactly 3 parts
+			}
+			key := parts[1]
+			value := parts[2]
+			req.Keys = append(req.Keys, key)
+			req.Values = append(req.Values, value)
+		}
+	}
+	return req, nil
 }
 
 func NewExecutor(redisHost string, redisPort string, traceProvider trace.Tracer) *Executor {
@@ -136,6 +174,14 @@ func NewExecutor(redisHost string, redisPort string, traceProvider trace.Tracer)
 		rdb:    rdb,
 		tracer: traceProvider,
 	}
+
+	traceFileloc := "../../tracefiles/serverInput.txt"
+	traceData, err := loadTrace(traceFileloc)
+
+	if err != nil {
+		fmt.Println("Failed to Load Trace!")
+	}
+	service.InitDb(context.Background(), traceData)
 
 	return &service
 

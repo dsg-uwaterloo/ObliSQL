@@ -300,7 +300,43 @@ func (c *myResolver) filterPkFromColumns(colData map[string]*queryResponse, q *r
 				}
 			}
 		case "range":
-			log.Fatal().Msgf("Range search for non-index column not implemented.")
+			searchValue := []string{}
+			parsedPart, singleOp := c.rangeParser(q.SearchVal[0])
+			if singleOp {
+				return nil, fmt.Errorf("Range Operations supported: Start_date <= Column <= End_Date")
+			}
+			columnType := c.getColumnType(q.TableName, q.SearchCol[0])
+			switch columnType {
+			case "int":
+				startingPoint, _ := strconv.ParseInt(parsedPart, 10, 64)   //starting point
+				endingPoint, _ := strconv.ParseInt(q.SearchVal[1], 10, 64) // Ending point
+				for v := startingPoint; v <= endingPoint; v++ {
+					indexKey := fmt.Sprintf("%d", v)
+					searchValue = append(searchValue, indexKey)
+				}
+			case "date":
+				dateRangeValues, err := getDatesInRange(parsedPart, q.SearchVal[0])
+
+				if err != nil {
+					log.Fatal().Msgf("Failed to parse Date Range into Parts: %v", err)
+				}
+				for _, v := range dateRangeValues {
+					indexKey := fmt.Sprintf("%s", v)
+					searchValue = append(searchValue, indexKey)
+				}
+			default:
+				return nil, fmt.Errorf("Range Operations on %s are not implemented", columnType)
+			}
+			genKeySet := make(map[string]struct{}, len(searchValue))
+			for _, genKey := range searchValue {
+				genKeySet[genKey] = struct{}{}
+			}
+			for idx, val := range v.Values {
+				if _, exists := genKeySet[val]; exists {
+					splitStrings := strings.Split(v.Keys[idx], "/")
+					keyMap[k] = append(keyMap[k], splitStrings[2])
+				}
+			}
 		default:
 			log.Printf("FilterPkFromColumn - Not Implemented for search type: %s", searchType)
 		}
@@ -388,6 +424,7 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery, localRequestID int64) (*q
 				return nil, fmt.Errorf("error filtering primary keys: %w", err)
 			}
 			filteredPks, err = c.filterPkFromColumns(columData, q, localRequestID)
+			fmt.Println(filteredPks)
 		}
 	}
 	span.AddEvent("Finished Indexing")

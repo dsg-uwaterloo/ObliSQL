@@ -22,7 +22,6 @@
         "pkStart": 0,
         "pkEnd": 417647,
         "indexOn": [
-            "u_id",
             "a_id",
             "i_id",
             "creation_date"

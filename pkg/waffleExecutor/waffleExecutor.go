@@ -21,8 +21,8 @@ func (p *ProxyClient) Init(host string, port int, traceObj trace.Tracer) error {
 	// Create a configuration for the socket
 	conf := &thrift.TConfiguration{
 		// Set your configuration options here (if needed)
-		MaxFrameSize:   int32(600 * 1024 * 1024),
-		MaxMessageSize: int32(600 * 1024 * 1024),
+		// MaxFrameSize:   int32(600 * 1024 * 1024),
+		// MaxMessageSize: int32(600 * 1024 * 1024),
 	}
 
 	// Use NewTSocketConf instead of NewTSocket
@@ -115,6 +115,71 @@ func (p *ProxyClient) MixBatch(keys, values []string, batchID int64) ([]string, 
 	}
 	return results, nil
 }
+
+// func (p *ProxyClient) MixBatch(keys, values []string, batchID int64) ([]string, error) {
+// 	// Start tracing
+// 	ctx := context.Background()
+// 	ctx, span := p.tracer.Start(ctx, "Thrift MixBatch")
+// 	defer span.End()
+
+// 	// Record attributes in the span
+// 	span.SetAttributes(
+// 		attribute.Int("keyLen", len(keys)),
+// 		attribute.Int64("batch_id", batchID),
+// 	)
+
+// 	// Hard limit
+// 	const maxBatchSize = 10000 //Can be some factor of B_R
+
+// 	if len(keys) <= maxBatchSize {
+// 		// Send one batch if within the limit
+// 		span.AddEvent("Sending single batch to Waffle")
+
+// 		results, err := p.client.MixBatch(ctx, keys, values)
+// 		span.AddEvent("Got single batch response from Waffle")
+
+// 		if err != nil {
+// 			return nil, fmt.Errorf("error calling MixBatch: %v", err)
+// 		}
+// 		return results, nil
+
+// 	} else {
+// 		// Split into multiple batches
+// 		span.AddEvent("Splitting into multiple batches for Waffle")
+
+// 		var allResults []string
+// 		for start := 0; start < len(keys); start += maxBatchSize {
+// 			end := start + maxBatchSize
+// 			if end > len(keys) {
+// 				end = len(keys)
+// 			}
+
+// 			partKeys := keys[start:end]
+// 			partValues := values[start:end]
+
+// 			// We can optionally create sub-spans for each batch if desired.
+// 			subCtx, subSpan := p.tracer.Start(ctx, "Thrift MixBatch - subBatch")
+// 			subSpan.SetAttributes(
+// 				attribute.Int("subBatch_keyLen", len(partKeys)),
+// 			)
+// 			subSpan.AddEvent("Sending sub-batch to Waffle")
+
+// 			partResults, err := p.client.MixBatch(subCtx, partKeys, partValues)
+
+// 			subSpan.AddEvent("Got sub-batch response from Waffle")
+// 			subSpan.End()
+
+// 			if err != nil {
+// 				return nil, fmt.Errorf("error calling MixBatch (sub-batch): %v", err)
+// 			}
+
+// 			// Accumulate results from this sub-batch
+// 			allResults = append(allResults, partResults...)
+// 		}
+
+// 		return allResults, nil
+// 	}
+// }
 
 func (p *ProxyClient) InitDB(keys, values []string) {
 	ctx := context.Background()

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/project/ObliSql/pkg/oramClient"
+	ptClient "github.com/project/ObliSql/pkg/plainTextClient"
 	"github.com/project/ObliSql/pkg/waffleExecutor"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -51,10 +52,28 @@ func (o *ORAMClientAdapter) MixBatch(keys []string, values []string, batchID int
 	return o.client.MixBatch(keys, values, batchID)
 }
 
+type plainTextClientAdapter struct {
+	client *ptClient.PlainTextClient
+	tracer trace.Tracer
+}
+
+func NewPlaintextClientAdapter(host string, port int, tracer trace.Tracer) (*plainTextClientAdapter, error) {
+	client := &ptClient.PlainTextClient{}
+	if err := client.CreateClient(host, port); err != nil {
+		return nil, err
+	}
+	return &plainTextClientAdapter{client: client, tracer: tracer}, nil
+}
+
+func (p *plainTextClientAdapter) MixBatch(keys []string, values []string, batchID int64) ([]string, error) {
+	return p.client.MixBatch(keys, values, batchID)
+}
+
 // Factory function to create ExecutorClient based on executorType
 const (
-	ExecutorTypeWaffle = "waffle"
-	ExecutorTypeORAM   = "oram"
+	ExecutorTypeWaffle    = "waffle"
+	ExecutorTypeORAM      = "oram"
+	ExecutorTypePlaintext = "plaintext"
 )
 
 func NewExecutorClient(executorType, host string, port int, tracer trace.Tracer) (ExecutorClient, error) {
@@ -63,6 +82,8 @@ func NewExecutorClient(executorType, host string, port int, tracer trace.Tracer)
 		return NewWaffleExecutorAdapter(host, port, tracer)
 	case ExecutorTypeORAM:
 		return NewORAMClientAdapter(host, port, tracer)
+	case ExecutorTypePlaintext:
+		return NewPlaintextClientAdapter(host, port, tracer)
 	default:
 		return nil, fmt.Errorf("unsupported executor type: %s", executorType)
 	}
