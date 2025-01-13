@@ -218,7 +218,7 @@ func (r *myResolver) createFilters(keys []string) {
 	r.Filters = filters
 }
 
-func (r *myResolver) readFilters(filePath string, joinName string) {
+func (r *myResolver) readJoinFilters(filePath string, joinName string) {
 	r.Filters[joinName] = cuckoo.NewFilter(1000000)
 
 	file, err := os.Open(filePath)
@@ -255,6 +255,30 @@ func (r *myResolver) readFilters(filePath string, joinName string) {
 		}
 	}
 
+}
+
+func (r *myResolver) readRangeFilters(filePath string, filterName string) {
+	fmt.Printf("Reading Filter for %s with name: %s \n", filePath, filterName)
+	r.Filters[filterName] = cuckoo.NewFilter(1000000)
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Fatal().Msgf("Failed to open file: %v", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		key := scanner.Text()
+		res := r.Filters[filterName].Insert([]byte(key))
+		if !res {
+			log.Fatal().Msgf("Failed to insert key into Filter: %s", key)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal().Msgf("Error reading file: %v", err)
+	}
 }
 
 func (r *myResolver) connectToBatchers(lbHosts []string, lbPorts []string) {
@@ -328,14 +352,26 @@ func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLoc
 		Inserted:        atomic.Int64{},
 	}
 
-	service.connectToBatchers(lbAddr, lbPort)
+	// service.connectToBatchers(lbAddr, lbPort)
 
 	service.readMetaData(metaDataLoc)
 	service.readJoinMap(joinMapLoc)
 	// service.InitDB(ctx, traceLocation) //Initialize the DB
 
-	service.readFilters("../../metaData/JoinMaps/pairList/pairs_review_trust.json", "review,trust")
-	service.readFilters("../../metaData/JoinMaps/pairList/pairs_item_review.json", "review,item")
+	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_review_trust.json", "review,trust")
+	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_item_review.json", "review,item")
 
+	files, err := os.ReadDir("../../metaData/filters")
+	if err != nil {
+		log.Fatal().Msgf("Failed to read filters directory: %v", err)
+	}
+
+	for _, file := range files {
+		if !file.IsDir() {
+			filterName := strings.TrimSuffix(file.Name(), ".txt")
+			filePath := "../../metaData/filters/" + file.Name()
+			service.readRangeFilters(filePath, filterName)
+		}
+	}
 	return &service
 }

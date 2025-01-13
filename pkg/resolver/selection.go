@@ -146,39 +146,44 @@ func (c *myResolver) constructPointIndexKey(searchCol, searchValue, tableName st
 }
 
 func (c *myResolver) constructRangeIndexKeyInt(searchCol string, searchValueStart, searchValueEnd int64, tableName string, lbReq *loadbalancer.LoadBalanceRequest) {
-	// filterKey := fmt.Sprintf("%s/%s", tableName, searchCol)
+	filterKey := fmt.Sprintf("%s_%s_index", tableName, searchCol)
 	for v := searchValueStart; v <= searchValueEnd; v++ {
 		indexKey := fmt.Sprintf("%s/%s_index/%d", tableName, searchCol, v)
-		// c.Created.Add(1)
-		// isPresent := c.Filters[filterKey].Lookup([]byte(indexKey))
-		// if isPresent {
-		// 	c.Inserted.Add(1)
-		// }
-		lbReq.Keys = append(lbReq.Keys, indexKey)
-		lbReq.Values = append(lbReq.Values, "")
+		c.Created.Add(1)
+		isPresent := c.Filters[filterKey].Lookup([]byte(indexKey))
+		if isPresent {
+			c.Inserted.Add(1)
+			lbReq.Keys = append(lbReq.Keys, indexKey)
+			lbReq.Values = append(lbReq.Values, "")
+		}
 	}
 }
 
 func (c *myResolver) constructRangeIndexDate(searchCol, searchValueStart, searchValueEnd, tableName string, lbReq *loadbalancer.LoadBalanceRequest) {
 	dateRangeValues, err := getDatesInRange(searchValueStart, searchValueEnd)
-	// filterKey := fmt.Sprintf("%s/%s", tableName, searchCol)
+	filterKey := fmt.Sprintf("%s_%s_index", tableName, searchCol)
 	if err != nil {
 		log.Fatal().Msgf("Failed to parse date range into points: %v", err)
 	}
 	for _, v := range dateRangeValues {
 		indexKey := fmt.Sprintf("%s/%s_index/%s", tableName, searchCol, v)
-		// c.Created.Add(1)
-		// isPresent := c.Filters[filterKey].Lookup([]byte(indexKey))
-		// if isPresent {
-		// 	c.Inserted.Add(1)
-		// }
-		lbReq.Keys = append(lbReq.Keys, indexKey)
-		lbReq.Values = append(lbReq.Values, "")
+		c.Created.Add(1)
+		isPresent := c.Filters[filterKey].Lookup([]byte(indexKey))
+		if isPresent {
+			c.Inserted.Add(1)
+			lbReq.Keys = append(lbReq.Keys, indexKey)
+			lbReq.Values = append(lbReq.Values, "")
+		}
 	}
 }
 
 func (c *myResolver) constructRequestAndFetch(pkList []string, requestID int64, q *resolver.ParsedQuery) ([]string, []string, error) {
 	ctx := context.Background()
+
+	if len(pkList) == 0 {
+		return []string{}, []string{}, nil
+	}
+
 	valReq := loadbalancer.LoadBalanceRequest{
 		Keys:      make([]string, 0, len(pkList)*len(q.ColToGet)),
 		Values:    make([]string, 0, len(pkList)*len(q.ColToGet)),
@@ -424,7 +429,6 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery, localRequestID int64) (*q
 				return nil, fmt.Errorf("error filtering primary keys: %w", err)
 			}
 			filteredPks, err = c.filterPkFromColumns(columData, q, localRequestID)
-			fmt.Println(filteredPks)
 		}
 	}
 	span.AddEvent("Finished Indexing")
