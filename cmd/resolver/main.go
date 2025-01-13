@@ -85,13 +85,14 @@ func main() {
 
 		select {
 		case sig := <-sigCh:
-			fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
 			fmt.Printf("Received signal: %v. Shutting down server...\n", sig)
+			fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
 			grpcServer.GracefulStop()
 			cancel()
 			return
 		case <-timer.C:
 			fmt.Println("Timeout reached. Shutting down server...")
+			fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
 			grpcServer.GracefulStop()
 			cancel()
 			return
