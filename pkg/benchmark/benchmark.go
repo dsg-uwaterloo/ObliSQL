@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -12,8 +13,9 @@ import (
 )
 
 type Ack struct {
-	hadError bool
-	latency  time.Duration
+	hadError  bool
+	latency   time.Duration
+	QueryType string
 }
 
 func GetRandomClient(resolverClient *[]resolver.ResolverClient) resolver.ResolverClient {
@@ -31,15 +33,16 @@ func asyncRequest(ctx context.Context, ackChannel *chan Ack, resolverClient *[]r
 	start := time.Now() // Record start time
 	resp, err := conn.ExecuteQuery(ctx, request.requestQuery)
 	latency := time.Since(start) // Calculate latency
+	queryType := request.requestQuery.QueryType
 	rateLimit.Release()
 
 	if err != nil {
-		*ackChannel <- Ack{hadError: true, latency: latency}
+		*ackChannel <- Ack{hadError: true, latency: latency, QueryType: queryType}
 	} else {
 		if len(resp.Values) > 0 {
 			counter.Add(1)
 		}
-		*ackChannel <- Ack{hadError: false, latency: latency}
+		*ackChannel <- Ack{hadError: false, latency: latency, QueryType: queryType}
 	}
 }
 
@@ -55,7 +58,7 @@ func sendRequestsForever(ctx context.Context, ackChannel *chan Ack, requests *[]
 }
 
 // Modified getResponses to collect latencies
-func getResponses(ctx context.Context, ackChannel *chan Ack, latencies *[]time.Duration) (int, int) {
+func getResponses(ctx context.Context, ackChannel *chan Ack, latencies *[]string) (int, int) {
 	operations, errors := 0, 0
 	for {
 		select {
@@ -67,14 +70,14 @@ func getResponses(ctx context.Context, ackChannel *chan Ack, latencies *[]time.D
 			} else {
 				operations++
 			}
-			*latencies = append(*latencies, ack.latency) // Collect latency
+			*latencies = append(*latencies, fmt.Sprintf(ack.latency.String()+"-"+ack.QueryType)) // Collect latency
 		}
 	}
 }
 
 func runBenchmark(resolverClient *[]resolver.ResolverClient, requests *[]Query, rateLimit *RateLimit, duration int, warmup bool) (int, int, time.Duration) {
 	realRequestCounter := atomic.Int64{}
-	latencies := []time.Duration{}
+	latencies := []string{}
 	ackChannel := make(chan Ack)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(duration)*time.Second)
 	defer cancel()
@@ -88,7 +91,13 @@ func runBenchmark(resolverClient *[]resolver.ResolverClient, requests *[]Query, 
 
 	var totalLatency time.Duration
 	for _, l := range latencies {
-		totalLatency += l
+		parts := strings.Split(l, "-")
+		if len(parts) > 0 {
+			latency, err := time.ParseDuration(parts[0])
+			if err == nil {
+				totalLatency += latency
+			}
+		}
 	}
 	averageLatency := time.Duration(0)
 	if len(latencies) > 0 {
