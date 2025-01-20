@@ -13,14 +13,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/exp/rand"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	blobloom "github.com/greatroar/blobloom"
 	loadBalancer "github.com/project/ObliSql/api/loadbalancer"
 	"github.com/project/ObliSql/api/resolver"
-	cuckoo "github.com/seiflotfy/cuckoofilter"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -171,7 +172,7 @@ func (r *myResolver) readMetaData(filePath string) {
 }
 func (r *myResolver) createFilters(keys []string) {
 	// Map to store separate filters for each table/index combination
-	filters := make(map[string]*cuckoo.Filter)
+	filters := make(map[string]*blobloom.Filter)
 
 	// Iterate over the keys
 	for _, key := range keys {
@@ -200,11 +201,14 @@ func (r *myResolver) createFilters(keys []string) {
 
 						// If no filter exists for this combination, create one
 						if _, ok := filters[filterKey]; !ok {
-							filters[filterKey] = cuckoo.NewFilter(1000000)
+							filters[filterKey] = blobloom.NewOptimized(blobloom.Config{
+								Capacity: 1000000, // Expected number of keys.
+								FPRate:   1e-4,    // Accept one false positive per 10,000 lookups.
+							})
 						}
 
 						// Add the key to the corresponding filter
-						filters[filterKey].InsertUnique([]byte(key))
+						filters[filterKey].Add(xxhash.Sum64([]byte(key)))
 						break
 					}
 				}
@@ -219,7 +223,10 @@ func (r *myResolver) createFilters(keys []string) {
 }
 
 func (r *myResolver) readJoinFilters(filePath string, joinName string) {
-	r.Filters[joinName] = cuckoo.NewFilter(1000000)
+	r.Filters[joinName] = blobloom.NewOptimized(blobloom.Config{
+		Capacity: 1000000, // Expected number of keys.
+		FPRate:   1e-4,    // Accept one false positive per 10,000 lookups.
+	})
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -246,10 +253,7 @@ func (r *myResolver) readJoinFilters(filePath string, joinName string) {
 			reviewPK := pair[0]
 			trustPK := pair[1]
 			key := fmt.Sprintf("%d/%d", reviewPK, trustPK)
-			res := r.Filters[joinName].Insert([]byte(key))
-			if !res {
-				log.Fatal().Msgf("Failed to insert into Filter")
-			}
+			r.Filters[joinName].Add(xxhash.Sum64([]byte(key)))
 		} else {
 			log.Fatal().Msgf("Invalid pair: %v", pair)
 		}
@@ -259,7 +263,10 @@ func (r *myResolver) readJoinFilters(filePath string, joinName string) {
 
 func (r *myResolver) readRangeFilters(filePath string, filterName string) {
 	fmt.Printf("Reading Filter for %s with name: %s \n", filePath, filterName)
-	r.Filters[filterName] = cuckoo.NewFilter(1000000)
+	r.Filters[filterName] = blobloom.NewOptimized(blobloom.Config{
+		Capacity: 1000000, // Expected number of keys.
+		FPRate:   1e-4,    // Accept one false positive per 10,000 lookups.
+	})
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -270,10 +277,7 @@ func (r *myResolver) readRangeFilters(filePath string, filterName string) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		key := scanner.Text()
-		res := r.Filters[filterName].Insert([]byte(key))
-		if !res {
-			log.Fatal().Msgf("Failed to insert key into Filter: %s", key)
-		}
+		r.Filters[filterName].Add(xxhash.Sum64([]byte(key)))
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -328,7 +332,7 @@ func (r *myResolver) GetBatchClient() (loadBalancer.LoadBalancerClient, error) {
 	return r.connPool[randomKey], nil
 }
 
-func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLocation string, metaDataLoc string, joinMapLoc string, tracer trace.Tracer) *myResolver {
+func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLocation string, metaDataLoc string, joinMapLoc string, tracer trace.Tracer, useBloom bool) *myResolver {
 
 	// Seed the random generator (ideally, do this once in an init function)
 	rand.Seed(uint64(time.Now().UnixNano()))
@@ -342,7 +346,7 @@ func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLoc
 		localRequestID:  atomic.Int64{},
 		tracer:          tracer,
 		requestsDone:    atomic.Int64{},
-		Filters:         make(map[string]*cuckoo.Filter),
+		Filters:         make(map[string]*blobloom.Filter),
 		selectIndexKeys: atomic.Int64{},
 		selectFetchKeys: atomic.Int64{},
 		selectRequests:  atomic.Int64{},
@@ -351,8 +355,11 @@ func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLoc
 		Created:         atomic.Int64{},
 		Inserted:        atomic.Int64{},
 	}
+	service.UseBloom = useBloom
 
-	// service.connectToBatchers(lbAddr, lbPort)
+	fmt.Printf("Using Bloom Filter? %t\n", useBloom)
+
+	service.connectToBatchers(lbAddr, lbPort)
 
 	service.readMetaData(metaDataLoc)
 	service.readJoinMap(joinMapLoc)
@@ -361,16 +368,18 @@ func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLoc
 	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_review_trust.json", "review,trust")
 	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_item_review.json", "review,item")
 
-	files, err := os.ReadDir("../../metaData/filters")
-	if err != nil {
-		log.Fatal().Msgf("Failed to read filters directory: %v", err)
-	}
+	if service.UseBloom {
+		files, err := os.ReadDir("../../metaData/filters")
+		if err != nil {
+			log.Fatal().Msgf("Failed to read filters directory: %v", err)
+		}
 
-	for _, file := range files {
-		if !file.IsDir() {
-			filterName := strings.TrimSuffix(file.Name(), ".txt")
-			filePath := "../../metaData/filters/" + file.Name()
-			service.readRangeFilters(filePath, filterName)
+		for _, file := range files {
+			if !file.IsDir() {
+				filterName := strings.TrimSuffix(file.Name(), ".txt")
+				filePath := "../../metaData/filters/" + file.Name()
+				service.readRangeFilters(filePath, filterName)
+			}
 		}
 	}
 	return &service

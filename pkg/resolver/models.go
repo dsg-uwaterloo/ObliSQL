@@ -4,9 +4,9 @@ import (
 	"sync"
 	"sync/atomic"
 
+	blobloom "github.com/greatroar/blobloom"
 	loadBalancer "github.com/project/ObliSql/api/loadbalancer"
 	"github.com/project/ObliSql/api/resolver"
-	cuckoo "github.com/seiflotfy/cuckoofilter"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -19,7 +19,7 @@ type myResolver struct {
 	recvChan        chan int32
 	metaData        map[string]MetaData
 	JoinMap         map[string]interface{}
-	Filters         map[string]*cuckoo.Filter
+	Filters         map[string]*blobloom.Filter
 	localRequestID  atomic.Int64
 	tracer          trace.Tracer
 	requestsDone    atomic.Int64
@@ -30,6 +30,7 @@ type myResolver struct {
 	joinRequests    atomic.Int64
 	Created         atomic.Int64
 	Inserted        atomic.Int64
+	UseBloom        bool
 }
 
 type parsedQuery struct {

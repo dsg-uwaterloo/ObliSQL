@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cespare/xxhash/v2"
 	loadbalancer "github.com/project/ObliSql/api/loadbalancer"
 	"github.com/project/ObliSql/api/resolver"
 	"github.com/rs/zerolog/log"
@@ -239,7 +240,7 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 	foundPairs := []string{}
 
 	for _, pair := range getCombo {
-		found := joinFilter.Lookup([]byte(pair))
+		found := joinFilter.Has(xxhash.Sum64([]byte(pair)))
 		if found {
 			foundPairs = append(foundPairs, pair)
 		}

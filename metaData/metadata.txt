@@ -1,7 +1,7 @@
 {
     "item": {
         "pkStart": 0,
-        "pkEnd": 149999,
+        "pkEnd": 999,
         "indexOn": [],
         "colNames": [
             "i_id",
@@ -13,15 +13,16 @@
             "i_id": "int",
             "title": "varchar",
             "description": "varchar",
-            "creation_date": "date"
+            "creation_date": "timestamp"
         },
         "rangeIndexInfo": {},
         "tableName": "item"
     },
     "review": {
         "pkStart": 0,
-        "pkEnd": 417647,
+        "pkEnd": 4969,
         "indexOn": [
+            "u_id",
             "a_id",
             "i_id",
             "creation_date"
@@ -49,7 +50,7 @@
     },
     "useracct": {
         "pkStart": 0,
-        "pkEnd": 299999,
+        "pkEnd": 1999,
         "indexOn": [],
         "colNames": [
             "u_id",
@@ -61,14 +62,14 @@
             "u_id": "int",
             "name": "varchar",
             "email": "varchar",
-            "creation_date": "date"
+            "creation_date": "timestamp"
         },
         "rangeIndexInfo": {},
         "tableName": "useracct"
     },
     "trust": {
         "pkStart": 0,
-        "pkEnd": 181841,
+        "pkEnd": 2531,
         "indexOn": [
             "source_u_id",
             "target_u_id"
@@ -83,7 +84,7 @@
             "source_u_id": "int",
             "target_u_id": "int",
             "trust": "int",
-            "creation_date": "date"
+            "creation_date": "timestamp"
         },
         "rangeIndexInfo": {},
         "tableName": "trust"
@@ -107,8 +108,8 @@
             "a_id": "int",
             "rating": "int",
             "status": "int",
-            "creation_date": "date",
-            "last_mod_date": "date",
+            "creation_date": "timestamp",
+            "last_mod_date": "timestamp",
             "type": "int",
             "vertical_id": "int"
         },
