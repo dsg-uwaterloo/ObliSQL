@@ -28,6 +28,7 @@ func main() {
 	bHostPtr := flag.String("bh", "localhost", "Address of Batchers (Comma Separated)")
 	bPortPtr := flag.String("bp", "9500", "Port of Batcher (Comma Separated)")
 	tracingBool := flag.Bool("t", false, "Tracing Boolean") //Default no tracing is on.
+	bloomBool := flag.Bool("bf", false, "Use Bloom Filter for ranges")
 
 	flag.Parse()
 
@@ -70,7 +71,7 @@ func main() {
 	bHostList := strings.Split(*bHostPtr, ",")
 	pHostList := strings.Split(*bPortPtr, ",")
 
-	resolverService := resolver.NewResolver(ctx, bHostList, pHostList, traceLoc, metaDataLoc, joinMapLoc, tracer)
+	resolverService := resolver.NewResolver(ctx, bHostList, pHostList, traceLoc, metaDataLoc, joinMapLoc, tracer, *bloomBool)
 	resolverAPI.RegisterResolverServer(grpcServer, resolverService)
 
 	// Handle graceful shutdown
@@ -85,19 +86,19 @@ func main() {
 
 		select {
 		case sig := <-sigCh:
-			fmt.Printf("Received signal: %v. Shutting down server...\n", sig)
 			fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
+			fmt.Printf("Received signal: %v. Shutting down server...\n", sig)
 			grpcServer.GracefulStop()
 			cancel()
 			return
 		case <-timer.C:
-			fmt.Println("Timeout reached. Shutting down server...")
 			fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
+			fmt.Println("Timeout reached. Shutting down server...")
 			grpcServer.GracefulStop()
 			cancel()
 			return
 		}
-		return
+
 	}()
 
 	// Start serving incoming gRPC connections

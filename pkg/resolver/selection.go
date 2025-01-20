@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/rs/zerolog/log"
 
 	loadbalancer "github.com/project/ObliSql/api/loadbalancer"
@@ -149,13 +150,22 @@ func (c *myResolver) constructRangeIndexKeyInt(searchCol string, searchValueStar
 	filterKey := fmt.Sprintf("%s_%s_index", tableName, searchCol)
 	for v := searchValueStart; v <= searchValueEnd; v++ {
 		indexKey := fmt.Sprintf("%s/%s_index/%d", tableName, searchCol, v)
-		c.Created.Add(1)
-		isPresent := c.Filters[filterKey].Lookup([]byte(indexKey))
-		if isPresent {
-			c.Inserted.Add(1)
+
+		if c.UseBloom {
+			c.Created.Add(1)
+			isPresent := c.Filters[filterKey].Has(xxhash.Sum64([]byte(indexKey)))
+			// fmt.Printf("Searching for %s in %s Found? %t\n", indexKey, filterKey, isPresent)
+			if isPresent {
+				c.Inserted.Add(1)
+				lbReq.Keys = append(lbReq.Keys, indexKey)
+				lbReq.Values = append(lbReq.Values, "")
+			}
+
+		} else {
 			lbReq.Keys = append(lbReq.Keys, indexKey)
 			lbReq.Values = append(lbReq.Values, "")
 		}
+
 	}
 }
 
@@ -167,10 +177,16 @@ func (c *myResolver) constructRangeIndexDate(searchCol, searchValueStart, search
 	}
 	for _, v := range dateRangeValues {
 		indexKey := fmt.Sprintf("%s/%s_index/%s", tableName, searchCol, v)
-		c.Created.Add(1)
-		isPresent := c.Filters[filterKey].Lookup([]byte(indexKey))
-		if isPresent {
-			c.Inserted.Add(1)
+		if c.UseBloom {
+			c.Created.Add(1)
+			isPresent := c.Filters[filterKey].Has(xxhash.Sum64([]byte(indexKey)))
+			if isPresent {
+				c.Inserted.Add(1)
+				lbReq.Keys = append(lbReq.Keys, indexKey)
+				lbReq.Values = append(lbReq.Values, "")
+			}
+
+		} else {
 			lbReq.Keys = append(lbReq.Keys, indexKey)
 			lbReq.Values = append(lbReq.Values, "")
 		}
@@ -374,9 +390,11 @@ func (c *myResolver) filterPkUsingIndex(q *resolver.ParsedQuery, localRequestID 
 				startingPoint, _ := strconv.ParseInt(parsedPart, 10, 64)     //starting point
 				endingPoint, _ := strconv.ParseInt(q.SearchVal[i+1], 10, 64) //Ending Point
 				c.constructRangeIndexKeyInt(q.SearchCol[i], startingPoint, endingPoint, q.TableName, &indexReqKeys)
+
+				// fmt.Printf("Range: %d, %d, Returned Index Keys: %v \n", startingPoint, endingPoint, indexReqKeys.Keys)
 			case "date":
 				c.constructRangeIndexDate(q.SearchCol[i], parsedPart, q.SearchVal[i+1], q.TableName, &indexReqKeys)
-				// log.Info().Msgf("Date Range Generated: %d", len(indexReqKeys.Keys))
+				// log.Info().Msgf("Date Range Generated: %d %v", len(indexReqKeys.Keys), indexReqKeys.Keys)
 			default:
 				return nil, fmt.Errorf("range operations on %s are not implemented", columnType)
 			}
@@ -390,6 +408,11 @@ func (c *myResolver) filterPkUsingIndex(q *resolver.ParsedQuery, localRequestID 
 	conn, err := c.GetBatchClient()
 	if err != nil {
 		log.Fatal().Msgf("Failed to get Batch Client!")
+	}
+
+	if len(indexReqKeys.Keys) == 0 {
+		//Filter resulted in no valid finds
+		return nil, nil
 	}
 
 	resp, err := conn.AddKeys(ctx, &indexReqKeys)
@@ -435,6 +458,15 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery, localRequestID int64) (*q
 
 	if err != nil {
 		return nil, fmt.Errorf("error filtering primary keys: %w", err)
+	}
+
+	if filteredPks == nil {
+		//Resolver side Filtering resulted in empty list
+		c.selectRequests.Add(1)
+		return &queryResponse{
+			Keys:   []string{},
+			Values: []string{},
+		}, nil
 	}
 
 	//Fatal Error for OR or anything else.
