@@ -18,7 +18,7 @@ type myResolver struct {
 	done            atomic.Int32
 	recvChan        chan int32
 	metaData        map[string]MetaData
-	JoinMap         map[string]interface{}
+	JoinMap         []string
 	Filters         map[string]*blobloom.Filter
 	localRequestID  atomic.Int64
 	tracer          trace.Tracer

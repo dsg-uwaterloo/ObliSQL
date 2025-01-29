@@ -302,22 +302,22 @@ func getTestCases() []Query {
 				SearchType: []string{"range"},
 			},
 		},
-		// {
-		// 	name: "Cross Join",
-		// 	//select review.rating,item.title from review,item where item.i_id=r.i_id and r.i_id = 17;
-		// 	//More verbose documentation in the resolver that defines how I am returning the join.
-		// 	requestQuery: &resolver.ParsedQuery{
-		// 		ClientId:    "1",
-		// 		QueryType:   "join",
-		// 		TableName:   "review,item", //Make it into a list
-		// 		ColToGet:    []string{"review.rating", "item.title"},
-		// 		SearchCol:   []string{"review.i_id"},
-		// 		SearchVal:   []string{getRandomValue(0, 149999)},
-		// 		SearchType:  []string{"point"},
-		// 		JoinColumns: []string{"i_id", "i_id"},
-		// 		OrderBy:     []string{"review.rating,DESC", "review.creation_date,DESC"},
-		// 	},
-		// },
+		{
+			name: "Cross Join",
+			//select review.rating,item.title from review,item where item.i_id=r.i_id and r.i_id = 17;
+			//More verbose documentation in the resolver that defines how I am returning the join.
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:    "1",
+				QueryType:   "join",
+				TableName:   "review,item", //Make it into a list
+				ColToGet:    []string{"review.rating", "item.title"},
+				SearchCol:   []string{"review.i_id"},
+				SearchVal:   []string{getRandomValue(0, 149999)},
+				SearchType:  []string{"point"},
+				JoinColumns: []string{"i_id", "i_id"},
+				OrderBy:     []string{"review.rating,DESC", "review.creation_date,DESC"},
+			},
+		},
 		{
 			name: "Join with two search filters",
 			//select review.rating from review,item where review.u_id=trust.target_u_id and review.i_id = ? and trust.source_u_id = ?
