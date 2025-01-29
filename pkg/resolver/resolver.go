@@ -117,32 +117,32 @@ func (r *myResolver) InitDB(ctx context.Context, filePath string) bool {
 	return success.Value
 }
 
-func (r *myResolver) readJoinMap(filePath string) {
-	//MetaData
-	file, err := os.Open(filePath)
-	if err != nil {
-		log.Fatal().Msgf("Error opening metadata file: %s\n", err)
-		return
-	}
-	defer file.Close()
+// func (r *myResolver) readJoinMap(filePath string) {
+// 	//MetaData
+// 	file, err := os.Open(filePath)
+// 	if err != nil {
+// 		log.Fatal().Msgf("Error opening metadata file: %s\n", err)
+// 		return
+// 	}
+// 	defer file.Close()
 
-	byteValue, err := io.ReadAll(file)
-	if err != nil {
-		log.Fatal().Msgf("Error reading metadata file: %s\n", err)
-		return
-	}
+// 	byteValue, err := io.ReadAll(file)
+// 	if err != nil {
+// 		log.Fatal().Msgf("Error reading metadata file: %s\n", err)
+// 		return
+// 	}
 
-	var data map[string]interface{}
-	err = json.Unmarshal(byteValue, &data)
-	if err != nil {
-		log.Fatal().Msgf("Error unmarshaling JSON: %s\n", err)
-		return
-	}
+// 	var data map[string]interface{}
+// 	err = json.Unmarshal(byteValue, &data)
+// 	if err != nil {
+// 		log.Fatal().Msgf("Error unmarshaling JSON: %s\n", err)
+// 		return
+// 	}
 
-	r.JoinMap = data
+// 	r.JoinMap = data
 
-	time.Sleep(1 * time.Second)
-}
+// 	time.Sleep(1 * time.Second)
+// }
 
 func (r *myResolver) readMetaData(filePath string) {
 	//MetaData
@@ -225,7 +225,7 @@ func (r *myResolver) createFilters(keys []string) {
 func (r *myResolver) readJoinFilters(filePath string, joinName string) {
 	r.Filters[joinName] = blobloom.NewOptimized(blobloom.Config{
 		Capacity: 1000000, // Expected number of keys.
-		FPRate:   1e-4,    // Accept one false positive per 10,000 lookups.
+		FPRate:   1e-9,    // Very small false positive rate.
 	})
 
 	file, err := os.Open(filePath)
@@ -258,6 +258,7 @@ func (r *myResolver) readJoinFilters(filePath string, joinName string) {
 			log.Fatal().Msgf("Invalid pair: %v", pair)
 		}
 	}
+	r.JoinMap = append(r.JoinMap, joinName)
 
 }
 
@@ -362,7 +363,7 @@ func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLoc
 	service.connectToBatchers(lbAddr, lbPort)
 
 	service.readMetaData(metaDataLoc)
-	service.readJoinMap(joinMapLoc)
+	// service.readJoinMap(joinMapLoc)
 	// service.InitDB(ctx, traceLocation) //Initialize the DB
 
 	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_review_trust.json", "review,trust")

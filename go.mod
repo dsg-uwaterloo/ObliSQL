@@ -4,7 +4,6 @@ go 1.23.2
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0
-	github.com/golang/mock v1.6.0
 	github.com/rs/zerolog v1.33.0
 	github.com/schollz/progressbar/v3 v3.17.1
 	go.opentelemetry.io/otel v1.30.0
