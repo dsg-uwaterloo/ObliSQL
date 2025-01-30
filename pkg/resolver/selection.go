@@ -154,7 +154,7 @@ func (c *myResolver) constructRangeIndexKeyInt(searchCol string, searchValueStar
 		if c.UseBloom {
 			c.Created.Add(1)
 			isPresent := c.Filters[filterKey].Has(xxhash.Sum64([]byte(indexKey)))
-			fmt.Printf("Searching for %s in %s Found? %t\n", indexKey, filterKey, isPresent)
+			// fmt.Printf("Searching for %s in %s Found? %t\n", indexKey, filterKey, isPresent)
 			if isPresent {
 				c.Inserted.Add(1)
 				lbReq.Keys = append(lbReq.Keys, indexKey)
