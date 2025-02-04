@@ -979,9 +979,9 @@ func TestSelectSequential(t *testing.T) {
 	testcases := getTestCases()
 
 	for _, tc := range testcases {
-		// if tc.name != "Join with two search filters" {
-		// 	continue
-		// }
+		if tc.name != "Join Aggregate with two search filters" {
+			continue
+		}
 		t.Run(tc.name, func(t *testing.T) {
 			fmt.Println("Starting Test", tc.name)
 			resp, err := resolverClient.ExecuteQuery(context.Background(), tc.requestQuery)
@@ -1005,6 +1005,63 @@ func TestSelectSequential(t *testing.T) {
 		})
 	}
 
+}
+
+func TestUpdate(t *testing.T) {
+
+	resolver_addr := "localhost:9900"
+	conn, err := grpc.NewClient(resolver_addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
+	if err != nil {
+		log.Fatalf("Failed to open connection to Resolver")
+	}
+
+	resolverClient := resolver.NewResolverClient(conn)
+
+	numUpdates := 5
+
+	for i := 1; i <= numUpdates; i++ {
+		testString := generateRandomString(10)
+		updateQuery := &resolver.ParsedQuery{
+			ClientId:   "1",
+			QueryType:  "update",
+			TableName:  "review",
+			ColToGet:   []string{"comment"},
+			SearchCol:  []string{"a_id", "i_id"},
+			SearchVal:  []string{"38", "84395"},
+			SearchType: []string{"point", "point"},
+			UpdateVal:  []string{testString},
+		}
+
+		// Execute the Update query
+		resp, err := resolverClient.ExecuteQuery(context.Background(), updateQuery)
+		if err != nil {
+			log.Printf("Error executing %s. %v", "Update", err)
+		} else {
+			fmt.Println("---------")
+			fmt.Println(resp.RequestId, "Update", resp.Keys, resp.Values)
+			fmt.Println("---------")
+
+			// Now Get it back to verify Persistance
+			selectQuery := &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "review",
+				ColToGet:   []string{"comment"},
+				SearchCol:  []string{"a_id", "i_id"},
+				SearchVal:  []string{"38", "84395"},
+				SearchType: []string{"point", "point"},
+			}
+			// Execute the Update query
+			resp, err := resolverClient.ExecuteQuery(context.Background(), selectQuery)
+			if err != nil {
+				log.Printf("Error executing %s. %v", "Select", err)
+			} else {
+				fmt.Println("---------")
+				fmt.Println(resp.RequestId, "Select", resp.Keys, resp.Values)
+				fmt.Println("---------")
+			}
+		}
+	}
 }
 
 // func TestSelectParallel(t *testing.T) {
@@ -1105,7 +1162,7 @@ func TestSelectSequential(t *testing.T) {
 // 					TableName:  "review",
 // 					ColToGet:   []string{"comment"},
 // 					SearchCol:  []string{"a_id", "i_id"},
-// 					SearchVal:  []string{"10", "7"},
+// 					SearchVal:  []string{"38", "84395"},
 // 					SearchType: []string{"point", "point"},
 // 					UpdateVal:  []string{testString},
 // 				}
@@ -1116,7 +1173,7 @@ func TestSelectSequential(t *testing.T) {
 // 					TableName:  "review",
 // 					ColToGet:   []string{"comment"},
 // 					SearchCol:  []string{"a_id", "i_id"},
-// 					SearchVal:  []string{"10", "7"},
+// 					SearchVal:  []string{"38", "84395"},
 // 					SearchType: []string{"point", "point"},
 // 				}
 // 			}

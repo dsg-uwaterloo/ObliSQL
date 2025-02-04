@@ -12,25 +12,26 @@ import (
 
 type myResolver struct {
 	resolver.UnimplementedResolverServer
-	connPool        map[string]loadBalancer.LoadBalancerClient
-	connPoolMutex   sync.RWMutex
-	requestId       atomic.Int64
-	done            atomic.Int32
-	recvChan        chan int32
-	metaData        map[string]MetaData
-	JoinMap         []string
-	Filters         map[string]*blobloom.Filter
-	localRequestID  atomic.Int64
-	tracer          trace.Tracer
-	requestsDone    atomic.Int64
-	selectIndexKeys atomic.Int64
-	selectFetchKeys atomic.Int64
-	selectRequests  atomic.Int64
-	joinFetchKeys   atomic.Int64
-	joinRequests    atomic.Int64
-	Created         atomic.Int64
-	Inserted        atomic.Int64
-	UseBloom        bool
+	connPool           map[string]loadBalancer.LoadBalancerClient
+	connPoolMutex      sync.RWMutex
+	requestId          atomic.Int64
+	done               atomic.Int32
+	recvChan           chan int32
+	metaData           map[string]MetaData
+	JoinMap            []string
+	Filters            map[string]*blobloom.Filter
+	localRequestID     atomic.Int64
+	tracer             trace.Tracer
+	requestsDone       atomic.Int64
+	selectIndexKeys    atomic.Int64
+	selectFetchKeys    atomic.Int64
+	selectRequests     atomic.Int64
+	joinFetchKeys      atomic.Int64
+	joinRequests       atomic.Int64
+	Created            atomic.Int64
+	Inserted           atomic.Int64
+	UseBloom           bool
+	JoinBloomOptimized bool
 }
 
 type parsedQuery struct {
