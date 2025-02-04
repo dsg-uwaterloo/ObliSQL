@@ -29,6 +29,7 @@ func main() {
 	bPortPtr := flag.String("bp", "9500", "Port of Batcher (Comma Separated)")
 	tracingBool := flag.Bool("t", false, "Tracing Boolean") //Default no tracing is on.
 	bloomBool := flag.Bool("bf", false, "Use Bloom Filter for ranges")
+	optiBoolJoin := flag.Bool("jo", false, "Optimized Bloom Filter")
 
 	flag.Parse()
 
@@ -71,7 +72,7 @@ func main() {
 	bHostList := strings.Split(*bHostPtr, ",")
 	pHostList := strings.Split(*bPortPtr, ",")
 
-	resolverService := resolver.NewResolver(ctx, bHostList, pHostList, traceLoc, metaDataLoc, joinMapLoc, tracer, *bloomBool)
+	resolverService := resolver.NewResolver(ctx, bHostList, pHostList, traceLoc, metaDataLoc, joinMapLoc, tracer, *bloomBool, *optiBoolJoin)
 	resolverAPI.RegisterResolverServer(grpcServer, resolverService)
 
 	// Handle graceful shutdown

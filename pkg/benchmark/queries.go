@@ -1,7 +1,6 @@
 package benchmark
 
 import (
-	"strconv"
 	"time"
 
 	"math/rand"
@@ -64,8 +63,11 @@ type Query struct {
 // 	return startDate, endDate
 // }
 
-func getRandomValue(min, max int) string {
-	return strconv.Itoa(rand.Intn(max-min+1) + min)
+func getRandomValue(values *[]string) string {
+	if len(*values) == 0 {
+		return ""
+	}
+	return (*values)[rand.Intn(len(*values))]
 }
 
 // func getRandomRangeWithLength(min, max, maxRangeLength int) (string, string) {
@@ -89,27 +91,22 @@ func getRandomNumber(max int) int {
 	return rand.Intn(max) + 1
 }
 
-func getRandomRange(start, end, length int) (string, string) {
-	if length <= 0 || start > end || (end-start+1) < length {
+func getRandomRangeFromList(list *[]string, k int) (string, string) {
+	if k <= 0 || len(*list) < k {
 		return "0", "0"
 	}
 
-	source := rand.NewSource((time.Now().UnixNano()))
+	source := rand.NewSource(time.Now().UnixNano())
 	rng := rand.New(source)
 
-	// Calculate the maximum starting point for a valid range of the specified length
-	maxStart := end - length + 1
+	// Calculate the maximum starting index for a valid range of size k
+	maxStart := len(*list) - k
 
-	// Generate a random starting point
-	randomStart := rng.Intn(maxStart-start+1) + start
+	// Generate a random starting index
+	randomStart := rng.Intn(maxStart + 1)
 
-	// Create the result slice with the specified length
-	result := make([]int, length)
-	for i := 0; i < length; i++ {
-		result[i] = randomStart + i
-	}
-
-	return strconv.Itoa(result[0]), strconv.Itoa(result[length-1])
+	// Return the first and last elements of the selected range
+	return (*list)[randomStart], (*list)[randomStart+k-1]
 }
 
 func getRandomDateRange(start, end time.Time, length int) (string, string) {
@@ -136,39 +133,39 @@ func getRandomDateRange(start, end time.Time, length int) (string, string) {
 	return randomStartDate.Format("2006-01-02"), randomEndDate.Format("2006-01-02")
 }
 
-func getTestCases() []Query {
+func getTestCases(u_id, i_id, a_id *[]string) []Query {
 	// Define the date range for random date generation
 	startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(2030, 12, 31, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2060, 12, 31, 0, 0, 0, 0, time.UTC)
 	testCases := []Query{
-		// {
+		{
 
-		// 	name: "Simple Select",
-		// 	//Select rating from review where u_id = 812;
-		// 	requestQuery: &resolver.ParsedQuery{
-		// 		ClientId:   "1",
-		// 		QueryType:  "select",
-		// 		TableName:  "review",
-		// 		ColToGet:   []string{"rating"},
-		// 		SearchCol:  []string{"u_id"},
-		// 		SearchVal:  []string{getRandomValue(0, 299995)},
-		// 		SearchType: []string{"point"},
-		// 	},
-		// },
-		// {
+			name: "Simple Select",
+			//Select rating from review where u_id = 812;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "review",
+				ColToGet:   []string{"rating"},
+				SearchCol:  []string{"u_id"},
+				SearchVal:  []string{getRandomValue(u_id)},
+				SearchType: []string{"point"},
+			},
+		},
+		{
 
-		// 	name: "Select using two filters with index (AND)",
-		// 	//Select * from review where a_id =10 and i_id = 7;
-		// 	requestQuery: &resolver.ParsedQuery{
-		// 		ClientId:   "1",
-		// 		QueryType:  "select",
-		// 		TableName:  "review",
-		// 		ColToGet:   []string{"*"},
-		// 		SearchCol:  []string{"a_id", "i_id"},
-		// 		SearchVal:  []string{getRandomValue(0, 78660), getRandomValue(0, 149999)},
-		// 		SearchType: []string{"point", "point"},
-		// 	},
-		// },
+			name: "Select using two filters with index (AND)",
+			//Select * from review where a_id =10 and i_id = 7;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "review",
+				ColToGet:   []string{"*"},
+				SearchCol:  []string{"a_id", "i_id"},
+				SearchVal:  []string{getRandomValue(a_id), getRandomValue(u_id)},
+				SearchType: []string{"point", "point"},
+			},
+		},
 		// {
 		// 	name: "Select without index",
 		// 	//Select title from item where i_id = 500;
@@ -182,94 +179,94 @@ func getTestCases() []Query {
 		// 		SearchType: []string{"point"},
 		// 	},
 		// },
-		// {
+		{
 
-		// 	name: "Select with Order by (Order by included column) - ASC",
-		// 	//Select rating from review where u_id = 812;
-		// 	requestQuery: &resolver.ParsedQuery{
-		// 		ClientId:   "1",
-		// 		QueryType:  "select",
-		// 		TableName:  "review",
-		// 		ColToGet:   []string{"rating", "creation_date"},
-		// 		SearchCol:  []string{"u_id"},
-		// 		SearchVal:  []string{getRandomValue(0, 299995)},
-		// 		SearchType: []string{"point"},
-		// 		OrderBy:    []string{"creation_date,ASC"},
-		// 	},
-		// },
-		// {
+			name: "Select with Order by (Order by included column) - ASC",
+			//Select rating from review where u_id = 812;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "review",
+				ColToGet:   []string{"rating", "creation_date"},
+				SearchCol:  []string{"u_id"},
+				SearchVal:  []string{getRandomValue(u_id)},
+				SearchType: []string{"point"},
+				OrderBy:    []string{"creation_date,ASC"},
+			},
+		},
+		{
 
-		// 	name: "Select with Order by (Order by included column) - DESC",
-		// 	//Select rating from review where u_id = 812;
-		// 	requestQuery: &resolver.ParsedQuery{
-		// 		ClientId:   "1",
-		// 		QueryType:  "select",
-		// 		TableName:  "review",
-		// 		ColToGet:   []string{"*"},
-		// 		SearchCol:  []string{"i_id"},
-		// 		SearchVal:  []string{getRandomValue(0, 149999)},
-		// 		SearchType: []string{"point"},
-		// 		OrderBy:    []string{"creation_date,DESC"},
-		// 	},
-		// },
-		// {
-		// 	name: "Avg Aggregate",
-		// 	//Select avg(rating) from review where i_id = 17;
-		// 	requestQuery: &resolver.ParsedQuery{
-		// 		ClientId:      "1",
-		// 		QueryType:     "aggregate",
-		// 		TableName:     "review",
-		// 		ColToGet:      []string{"rating"},
-		// 		SearchCol:     []string{"i_id"},
-		// 		SearchVal:     []string{getRandomValue(0, 149999)},
-		// 		SearchType:    []string{"point"},
-		// 		AggregateType: []string{"avg"},
-		// 	},
-		// },
-		// {
-		// 	name: "Sum Aggregate",
-		// 	//select sum(rating) from review where i_id = 7;
-		// 	requestQuery: &resolver.ParsedQuery{
-		// 		ClientId:      "1",
-		// 		QueryType:     "aggregate",
-		// 		TableName:     "review",
-		// 		ColToGet:      []string{"rating"},
-		// 		SearchCol:     []string{"i_id"},
-		// 		SearchVal:     []string{getRandomValue(0, 149999)},
-		// 		SearchType:    []string{"point"},
-		// 		AggregateType: []string{"sum"},
-		// 	},
-		// },
-		// {
-		// 	name: "Count Aggregate",
-		// 	//select count(rating) from review where i_id = 7;
-		// 	requestQuery: &resolver.ParsedQuery{
-		// 		ClientId:      "1",
-		// 		QueryType:     "aggregate",
-		// 		TableName:     "review",
-		// 		ColToGet:      []string{"rating"},
-		// 		SearchCol:     []string{"i_id"},
-		// 		SearchVal:     []string{getRandomValue(0, 149999)},
-		// 		SearchType:    []string{"point"},
-		// 		AggregateType: []string{"count"},
-		// 	},
-		// },
-		// {
-		// 	name: "Sum & Count Aggregate",
-		// 	// select sum(rating) from new_review where i_id =7
-		// 	// union all
-		// 	// select count(rating)  from new_review where i_id =7;
-		// 	requestQuery: &resolver.ParsedQuery{
-		// 		ClientId:      "1",
-		// 		QueryType:     "aggregate",
-		// 		TableName:     "review",
-		// 		ColToGet:      []string{"rating", "rating"},
-		// 		SearchCol:     []string{"i_id", "i_id"},
-		// 		SearchVal:     []string{getRandomValue(0, 149999), getRandomValue(0, 149999)},
-		// 		SearchType:    []string{"point", "point"},
-		// 		AggregateType: []string{"sum", "count"},
-		// 	},
-		// },
+			name: "Select with Order by (Order by included column) - DESC",
+			//Select rating from review where u_id = 812;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "review",
+				ColToGet:   []string{"*"},
+				SearchCol:  []string{"i_id"},
+				SearchVal:  []string{getRandomValue(i_id)},
+				SearchType: []string{"point"},
+				OrderBy:    []string{"creation_date,DESC"},
+			},
+		},
+		{
+			name: "Avg Aggregate",
+			//Select avg(rating) from review where i_id = 17;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:      "1",
+				QueryType:     "aggregate",
+				TableName:     "review",
+				ColToGet:      []string{"rating"},
+				SearchCol:     []string{"i_id"},
+				SearchVal:     []string{getRandomValue(i_id)},
+				SearchType:    []string{"point"},
+				AggregateType: []string{"avg"},
+			},
+		},
+		{
+			name: "Sum Aggregate",
+			//select sum(rating) from review where i_id = 7;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:      "1",
+				QueryType:     "aggregate",
+				TableName:     "review",
+				ColToGet:      []string{"rating"},
+				SearchCol:     []string{"i_id"},
+				SearchVal:     []string{getRandomValue(i_id)},
+				SearchType:    []string{"point"},
+				AggregateType: []string{"sum"},
+			},
+		},
+		{
+			name: "Count Aggregate",
+			//select count(rating) from review where i_id = 7;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:      "1",
+				QueryType:     "aggregate",
+				TableName:     "review",
+				ColToGet:      []string{"rating"},
+				SearchCol:     []string{"i_id"},
+				SearchVal:     []string{getRandomValue(i_id)},
+				SearchType:    []string{"point"},
+				AggregateType: []string{"count"},
+			},
+		},
+		{
+			name: "Sum & Count Aggregate",
+			// select sum(rating) from new_review where i_id =7
+			// union all
+			// select count(rating)  from new_review where i_id =7;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:      "1",
+				QueryType:     "aggregate",
+				TableName:     "review",
+				ColToGet:      []string{"rating", "rating"},
+				SearchCol:     []string{"i_id", "i_id"},
+				SearchVal:     []string{getRandomValue(i_id), getRandomValue(i_id)},
+				SearchType:    []string{"point", "point"},
+				AggregateType: []string{"sum", "count"},
+			},
+		},
 		{
 			name: "Range",
 			//select rating from review where u_id between 812 and 814;
@@ -278,9 +275,9 @@ func getTestCases() []Query {
 				QueryType: "select",
 				TableName: "review",
 				ColToGet:  []string{"rating"},
-				SearchCol: []string{"u_id"}, //Change to fetch at most 10 rows
+				SearchCol: []string{"u_id"}, //Change to fetch at most 10 rows 299995
 				SearchVal: func() []string {
-					start, end := getRandomRange(0, 299995, getRandomNumber(5))
+					start, end := getRandomRangeFromList(u_id, getRandomNumber(5))
 					return []string{start, end}
 				}(),
 				SearchType: []string{"range"},
@@ -312,7 +309,7 @@ func getTestCases() []Query {
 				TableName:   "review,item", //Make it into a list
 				ColToGet:    []string{"review.rating", "item.title"},
 				SearchCol:   []string{"review.i_id"},
-				SearchVal:   []string{getRandomValue(0, 149999)},
+				SearchVal:   []string{getRandomValue(i_id)},
 				SearchType:  []string{"point"},
 				JoinColumns: []string{"i_id", "i_id"},
 				OrderBy:     []string{"review.rating,DESC", "review.creation_date,DESC"},
@@ -327,7 +324,7 @@ func getTestCases() []Query {
 				TableName:   "review,trust", //Make it into a list
 				ColToGet:    []string{"review.rating"},
 				SearchCol:   []string{"review.i_id", "trust.source_u_id"},
-				SearchVal:   []string{getRandomValue(0, 149999), getRandomValue(0, 168748)},
+				SearchVal:   []string{getRandomValue(i_id), getRandomValue(u_id)},
 				SearchType:  []string{"point"},
 				JoinColumns: []string{"u_id", "target_u_id"},
 			},
@@ -341,7 +338,7 @@ func getTestCases() []Query {
 				TableName:     "review,trust", //Make it into a list
 				ColToGet:      []string{"review.rating"},
 				SearchCol:     []string{"review.i_id", "trust.source_u_id"},
-				SearchVal:     []string{getRandomValue(0, 149999), getRandomValue(0, 168748)},
+				SearchVal:     []string{getRandomValue(i_id), getRandomValue(u_id)},
 				SearchType:    []string{"point"},
 				JoinColumns:   []string{"u_id", "target_u_id"},
 				AggregateType: []string{"avg"},

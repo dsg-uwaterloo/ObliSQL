@@ -333,7 +333,7 @@ func (r *myResolver) GetBatchClient() (loadBalancer.LoadBalancerClient, error) {
 	return r.connPool[randomKey], nil
 }
 
-func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLocation string, metaDataLoc string, joinMapLoc string, tracer trace.Tracer, useBloom bool) *myResolver {
+func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLocation string, metaDataLoc string, joinMapLoc string, tracer trace.Tracer, useBloom bool, JoinBloomOptimized bool) *myResolver {
 
 	// Seed the random generator (ideally, do this once in an init function)
 	rand.Seed(uint64(time.Now().UnixNano()))
@@ -357,8 +357,10 @@ func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLoc
 		Inserted:        atomic.Int64{},
 	}
 	service.UseBloom = useBloom
+	service.JoinBloomOptimized = JoinBloomOptimized
 
-	fmt.Printf("Using Bloom Filter? %t\n", useBloom)
+	fmt.Printf("Using Bloom Filter? %t\n", service.UseBloom)
+	fmt.Printf("Using Optimized Bloom Join? %t\n", service.JoinBloomOptimized)
 
 	service.connectToBatchers(lbAddr, lbPort)
 

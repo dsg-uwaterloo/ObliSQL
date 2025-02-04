@@ -67,6 +67,64 @@ func createJoinColumnMap(query *resolver.ParsedQuery) map[string]string {
 // 	return columns.(map[string]interface{}), values.(map[string]interface{})
 // }
 
+func filterMatchingPairs(
+	globalFoundPairs []string,
+	globalJoinCheck []string,
+	storeKeys []string,
+	storeValues []string,
+) ([]string, []string) {
+	filteredKeys := []string{}
+	filteredValues := []string{}
+
+	// Step 1: Iterate through each pair in globalFoundPairs
+	for _, pair := range globalFoundPairs {
+		splitPair := strings.Split(pair, "/")
+		if len(splitPair) != 2 {
+			fmt.Println("Invalid pair format:", pair)
+			continue
+		}
+
+		id1, id2 := splitPair[0], splitPair[1]
+
+		// Step 2: Identify keys in globalJoinCheck that match the pair
+		matchingKeys := map[string]bool{} // Store matched keys
+		for _, joinKey := range globalJoinCheck {
+			if strings.HasSuffix(joinKey, "/"+id1) || strings.HasSuffix(joinKey, "/"+id2) {
+				matchingKeys[joinKey] = true
+			}
+		}
+
+		// Step 3: Verify values in storeKeys/storeValues
+		matchingValues := map[string]string{} // Store valid key-value pairs
+		for i, storeKey := range storeKeys {
+			if matchingKeys[storeKey] {
+				matchingValues[storeKey] = storeValues[i]
+			}
+		}
+
+		// Step 4: If all matching keys have identical values, add related keys to results
+		if len(matchingValues) > 1 {
+			valueSet := map[string]bool{} // To check if all values match
+			for _, v := range matchingValues {
+				valueSet[v] = true
+			}
+
+			// If all values in set are the same, consider them valid
+			if len(valueSet) == 1 {
+				for i, storeKey := range storeKeys {
+					// Exclude join columns from the final output
+					if !matchingKeys[storeKey] { // Only add non-join keys
+						filteredKeys = append(filteredKeys, storeKey)
+						filteredValues = append(filteredValues, storeValues[i])
+					}
+				}
+			}
+		}
+	}
+
+	return filteredKeys, filteredValues
+}
+
 func (c *myResolver) CreateSearchMap(searchCol, searchVal, tableNamesQuery []string) (map[string]map[string]string, []string, []string) {
 	// Initialize the result map
 	result := make(map[string]map[string]string)
@@ -135,30 +193,38 @@ func checkJoinFilterColumnSame(columnName []string, joinColumns []string) bool {
 	return true
 }
 
-func generateCombinations(tableNameKeyMap map[string][]string, order []string) []string {
+func generateCombinations(tableNameKeyMap map[string][]string, order []string) ([]string, []string) {
 	result := []string{}
+	orders := []string{} // Stores the order of table names in each combination
 
 	// Helper function to recursively generate combinations
-	var helper func([]string, int, string)
-	helper = func(current []string, depth int, combination string) {
+	var helper func(int, string, string)
+	helper = func(depth int, combination string, orderTrack string) {
 		if depth == len(order) {
 			result = append(result, combination)
+			orders = append(orders, orderTrack)
 			return
 		}
 
 		tableName := order[depth]
 		for _, value := range tableNameKeyMap[tableName] {
 			newCombination := combination
+			newOrderTrack := orderTrack
+
 			if newCombination != "" {
 				newCombination += "/"
+				newOrderTrack += "/" // Maintain order tracking format
 			}
+
 			newCombination += value
-			helper(current, depth+1, newCombination)
+			newOrderTrack += tableName
+
+			helper(depth+1, newCombination, newOrderTrack)
 		}
 	}
 
-	helper([]string{}, 0, "")
-	return result
+	helper(0, "", "")
+	return result, orders
 }
 
 func constructTablePkMap(order []string, foundPairs []string) map[string][]string {
@@ -187,7 +253,7 @@ func appendUnique(slice []string, value string) []string {
 	return append(slice, value)
 }
 
-func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]map[string]string, joinColMap *map[string]string, localRequestID int64) map[string][]string {
+func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]map[string]string, joinColMap *map[string]string, localRequestID int64) (map[string][]string, []string, []string) {
 	lbReq := loadbalancer.LoadBalanceRequest{
 		RequestId: localRequestID,
 	}
@@ -207,20 +273,22 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 		log.Fatal().Msgf("Failed to fetch index keys from load balancer!: %s \n", err)
 	}
 	tableNameKeyMap := make(map[string][]string)
+	foundPairs := []string{}
+	joinCheck := []string{}
 
 	for i, k := range resp.Keys {
 		tableNameInner := strings.Split(k, "/")[0]
 		splitValues := strings.Split(resp.Values[i], ",")
 		if contains(splitValues, "-1") {
-			return map[string][]string{} // Empty Response back, we can return
+			return map[string][]string{}, joinCheck, foundPairs // Empty Response back, we can return
 		}
 		tableNameKeyMap[tableNameInner] = splitValues
 	}
 
-	getCombo := generateCombinations(tableNameKeyMap, strings.Split(tableName, ","))
-	foundPairs := []string{}
+	getCombo, tableOrder := generateCombinations(tableNameKeyMap, strings.Split(tableName, ","))
 
 	if c.UseBloom {
+		//Can have False Positives
 		joinFilter := c.Filters[tableName]
 		for _, pair := range getCombo {
 			found := joinFilter.Has(xxhash.Sum64([]byte(pair)))
@@ -228,7 +296,28 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 				foundPairs = append(foundPairs, pair)
 			}
 		}
+
+		if c.JoinBloomOptimized {
+			//Optimistically fetch join column and verify before returning
+
+			for _, pair := range foundPairs {
+				splitPair := strings.Split(pair, "/")
+				splitTableOrder := strings.Split(tableOrder[0], "/")
+
+				if len(splitPair) != len(splitTableOrder) {
+					fmt.Println("Mismatch in values and table order:", splitPair, splitTableOrder)
+					continue
+				}
+				//Only works for Join of two Tables. Extend for 3 if needed.
+				newKeyOne := fmt.Sprintf("%s/%s/%s", splitTableOrder[0], (*joinColMap)[splitTableOrder[0]], splitPair[0])
+				newKeyTwo := fmt.Sprintf("%s/%s/%s", splitTableOrder[1], (*joinColMap)[splitTableOrder[1]], splitPair[1])
+				joinCheck = append(joinCheck, newKeyOne)
+				joinCheck = append(joinCheck, newKeyTwo)
+			}
+		}
+
 	} else {
+		//Completely Correct
 		// 1. Get the Join Column Values for each PK we got back from index.
 		// 2. Verify which Pairs satisfy the join.
 		lbReq1 := loadbalancer.LoadBalanceRequest{
@@ -300,7 +389,7 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 	// fmt.Println(getCombo)
 	// fmt.Println(foundPairs)
 	tablePkMap := constructTablePkMap(strings.Split(tableName, ","), foundPairs)
-	return tablePkMap
+	return tablePkMap, joinCheck, foundPairs
 }
 
 func (c *myResolver) constructRequestValues(pkMap map[string][]string, q *resolver.ParsedQuery) ([]string, []string) {
@@ -324,6 +413,8 @@ func (c *myResolver) constructRequestValues(pkMap map[string][]string, q *resolv
 func (c *myResolver) doJoin(q *resolver.ParsedQuery, localRequestID int64) (*queryResponse, error) {
 	var reqKeys []string
 	var reqValues []string
+	var globalJoinCheck []string
+	var globalFoundPairs []string
 
 	//Working only for single search filter. Extend to multiple filters.
 	if c.checkJoinColumnPresent(q.TableName) {
@@ -334,8 +425,14 @@ func (c *myResolver) doJoin(q *resolver.ParsedQuery, localRequestID int64) (*que
 			//All Search Columns do have an index!
 
 			joinColMap := createJoinColumnMap(q)
-			filteredKeys := c.indexFilterAndJoin(q.TableName, &searchMap, &joinColMap, localRequestID)
+			filteredKeys, joinCheck, foundPairs := c.indexFilterAndJoin(q.TableName, &searchMap, &joinColMap, localRequestID)
 			reqKeys, reqValues = c.constructRequestValues(filteredKeys, q) //Note: Test might fail sometimes due to reordering of keys in Map. Fix by sorting.
+			if len(joinCheck) > 0 {
+				globalJoinCheck = joinCheck
+				globalFoundPairs = foundPairs
+				reqKeys = append(reqKeys, joinCheck...)
+				reqValues = append(reqValues, make([]string, len(joinCheck))...)
+			}
 		} else {
 			fmt.Errorf("Joing within an Index not supported!")
 		}
@@ -357,7 +454,14 @@ func (c *myResolver) doJoin(q *resolver.ParsedQuery, localRequestID int64) (*que
 	} else {
 		// log.Info().Msgf("Join Request Key Size: %d, %s", len(reqKeys), reqKeys)
 		storeKeys, storeVals := c.simpleFetch(reqKeys, reqValues, localRequestID)
-
+		if c.JoinBloomOptimized {
+			keys, vals := filterMatchingPairs(globalFoundPairs, globalJoinCheck, storeKeys, storeVals)
+			c.joinRequests.Add(1)
+			return &queryResponse{
+				Keys:   keys,
+				Values: vals,
+			}, nil
+		}
 		//For Order by, change the way joins are done. Associate the keys from different tables together
 		//Form a list of objects. Then for order-by, sort this array of objects according to query.
 		c.joinRequests.Add(1)

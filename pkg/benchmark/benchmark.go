@@ -2,9 +2,12 @@ package benchmark
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -13,9 +16,54 @@ import (
 )
 
 type Ack struct {
-	hadError  bool
-	latency   time.Duration
-	QueryType string
+	hadError     bool
+	latency      time.Duration
+	QueryType    string
+	ErrorString  error
+	responseSize int
+}
+
+func ReadCSVColumn(filename string, columnIndex int, skipHeader bool) ([]string, error) {
+	// Open the file
+	file, err := os.Open(filename)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("error opening file: %v", err)
+	}
+	defer file.Close()
+
+	// Create CSV reader
+	reader := csv.NewReader(file)
+	// Read all records
+	records, err := reader.ReadAll()
+	fmt.Printf("Read %d records for %s\n", len(records), filename)
+	if err != nil {
+		return nil, fmt.Errorf("error reading CSV: %v", err)
+	}
+
+	// Check if file is empty
+	if len(records) == 0 {
+		return nil, fmt.Errorf("CSV file is empty")
+	}
+
+	// Check if columnIndex is valid
+	if len(records[0]) <= columnIndex {
+		return nil, fmt.Errorf("column index %d is out of range. File has %d columns", columnIndex, len(records[0]))
+	}
+
+	// Calculate starting index based on whether to skip header
+	startIdx := 0
+	if skipHeader {
+		startIdx = 1
+	}
+
+	// Extract the specified column
+	result := make([]string, 0, len(records)-startIdx)
+	for i := startIdx; i < len(records); i++ {
+		result = append(result, records[i][columnIndex])
+	}
+
+	return result, nil
 }
 
 func GetRandomClient(resolverClient *[]resolver.ResolverClient) resolver.ResolverClient {
@@ -37,12 +85,13 @@ func asyncRequest(ctx context.Context, ackChannel *chan Ack, resolverClient *[]r
 	rateLimit.Release()
 
 	if err != nil {
-		*ackChannel <- Ack{hadError: true, latency: latency, QueryType: queryType}
+		// fmt.Println(err)
+		*ackChannel <- Ack{hadError: true, latency: latency, QueryType: queryType, ErrorString: err, responseSize: -1}
 	} else {
 		if len(resp.Values) > 0 {
 			counter.Add(1)
 		}
-		*ackChannel <- Ack{hadError: false, latency: latency, QueryType: queryType}
+		*ackChannel <- Ack{hadError: false, latency: latency, QueryType: queryType, ErrorString: nil, responseSize: len(resp.Values)}
 	}
 }
 
@@ -70,7 +119,7 @@ func getResponses(ctx context.Context, ackChannel *chan Ack, latencies *[]string
 			} else {
 				operations++
 			}
-			*latencies = append(*latencies, fmt.Sprintf(ack.latency.String()+"-"+ack.QueryType)) // Collect latency
+			*latencies = append(*latencies, ack.latency.String()+"_"+ack.QueryType+"_"+strconv.Itoa(ack.responseSize))
 		}
 	}
 }
@@ -91,7 +140,7 @@ func runBenchmark(resolverClient *[]resolver.ResolverClient, requests *[]Query, 
 
 	var totalLatency time.Duration
 	for _, l := range latencies {
-		parts := strings.Split(l, "-")
+		parts := strings.Split(l, "_")
 		if len(parts) > 0 {
 			latency, err := time.ParseDuration(parts[0])
 			if err == nil {
@@ -126,18 +175,47 @@ func runBenchmark(resolverClient *[]resolver.ResolverClient, requests *[]Query, 
 }
 
 func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDuration int) {
+	itemIDFile := os.Getenv("ITEM_ID_FILE")
+	if itemIDFile == "" {
+		itemIDFile = "../../pkg/benchmark/benchmarkIdLists/i_id.csv"
+	}
+
+	userIDFile := os.Getenv("USER_ID_FILE")
+	if userIDFile == "" {
+		userIDFile = "../../pkg/benchmark/benchmarkIdLists/u_id.csv"
+	}
+
+	aIDFile := os.Getenv("A_ID_FILE")
+	if userIDFile == "" {
+		userIDFile = "../../pkg/benchmark/benchmarkIdLists/a_id.csv"
+	}
+
+	item_id_list, err := ReadCSVColumn(itemIDFile, 0, true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	user_id_list, err := ReadCSVColumn(userIDFile, 0, true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	a_id_list, err := ReadCSVColumn(aIDFile, 0, true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	requestsWarmup := []Query{}
 	for len(requestsWarmup) < 50000 {
-		requestsWarmup = append(requestsWarmup, getTestCases()...)
+		requestsWarmup = append(requestsWarmup, getTestCases(&item_id_list, &user_id_list, &a_id_list)...)
 	}
 
 	requestsBench := []Query{}
 	for len(requestsBench) < 500000 {
-		requestsBench = append(requestsBench, getTestCases()...)
+		requestsBench = append(requestsBench, getTestCases(&item_id_list, &user_id_list, &a_id_list)...)
 	}
 
 	fmt.Println("In-Flight Requests:", inFlight)
-
 	rateLimit := NewRateLimit(inFlight)
 	ops1, err1, _ := runBenchmark(resolverClient, &requestsWarmup, rateLimit, 10, true)
 	fmt.Printf("Warmup Done! %d %d\n", ops1, err1)
