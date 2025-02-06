@@ -344,20 +344,48 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				AggregateType: []string{"avg"},
 			},
 		},
-		// {
-		// 	name: "Update using two filters with index (AND)",
-		// 	//Update review set comment = "This is the new comment" where a_id =10 and i_id = 7;
-		// 	requestQuery: &resolver.ParsedQuery{
-		// 		ClientId:   "1",
-		// 		QueryType:  "update",
-		// 		TableName:  "review",
-		// 		ColToGet:   []string{"comment"},
-		// 		SearchCol:  []string{"a_id", "i_id"},
-		// 		SearchVal:  []string{getRandomValue(0, 78660), getRandomValue(0, 149999)},
-		// 		SearchType: []string{"point", "point"},
-		// 		UpdateVal:  []string{"This is the new comment"},
-		// 	},
-		// },
+		{
+			name: "Update using two filters with index (AND) (Update Review)",
+			//Update review set comment = "This is the new comment" where a_id =10 and i_id = 7;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "update",
+				TableName:  "review",
+				ColToGet:   []string{"comment"},
+				SearchCol:  []string{"a_id", "i_id"},
+				SearchVal:  []string{getRandomValue(a_id), getRandomValue(i_id)},
+				SearchType: []string{"point", "point"},
+				UpdateVal:  []string{"This is the new comment"},
+			},
+		},
+		{
+			name: "Update using two filters with index (AND) (Update Review Rating)",
+			//Update review set comment = "This is the new comment" where a_id =10 and i_id = 7;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "update",
+				TableName:  "review",
+				ColToGet:   []string{"rating"},
+				SearchCol:  []string{"a_id", "i_id"},
+				SearchVal:  []string{getRandomValue(i_id), getRandomValue(u_id)},
+				SearchType: []string{"point", "point"},
+				UpdateVal:  []string{"6"}, //Adding a new Rating just to make sure it isn't something from the DB
+			},
+		},
+		{
+			name: "Update using two filters with index (AND) (Update Trust)",
+			//Update review set comment = "This is the new comment" where a_id =10 and i_id = 7;
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "update",
+				TableName:  "trust",
+				ColToGet:   []string{"trust"},
+				SearchCol:  []string{"a_id", "i_id"},
+				SearchVal:  []string{getRandomValue(u_id), getRandomValue(u_id)}, //using u_id since source/trust u_id reference user IDS.
+				SearchType: []string{"point", "point"},
+				UpdateVal:  []string{"10"},
+			},
+		},
 		// {
 		// 	name: "Update without index",
 		// 	//Select title from item where i_id = 500;
