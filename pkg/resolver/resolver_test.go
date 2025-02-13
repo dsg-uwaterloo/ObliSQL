@@ -979,9 +979,9 @@ func TestSelectSequential(t *testing.T) {
 	testcases := getTestCases()
 
 	for _, tc := range testcases {
-		if tc.name != "Join Aggregate with two search filters" {
-			continue
-		}
+		// if tc.name != "Join Aggregate with two search filters" {
+		// 	continue
+		// }
 		t.Run(tc.name, func(t *testing.T) {
 			fmt.Println("Starting Test", tc.name)
 			resp, err := resolverClient.ExecuteQuery(context.Background(), tc.requestQuery)

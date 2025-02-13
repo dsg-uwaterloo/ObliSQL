@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"strconv"
 	"time"
 
 	"math/rand"
@@ -63,11 +64,12 @@ type Query struct {
 // 	return startDate, endDate
 // }
 
-func getRandomValue(values *[]string) string {
+func getRandomValue(values *[]string, rng *rand.Rand) string {
 	if len(*values) == 0 {
 		return ""
 	}
-	return (*values)[rand.Intn(len(*values))]
+
+	return (*values)[rng.Intn(len(*values))]
 }
 
 // func getRandomRangeWithLength(min, max, maxRangeLength int) (string, string) {
@@ -89,6 +91,30 @@ func getRandomValue(values *[]string) string {
 
 func getRandomNumber(max int) int {
 	return rand.Intn(max) + 1
+}
+
+func getRandomNumberInRange(x, y int) int {
+	if x >= y {
+		return x
+	}
+	return rand.Intn(y-x) + x
+}
+
+func getRandomNumberAboveThousand(numbers []string) string {
+	var filteredNumbers []int
+	for _, numStr := range numbers {
+		num, err := strconv.Atoi(numStr)
+		if err == nil && num > 1000 {
+			filteredNumbers = append(filteredNumbers, num)
+		}
+	}
+
+	if len(filteredNumbers) == 0 {
+		return ""
+	}
+
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	return strconv.Itoa(filteredNumbers[rng.Intn(len(filteredNumbers))])
 }
 
 func getRandomRangeFromList(list *[]string, k int) (string, string) {
@@ -133,7 +159,9 @@ func getRandomDateRange(start, end time.Time, length int) (string, string) {
 	return randomStartDate.Format("2006-01-02"), randomEndDate.Format("2006-01-02")
 }
 
-func getTestCases(u_id, i_id, a_id *[]string) []Query {
+func getTestCases(u_id, i_id, a_id, pageRank_list *[]string, pair_list *[][]string, seedVal int64) []Query {
+	source := rand.NewSource(seedVal) // Fixed seed value
+	rng := rand.New(source)
 	// Define the date range for random date generation
 	startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(2060, 12, 31, 0, 0, 0, 0, time.UTC)
@@ -148,7 +176,7 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				TableName:  "review",
 				ColToGet:   []string{"rating"},
 				SearchCol:  []string{"u_id"},
-				SearchVal:  []string{getRandomValue(u_id)},
+				SearchVal:  []string{getRandomValue(u_id, rng)},
 				SearchType: []string{"point"},
 			},
 		},
@@ -162,7 +190,7 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				TableName:  "review",
 				ColToGet:   []string{"*"},
 				SearchCol:  []string{"a_id", "i_id"},
-				SearchVal:  []string{getRandomValue(a_id), getRandomValue(u_id)},
+				SearchVal:  []string{getRandomValue(a_id, rng), getRandomValue(u_id, rng)},
 				SearchType: []string{"point", "point"},
 			},
 		},
@@ -188,8 +216,8 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				QueryType:  "select",
 				TableName:  "review",
 				ColToGet:   []string{"rating", "creation_date"},
-				SearchCol:  []string{"u_id"},
-				SearchVal:  []string{getRandomValue(u_id)},
+				SearchCol:  []string{"i_id"},
+				SearchVal:  []string{getRandomValue(i_id, rng)},
 				SearchType: []string{"point"},
 				OrderBy:    []string{"creation_date,ASC"},
 			},
@@ -204,7 +232,7 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				TableName:  "review",
 				ColToGet:   []string{"*"},
 				SearchCol:  []string{"i_id"},
-				SearchVal:  []string{getRandomValue(i_id)},
+				SearchVal:  []string{getRandomValue(i_id, rng)},
 				SearchType: []string{"point"},
 				OrderBy:    []string{"creation_date,DESC"},
 			},
@@ -218,7 +246,7 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				TableName:     "review",
 				ColToGet:      []string{"rating"},
 				SearchCol:     []string{"i_id"},
-				SearchVal:     []string{getRandomValue(i_id)},
+				SearchVal:     []string{getRandomValue(i_id, rng)},
 				SearchType:    []string{"point"},
 				AggregateType: []string{"avg"},
 			},
@@ -232,7 +260,7 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				TableName:     "review",
 				ColToGet:      []string{"rating"},
 				SearchCol:     []string{"i_id"},
-				SearchVal:     []string{getRandomValue(i_id)},
+				SearchVal:     []string{getRandomValue(i_id, rng)},
 				SearchType:    []string{"point"},
 				AggregateType: []string{"sum"},
 			},
@@ -246,7 +274,7 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				TableName:     "review",
 				ColToGet:      []string{"rating"},
 				SearchCol:     []string{"i_id"},
-				SearchVal:     []string{getRandomValue(i_id)},
+				SearchVal:     []string{getRandomValue(i_id, rng)},
 				SearchType:    []string{"point"},
 				AggregateType: []string{"count"},
 			},
@@ -262,7 +290,7 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				TableName:     "review",
 				ColToGet:      []string{"rating", "rating"},
 				SearchCol:     []string{"i_id", "i_id"},
-				SearchVal:     []string{getRandomValue(i_id), getRandomValue(i_id)},
+				SearchVal:     []string{getRandomValue(i_id, rng), getRandomValue(i_id, rng)},
 				SearchType:    []string{"point", "point"},
 				AggregateType: []string{"sum", "count"},
 			},
@@ -277,7 +305,7 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				ColToGet:  []string{"rating"},
 				SearchCol: []string{"u_id"}, //Change to fetch at most 10 rows 299995
 				SearchVal: func() []string {
-					start, end := getRandomRangeFromList(u_id, getRandomNumber(5))
+					start, end := getRandomRangeFromList(u_id, 5)
 					return []string{start, end}
 				}(),
 				SearchType: []string{"range"},
@@ -309,7 +337,7 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				TableName:   "review,item", //Make it into a list
 				ColToGet:    []string{"review.rating", "item.title"},
 				SearchCol:   []string{"review.i_id"},
-				SearchVal:   []string{getRandomValue(i_id)},
+				SearchVal:   []string{getRandomValue(i_id, rng)}, //getRandomValue(i_id, rng) 55861
 				SearchType:  []string{"point"},
 				JoinColumns: []string{"i_id", "i_id"},
 				OrderBy:     []string{"review.rating,DESC", "review.creation_date,DESC"},
@@ -324,7 +352,7 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				TableName:   "review,trust", //Make it into a list
 				ColToGet:    []string{"review.rating"},
 				SearchCol:   []string{"review.i_id", "trust.source_u_id"},
-				SearchVal:   []string{getRandomValue(i_id), getRandomValue(u_id)},
+				SearchVal:   []string{getRandomValue(i_id, rng), getRandomValue(u_id, rng)},
 				SearchType:  []string{"point"},
 				JoinColumns: []string{"u_id", "target_u_id"},
 			},
@@ -338,7 +366,7 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 				TableName:     "review,trust", //Make it into a list
 				ColToGet:      []string{"review.rating"},
 				SearchCol:     []string{"review.i_id", "trust.source_u_id"},
-				SearchVal:     []string{getRandomValue(i_id), getRandomValue(u_id)},
+				SearchVal:     []string{getRandomValue(i_id, rng), getRandomValue(u_id, rng)},
 				SearchType:    []string{"point"},
 				JoinColumns:   []string{"u_id", "target_u_id"},
 				AggregateType: []string{"avg"},
@@ -346,44 +374,58 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 		},
 		{
 			name: "Update using two filters with index (AND) (Update Review)",
-			//Update review set comment = "This is the new comment" where a_id =10 and i_id = 7;
+			//UPDATE item SET title = ? WHERE i_id=?
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:   "1",
 				QueryType:  "update",
 				TableName:  "review",
-				ColToGet:   []string{"comment"},
-				SearchCol:  []string{"a_id", "i_id"},
-				SearchVal:  []string{getRandomValue(a_id), getRandomValue(i_id)},
-				SearchType: []string{"point", "point"},
-				UpdateVal:  []string{"This is the new comment"},
+				ColToGet:   []string{"title"},
+				SearchCol:  []string{"i_id"},
+				SearchVal:  []string{getRandomValue(i_id, rng)},
+				SearchType: []string{"point"},
+				UpdateVal:  []string{"This is the new title"},
 			},
 		},
 		{
 			name: "Update using two filters with index (AND) (Update Review Rating)",
-			//Update review set comment = "This is the new comment" where a_id =10 and i_id = 7;
+			//UPDATE review SET rating = ? WHERE i_id=? AND u_id=?
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:   "1",
 				QueryType:  "update",
 				TableName:  "review",
 				ColToGet:   []string{"rating"},
-				SearchCol:  []string{"a_id", "i_id"},
-				SearchVal:  []string{getRandomValue(i_id), getRandomValue(u_id)},
+				SearchCol:  []string{"i_id", "u_id"},
+				SearchVal:  []string{getRandomValue(i_id, rng), getRandomValue(u_id, rng)},
 				SearchType: []string{"point", "point"},
 				UpdateVal:  []string{"6"}, //Adding a new Rating just to make sure it isn't something from the DB
 			},
 		},
 		{
 			name: "Update using two filters with index (AND) (Update Trust)",
-			//Update review set comment = "This is the new comment" where a_id =10 and i_id = 7;
+			//UPDATE trust SET trust = ? WHERE source_u_id=? AND target_u_id=?
 			requestQuery: &resolver.ParsedQuery{
 				ClientId:   "1",
 				QueryType:  "update",
 				TableName:  "trust",
 				ColToGet:   []string{"trust"},
-				SearchCol:  []string{"a_id", "i_id"},
-				SearchVal:  []string{getRandomValue(u_id), getRandomValue(u_id)}, //using u_id since source/trust u_id reference user IDS.
+				SearchCol:  []string{"source_u_id", "target_u_id"},
+				SearchVal:  []string{getRandomValue(u_id, rng), getRandomValue(u_id, rng)}, //using u_id since source/trust u_id reference user IDS.
 				SearchType: []string{"point", "point"},
 				UpdateVal:  []string{"10"},
+			},
+		},
+		{
+			name: "Update Item Description",
+			//UPDATE trust SET trust = ? WHERE source_u_id=? AND target_u_id=?
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "update",
+				TableName:  "item",
+				ColToGet:   []string{"description"},
+				SearchCol:  []string{"i_id"},
+				SearchVal:  []string{getRandomValue(i_id, rng)}, //using u_id since source/trust u_id reference user IDS.
+				SearchType: []string{"point"},
+				UpdateVal:  []string{"new-title"},
 			},
 		},
 		// {
@@ -398,6 +440,49 @@ func getTestCases(u_id, i_id, a_id *[]string) []Query {
 		// 		SearchVal:  []string{getRandomValue(0, 49999)},
 		// 		SearchType: []string{"point"},
 		// 		UpdateVal:  []string{"New Title for testing!"},
+		// 	},
+		// },
+		// {
+		// 	name: "BDB1",
+		// 	//SELECT pageURL, pageRank FROM rankings WHERE pageRank > X
+		// 	requestQuery: &resolver.ParsedQuery{
+		// 		ClientId:   "1",
+		// 		QueryType:  "select",
+		// 		TableName:  "rankings",
+		// 		ColToGet:   []string{"pageURL", "pageRank"},
+		// 		SearchCol:  []string{"pageRank"},
+		// 		SearchVal:  []string{"1001", "80818"},
+		// 		SearchType: []string{"range"},
+		// 	},
+		// },
+		// {
+
+		// 	name: "BDB1-Select",
+		// 	//Select rating from review where u_id = 812;
+		// 	requestQuery: &resolver.ParsedQuery{
+		// 		ClientId:   "1",
+		// 		QueryType:  "select",
+		// 		TableName:  "rankings",
+		// 		ColToGet:   []string{"pageURL", "pageRank"},
+		// 		SearchCol:  []string{"pageRank"},
+		// 		SearchVal:  []string{(getRandomValue(pageRank_list, rng))},
+		// 		SearchType: []string{"point"},
+		// 	},
+		// },
+		// {
+		// 	name: "Cross Join - JoinBloomCheck",
+		// 	//select review.rating,item.title from review,item where item.i_id=r.i_id and item.i_id = 757 and review.creation_date='2018-05-03';
+		// 	//Find rating and title of a review for item X created on date Y.
+
+		// 	requestQuery: &resolver.ParsedQuery{
+		// 		ClientId:    "1",
+		// 		QueryType:   "join",
+		// 		TableName:   "review,item", //Make it into a list
+		// 		ColToGet:    []string{"review.rating", "item.title"},
+		// 		SearchCol:   []string{"review.creation_date", "item.i_id"},
+		// 		SearchVal:   (*pair_list)[getRandomNumber(len(*pair_list)-1)], //getRandomValue(i_id, rng) 55861[]string{"2017-01-09", "28125"}
+		// 		SearchType:  []string{"point"},
+		// 		JoinColumns: []string{"i_id", "i_id"},
 		// 	},
 		// },
 	}

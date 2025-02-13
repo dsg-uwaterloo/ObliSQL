@@ -9,7 +9,67 @@ import (
 	loadbalancer "github.com/project/ObliSql/api/loadbalancer"
 	"github.com/project/ObliSql/api/resolver"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
+
+// Create a map to track unique values for each table and maintain mapping
+type TableTracking struct {
+	uniqueKeys map[string]bool     // Track unique keys we'll actually request
+	keyMapping map[string][]string // Track which original pairs each unique key came from
+}
+
+func constructJoinKeysOptimized(foundPairs []string, tableOrder []string, joinColMap *map[string]string) ([]string, map[string][]string) {
+	tracking := make(map[string]*TableTracking) // One tracker per table
+
+	// Initialize trackers for each table
+	for _, table := range strings.Split(tableOrder[0], "/") {
+		tracking[table] = &TableTracking{
+			uniqueKeys: make(map[string]bool),
+			keyMapping: make(map[string][]string),
+		}
+	}
+
+	// Process all pairs
+	for _, pair := range foundPairs {
+		splitPair := strings.Split(pair, "/")
+		splitTableOrder := strings.Split(tableOrder[0], "/")
+
+		if len(splitPair) != len(splitTableOrder) {
+			fmt.Println("Mismatch in values and table order:", splitPair, splitTableOrder)
+			continue
+		}
+
+		// Handle each table's values
+		for i, table := range splitTableOrder {
+			newKey := fmt.Sprintf("%s/%s/%s", table, (*joinColMap)[table], splitPair[i])
+
+			// Track the original pair this key came from
+			tracking[table].keyMapping[newKey] = append(tracking[table].keyMapping[newKey], pair)
+
+			// Mark this key as needed
+			tracking[table].uniqueKeys[newKey] = true
+		}
+	}
+
+	// Construct final deduplicated key list
+	var joinCheck []string
+	for _, tableTrack := range tracking {
+		for key := range tableTrack.uniqueKeys {
+			joinCheck = append(joinCheck, key)
+		}
+	}
+
+	// Construct mapping of which pairs led to each key
+	pairMapping := make(map[string][]string)
+	for table, tableTrack := range tracking {
+		for key, pairs := range tableTrack.keyMapping {
+			pairMapping[fmt.Sprintf("%s:%s", table, key)] = pairs
+		}
+	}
+
+	return joinCheck, pairMapping
+}
 
 func getTableNames(tablNames string) (string, string) {
 	splitNames := strings.Split(tablNames, ",")
@@ -21,7 +81,6 @@ func getTableNames(tablNames string) (string, string) {
 
 func (c *myResolver) orderTuplesJoin(keys []string, values []string, q *resolver.ParsedQuery) ([]string, []string) {
 
-	fmt.Println(keys)
 	return keys, values
 }
 
@@ -45,77 +104,110 @@ func createJoinColumnMap(query *resolver.ParsedQuery) map[string]string {
 
 	return joinColumnMap
 }
-
-// func (c *myResolver) removeAdditionalColumns(q *resolver.ParsedQuery, keys []string, values []string) {
-
-// }
-
-// Order of tableNames matters. Either raise descriptive error or handle.
-// func (c *myResolver) parseJoinMapForTable(tableNames string) (map[string]interface{}, map[string]interface{}) {
-// 	if c.JoinMap[tableNames] == nil {
-// 		log.Fatal().Msgf("Nil Join Map! %s\n", tableNames)
-// 	}
-// 	columns, ok := c.JoinMap[tableNames].(map[string]interface{})["column"]
-// 	if !ok {
-// 		log.Fatal().Msgf("Error parsing JoinMap! \n")
-// 	}
-// 	values, ok := c.JoinMap[tableNames].(map[string]interface{})["values"]
-// 	if !ok {
-// 		log.Fatal().Msgf("Error parsing JoinMap! \n")
-// 	}
-
-// 	return columns.(map[string]interface{}), values.(map[string]interface{})
-// }
-
-func filterMatchingPairs(
-	globalFoundPairs []string,
-	globalJoinCheck []string,
+func filterMatchingPairsOptimized(
+	pairMapping map[string][]string,
 	storeKeys []string,
 	storeValues []string,
 ) ([]string, []string) {
-	filteredKeys := []string{}
-	filteredValues := []string{}
 
-	// Step 1: Iterate through each pair in globalFoundPairs
-	for _, pair := range globalFoundPairs {
-		splitPair := strings.Split(pair, "/")
-		if len(splitPair) != 2 {
-			fmt.Println("Invalid pair format:", pair)
+	// fmt.Println(pairMapping)
+	// fmt.Println("---")
+	// fmt.Println(storeKeys)
+
+	// Maps to help construct the final result
+	tableData := make(map[string]map[string]string)   // Maps table -> id -> value
+	tableKeys := make(map[string]map[string]string)   // Maps table -> id -> original key
+	joinKeyData := make(map[string]map[string]string) // Maps table -> id -> join column value
+	validPairs := make(map[string]bool)               // Track which pairs are actually valid after checking values
+
+	// Step 1: Separate join column keys and data keys
+	for i, key := range storeKeys {
+		parts := strings.Split(key, "/")
+		if len(parts) < 3 {
 			continue
 		}
 
-		id1, id2 := splitPair[0], splitPair[1]
+		table := parts[0]
+		id := parts[2]
 
-		// Step 2: Identify keys in globalJoinCheck that match the pair
-		matchingKeys := map[string]bool{} // Store matched keys
-		for _, joinKey := range globalJoinCheck {
-			if strings.HasSuffix(joinKey, "/"+id1) || strings.HasSuffix(joinKey, "/"+id2) {
-				matchingKeys[joinKey] = true
+		// Check if this key is in our pairMapping (is it a join column?)
+		isJoinKey := false
+		for mappingKey := range pairMapping {
+			if strings.HasSuffix(mappingKey, ":"+key) {
+				isJoinKey = true
+				// Store the join column value
+				if _, exists := joinKeyData[table]; !exists {
+					joinKeyData[table] = make(map[string]string)
+				}
+				joinKeyData[table][id] = storeValues[i]
+				break
 			}
 		}
+		if !isJoinKey {
+			// This is a data column
+			if _, exists := tableData[table]; !exists {
+				tableData[table] = make(map[string]string)
+				tableKeys[table] = make(map[string]string)
+			}
 
-		// Step 3: Verify values in storeKeys/storeValues
-		matchingValues := map[string]string{} // Store valid key-value pairs
-		for i, storeKey := range storeKeys {
-			if matchingKeys[storeKey] {
-				matchingValues[storeKey] = storeValues[i]
+			tableData[table][id] = storeValues[i]
+			tableKeys[table][id] = key
+		}
+	}
+
+	// Step 2: Validate pairs by checking actual join values
+	for _, pairs := range pairMapping {
+		for _, pair := range pairs {
+			ids := strings.Split(pair, "/")
+			if len(ids) != 2 {
+				continue
+			}
+
+			// Get the tables involved in this pair
+			var table1, table2 string
+			for table := range joinKeyData {
+				if _, hasID := joinKeyData[table][ids[0]]; hasID {
+					table1 = table
+				}
+				if _, hasID := joinKeyData[table][ids[1]]; hasID {
+					table2 = table
+				}
+			}
+
+			// Check if join values match
+			if joinVal1, ok1 := joinKeyData[table1][ids[0]]; ok1 {
+				if joinVal2, ok2 := joinKeyData[table2][ids[1]]; ok2 {
+					if joinVal1 == joinVal2 {
+						validPairs[pair] = true
+					}
+				}
 			}
 		}
+	}
 
-		// Step 4: If all matching keys have identical values, add related keys to results
-		if len(matchingValues) > 1 {
-			valueSet := map[string]bool{} // To check if all values match
-			for _, v := range matchingValues {
-				valueSet[v] = true
-			}
+	// Step 3: Construct the final result using only valid pairs
+	var filteredKeys []string
+	var filteredValues []string
+	// seen := make(map[string]bool)
 
-			// If all values in set are the same, consider them valid
-			if len(valueSet) == 1 {
-				for i, storeKey := range storeKeys {
-					// Exclude join columns from the final output
-					if !matchingKeys[storeKey] { // Only add non-join keys
-						filteredKeys = append(filteredKeys, storeKey)
-						filteredValues = append(filteredValues, storeValues[i])
+	for pair := range validPairs {
+		ids := strings.Split(pair, "/")
+		if len(ids) != 2 {
+			continue
+		}
+
+		// Add data for both tables in the pair
+		for table := range tableData {
+			for _, id := range ids {
+				if key, exists := tableKeys[table][id]; exists {
+					if value, hasValue := tableData[table][id]; hasValue {
+						// Use composite key to avoid duplicates within the same table
+						// compositeKey := fmt.Sprintf("%s/%s", key, id)
+						filteredKeys = append(filteredKeys, key)
+						filteredValues = append(filteredValues, value)
+						// if !seen[compositeKey] {
+						// 	seen[compositeKey] = true
+						// }
 					}
 				}
 			}
@@ -253,10 +345,11 @@ func appendUnique(slice []string, value string) []string {
 	return append(slice, value)
 }
 
-func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]map[string]string, joinColMap *map[string]string, localRequestID int64) (map[string][]string, []string, []string) {
+func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]map[string]string, joinColMap *map[string]string, localRequestID int64, span trace.Span) (map[string][]string, []string, []string, map[string][]string) {
 	lbReq := loadbalancer.LoadBalanceRequest{
 		RequestId: localRequestID,
 	}
+	span.AddEvent("Getting Index Keys")
 	for tableName, searchObj := range *searchMap {
 		for searchCol, searchVal := range searchObj {
 			c.constructPointIndexKey(searchCol, searchVal, tableName, &lbReq)
@@ -272,23 +365,34 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 	if err != nil {
 		log.Fatal().Msgf("Failed to fetch index keys from load balancer!: %s \n", err)
 	}
+	span.AddEvent("Got Index Keys")
+	span.SetAttributes(
+		attribute.String("IndexKeys", strings.Join(resp.Keys, ",")),
+		attribute.String("IndexValues", strings.Join(resp.Values, ",")),
+	)
 	tableNameKeyMap := make(map[string][]string)
 	foundPairs := []string{}
 	joinCheck := []string{}
+	pairMapping := make(map[string][]string)
 
+	span.AddEvent("Parsing Index")
 	for i, k := range resp.Keys {
 		tableNameInner := strings.Split(k, "/")[0]
 		splitValues := strings.Split(resp.Values[i], ",")
 		if contains(splitValues, "-1") {
-			return map[string][]string{}, joinCheck, foundPairs // Empty Response back, we can return
+			return map[string][]string{}, joinCheck, foundPairs, pairMapping // Empty Response back, we can return
 		}
 		tableNameKeyMap[tableNameInner] = splitValues
 	}
+	span.AddEvent("Parsed Index")
 
+	span.AddEvent("Get all Combos")
 	getCombo, tableOrder := generateCombinations(tableNameKeyMap, strings.Split(tableName, ","))
+	span.AddEvent("Got all Combos")
 
 	if c.UseBloom {
 		//Can have False Positives
+		span.AddEvent("Checking Membership")
 		joinFilter := c.Filters[tableName]
 		for _, pair := range getCombo {
 			found := joinFilter.Has(xxhash.Sum64([]byte(pair)))
@@ -296,24 +400,32 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 				foundPairs = append(foundPairs, pair)
 			}
 		}
+		span.AddEvent("Checked Membership")
 
 		if c.JoinBloomOptimized {
+			span.AddEvent("Constructing Extra Join Keys")
+			joinCheck, pairMapping = constructJoinKeysOptimized(foundPairs, tableOrder, joinColMap)
+			span.AddEvent("Constructed Extra Join Keys")
+			span.SetAttributes(
+				attribute.String("Found Pairs", strings.Join(foundPairs, ",")),
+			)
 			//Optimistically fetch join column and verify before returning
+			// span.AddEvent("Constructing Extra Join Keys")
+			// for _, pair := range foundPairs {
+			// 	splitPair := strings.Split(pair, "/")
+			// 	splitTableOrder := strings.Split(tableOrder[0], "/")
 
-			for _, pair := range foundPairs {
-				splitPair := strings.Split(pair, "/")
-				splitTableOrder := strings.Split(tableOrder[0], "/")
-
-				if len(splitPair) != len(splitTableOrder) {
-					fmt.Println("Mismatch in values and table order:", splitPair, splitTableOrder)
-					continue
-				}
-				//Only works for Join of two Tables. Extend for 3 if needed.
-				newKeyOne := fmt.Sprintf("%s/%s/%s", splitTableOrder[0], (*joinColMap)[splitTableOrder[0]], splitPair[0])
-				newKeyTwo := fmt.Sprintf("%s/%s/%s", splitTableOrder[1], (*joinColMap)[splitTableOrder[1]], splitPair[1])
-				joinCheck = append(joinCheck, newKeyOne)
-				joinCheck = append(joinCheck, newKeyTwo)
-			}
+			// 	if len(splitPair) != len(splitTableOrder) {
+			// 		fmt.Println("Mismatch in values and table order:", splitPair, splitTableOrder)
+			// 		continue
+			// 	}
+			// 	//Only works for Join of two Tables. Extend for 3 if needed.
+			// 	newKeyOne := fmt.Sprintf("%s/%s/%s", splitTableOrder[0], (*joinColMap)[splitTableOrder[0]], splitPair[0])
+			// 	newKeyTwo := fmt.Sprintf("%s/%s/%s", splitTableOrder[1], (*joinColMap)[splitTableOrder[1]], splitPair[1])
+			// 	joinCheck = append(joinCheck, newKeyOne)
+			// 	joinCheck = append(joinCheck, newKeyTwo)
+			// }
+			// span.AddEvent("Constructed Extra Join Keys")
 		}
 
 	} else {
@@ -324,6 +436,7 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 			RequestId: localRequestID,
 		}
 		// Create a map to store join column values for each table
+		span.AddEvent("Default - Join Key Constructing")
 		for table, pks := range tableNameKeyMap {
 			joinCol := (*joinColMap)[table]
 			for _, pk := range pks {
@@ -332,7 +445,8 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 				lbReq1.Values = append(lbReq1.Values, "")
 			}
 		}
-
+		span.AddEvent("Default - Join Key Constructed")
+		span.AddEvent("Default - Fetching Join Columns")
 		conn, err := c.GetBatchClient()
 		if err != nil {
 			log.Fatal().Msgf("Failed to get Batch Client!")
@@ -342,9 +456,14 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 		if err != nil {
 			log.Fatal().Msgf("Failed to fetch index keys from load balancer!: %s \n", err)
 		}
+		span.AddEvent("Default - Fetched Join Columns")
+		span.SetAttributes(
+			attribute.Int("joinKeys", len(lbReq.Keys)),
+		)
 		joinColumnValues := make(map[string]map[string]string)
 
 		// Populate the map with join column values from the response
+		span.AddEvent("Checking Join")
 		for i, key := range resp.Keys {
 			parts := strings.Split(key, "/")
 			if len(parts) != 3 {
@@ -384,12 +503,14 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 				foundPairs = append(foundPairs, pair)
 			}
 		}
+		span.AddEvent("Checked Join")
+
 	}
 
 	// fmt.Println(getCombo)
 	// fmt.Println(foundPairs)
 	tablePkMap := constructTablePkMap(strings.Split(tableName, ","), foundPairs)
-	return tablePkMap, joinCheck, foundPairs
+	return tablePkMap, joinCheck, foundPairs, pairMapping
 }
 
 func (c *myResolver) constructRequestValues(pkMap map[string][]string, q *resolver.ParsedQuery) ([]string, []string) {
@@ -413,25 +534,38 @@ func (c *myResolver) constructRequestValues(pkMap map[string][]string, q *resolv
 func (c *myResolver) doJoin(q *resolver.ParsedQuery, localRequestID int64) (*queryResponse, error) {
 	var reqKeys []string
 	var reqValues []string
-	var globalJoinCheck []string
-	var globalFoundPairs []string
+	pairMap := make(map[string][]string)
+	ctx := context.Background()
+	ctx, span := c.tracer.Start(ctx, "Join")
 
-	//Working only for single search filter. Extend to multiple filters.
+	defer span.End()
+	span.SetAttributes(
+		attribute.Int64("request_id", localRequestID),
+		attribute.String("query", q.String()),
+		attribute.String("searchVal", strings.Join(q.SearchVal, ",")),
+	)
+
 	if c.checkJoinColumnPresent(q.TableName) {
-
+		span.AddEvent("Creating Search Map")
 		searchMap, tabNames, tabCols := c.CreateSearchMap(q.SearchCol, q.SearchVal, strings.Split(q.TableName, ","))
 		//Do the search columns have an index on them?
+		span.AddEvent("Created Search Map")
 		if c.checkMultiTableIndexExists(tabNames, tabCols) {
 			//All Search Columns do have an index!
 
 			joinColMap := createJoinColumnMap(q)
-			filteredKeys, joinCheck, foundPairs := c.indexFilterAndJoin(q.TableName, &searchMap, &joinColMap, localRequestID)
+			span.AddEvent("Filtering Using Join Logic")
+			filteredKeys, joinCheck, _, pairMapping := c.indexFilterAndJoin(q.TableName, &searchMap, &joinColMap, localRequestID, span)
+			span.AddEvent("Filtered Using Join Logic")
+			span.AddEvent("Constructing Request")
 			reqKeys, reqValues = c.constructRequestValues(filteredKeys, q) //Note: Test might fail sometimes due to reordering of keys in Map. Fix by sorting.
+			span.AddEvent("Constructed Request")
+
 			if len(joinCheck) > 0 {
-				globalJoinCheck = joinCheck
-				globalFoundPairs = foundPairs
+				pairMap = pairMapping
 				reqKeys = append(reqKeys, joinCheck...)
 				reqValues = append(reqValues, make([]string, len(joinCheck))...)
+				span.AddEvent("Added Extra Join Keys")
 			}
 		} else {
 			fmt.Errorf("Joing within an Index not supported!")
@@ -446,17 +580,34 @@ func (c *myResolver) doJoin(q *resolver.ParsedQuery, localRequestID int64) (*que
 	}
 
 	if len(reqKeys) == 0 {
+		span.AddEvent("Empty Request")
 		c.joinRequests.Add(1)
 		return &queryResponse{
 			Keys:   []string{},
 			Values: []string{},
 		}, nil
+
 	} else {
 		// log.Info().Msgf("Join Request Key Size: %d, %s", len(reqKeys), reqKeys)
+		span.AddEvent("Fetching Values")
 		storeKeys, storeVals := c.simpleFetch(reqKeys, reqValues, localRequestID)
+		span.AddEvent("Fetched Values")
+
 		if c.JoinBloomOptimized {
-			keys, vals := filterMatchingPairs(globalFoundPairs, globalJoinCheck, storeKeys, storeVals)
+			span.SetAttributes(
+				attribute.Int64("HasValue", 1),
+				attribute.Int64("RequestKeySize:", int64(len(reqKeys))),
+				attribute.String("Sending Request", strings.Join(reqKeys, ",")),
+			)
+			span.AddEvent("Find Matching Pairs")
+			keys, vals := filterMatchingPairsOptimized(pairMap, storeKeys, storeVals)
+			span.AddEvent("Found Matching Pairs")
 			c.joinRequests.Add(1)
+
+			span.SetAttributes(
+				attribute.Int64("Return Key Size:", int64(len(keys))),
+				attribute.String("KeyGoingAsResp", strings.Join(keys, ",")),
+			)
 			return &queryResponse{
 				Keys:   keys,
 				Values: vals,
@@ -465,6 +616,12 @@ func (c *myResolver) doJoin(q *resolver.ParsedQuery, localRequestID int64) (*que
 		//For Order by, change the way joins are done. Associate the keys from different tables together
 		//Form a list of objects. Then for order-by, sort this array of objects according to query.
 		c.joinRequests.Add(1)
+		span.SetAttributes(
+			attribute.Int64("HasValue", 2),
+			attribute.Int64("ResponseKeySize:", int64(len(storeKeys))),
+			attribute.String("storeKeys", strings.Join(storeKeys, ",")),
+		)
+		span.AddEvent("Sending Normal Response")
 		return &queryResponse{
 			Keys:   storeKeys,
 			Values: storeVals,

@@ -1,0 +1,54 @@
+{
+    "rankings": {
+        "pkStart": 0,
+        "pkEnd": 359999,
+        "indexOn": [
+            "pageRank",
+            "pageURL"
+        ],
+        "colNames": [
+            "pageURL",
+            "pageRank",
+            "avgDuration"
+        ],
+        "colTypes": {
+            "pageURL": "varchar",
+            "pageRank": "int",
+            "avgDuration": "int"
+        },
+        "rangeIndexInfo": {},
+        "tableName": "rankings"
+    },
+    "uservisits": {
+        "pkStart": 0,
+        "pkEnd": 349999,
+        "indexOn": [
+            "destURL",
+            "visitDate"
+        ],
+        "colNames": [
+            "sourceIP",
+            "destURL",
+            "visitDate",
+            "adRevenue",
+            "userAgent",
+            "countryCode",
+            "languageCode",
+            "searchWord",
+            "duration"
+        ],
+        "colTypes": {
+            "sourceIP": "varchar",
+            "destURL": "varchar",
+            "visitDate": "date",
+            "adRevenue": "float",
+            "userAgent": "varchar",
+            "countryCode": "CHAR",
+            "languageCode": "CHAR",
+            "searchWord": "VARCHAR",
+            "duration": "int"
+        },
+        "rangeIndexInfo": {},
+        "tableName": "uservisits"
+    }
+}
