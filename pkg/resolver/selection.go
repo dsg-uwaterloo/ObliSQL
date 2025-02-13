@@ -165,7 +165,6 @@ func (c *myResolver) constructRangeIndexKeyInt(searchCol string, searchValueStar
 			lbReq.Keys = append(lbReq.Keys, indexKey)
 			lbReq.Values = append(lbReq.Values, "")
 		}
-
 	}
 }
 
@@ -223,7 +222,6 @@ func (c *myResolver) constructRequestAndFetch(pkList []string, requestID int64, 
 	if err != nil {
 		log.Fatal().Msgf("Failed to get Batch Client!")
 	}
-
 	valueRes, err := conn.AddKeys(ctx, &valReq)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch values: %w", err)
@@ -419,7 +417,6 @@ func (c *myResolver) filterPkUsingIndex(q *resolver.ParsedQuery, localRequestID 
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch index value: %w", err)
 	}
-
 	parsedKeyMap := parseValuesAndRemoveNull(resp) //Parses (2,3,4) --> [2,3,4] and ignores any -1 froms the executor (key didn't exist)
 	// log.Info().Msgf("Date Range Parsed: %d", len(parsedKeyMap))
 	return parsedKeyMap, nil
@@ -477,7 +474,6 @@ func (c *myResolver) doSelect(q *resolver.ParsedQuery, localRequestID int64) (*q
 	if err != nil {
 		return nil, fmt.Errorf("error constructing request and fetching: %w", err)
 	}
-
 	span.AddEvent("Finished Selection")
 
 	//If there is an OrderBy

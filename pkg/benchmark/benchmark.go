@@ -23,6 +23,25 @@ type Ack struct {
 	responseSize int
 }
 
+func ReadCSV(filename string) ([][]string, error) {
+	// Open the file
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("error opening file: %v", err)
+	}
+	defer file.Close()
+
+	// Create CSV reader
+	reader := csv.NewReader(file)
+	// Read all records
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("error reading CSV: %v", err)
+	}
+
+	return records, nil
+}
+
 func ReadCSVColumn(filename string, columnIndex int, skipHeader bool) ([]string, error) {
 	// Open the file
 	file, err := os.Open(filename)
@@ -91,6 +110,7 @@ func asyncRequest(ctx context.Context, ackChannel *chan Ack, resolverClient *[]r
 		if len(resp.Values) > 0 {
 			counter.Add(1)
 		}
+		fmt.Println(resp.Keys, request.requestQuery)
 		*ackChannel <- Ack{hadError: false, latency: latency, QueryType: queryType, ErrorString: nil, responseSize: len(resp.Values)}
 	}
 }
@@ -186,8 +206,18 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 	}
 
 	aIDFile := os.Getenv("A_ID_FILE")
-	if userIDFile == "" {
-		userIDFile = "../../pkg/benchmark/benchmarkIdLists/a_id.csv"
+	if aIDFile == "" {
+		aIDFile = "../../pkg/benchmark/benchmarkIdLists/a_id.csv"
+	}
+
+	id_creation_pair_File := os.Getenv("PAIR_ID_FILE")
+	if id_creation_pair_File == "" {
+		id_creation_pair_File = "../../pkg/benchmark/benchmarkIdLists/id_creation_pairs.csv"
+	}
+
+	pageRankFile := os.Getenv("pageRankFile")
+	if pageRankFile == "" {
+		pageRankFile = "../../pkg/benchmark/benchmarkIdLists/pageRank.csv"
 	}
 
 	item_id_list, err := ReadCSVColumn(itemIDFile, 0, true)
@@ -205,14 +235,26 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		log.Fatal(err)
 	}
 
+	pair_date_list, err := ReadCSV(id_creation_pair_File)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	pageRank_list, err := ReadCSVColumn(pageRankFile, 0, true)
+	if err != nil {
+		log.Fatal(err)
+	}
+	selectionSeed := int64(13091999) //Random Seed
+
 	requestsWarmup := []Query{}
 	for len(requestsWarmup) < 50000 {
-		requestsWarmup = append(requestsWarmup, getTestCases(&item_id_list, &user_id_list, &a_id_list)...)
+		//u_id,i_id,a_id
+		requestsWarmup = append(requestsWarmup, getTestCases(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 	}
 
 	requestsBench := []Query{}
 	for len(requestsBench) < 500000 {
-		requestsBench = append(requestsBench, getTestCases(&item_id_list, &user_id_list, &a_id_list)...)
+		requestsBench = append(requestsBench, getTestCases(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 	}
 
 	fmt.Println("In-Flight Requests:", inFlight)
