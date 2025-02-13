@@ -26,7 +26,7 @@ type myResolver struct {
 	selectIndexKeys    atomic.Int64
 	selectFetchKeys    atomic.Int64
 	selectRequests     atomic.Int64
-	joinFetchKeys      atomic.Int64
+	JoinFetchKeys      atomic.Int64
 	joinRequests       atomic.Int64
 	Created            atomic.Int64
 	Inserted           atomic.Int64

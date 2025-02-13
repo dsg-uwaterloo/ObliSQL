@@ -87,13 +87,15 @@ func main() {
 
 		select {
 		case sig := <-sigCh:
-			fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
+			// fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
+			fmt.Println("Total Keys recieved in Joins:", resolverService.JoinFetchKeys.Load())
 			fmt.Printf("Received signal: %v. Shutting down server...\n", sig)
 			grpcServer.GracefulStop()
 			cancel()
 			return
 		case <-timer.C:
-			fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
+			// fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
+			fmt.Println("Total Keys recieved in Joins:", resolverService.JoinFetchKeys.Load())
 			fmt.Println("Timeout reached. Shutting down server...")
 			grpcServer.GracefulStop()
 			cancel()
