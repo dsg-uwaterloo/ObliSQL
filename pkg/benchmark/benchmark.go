@@ -110,7 +110,6 @@ func asyncRequest(ctx context.Context, ackChannel *chan Ack, resolverClient *[]r
 		if len(resp.Values) > 0 {
 			counter.Add(1)
 		}
-		fmt.Println(resp.Keys, request.requestQuery)
 		*ackChannel <- Ack{hadError: false, latency: latency, QueryType: queryType, ErrorString: nil, responseSize: len(resp.Values)}
 	}
 }
