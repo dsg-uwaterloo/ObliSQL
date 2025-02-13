@@ -365,6 +365,7 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 	if err != nil {
 		log.Fatal().Msgf("Failed to fetch index keys from load balancer!: %s \n", err)
 	}
+	c.JoinFetchKeys.Add(int64(len(resp.Keys)))
 	span.AddEvent("Got Index Keys")
 	span.SetAttributes(
 		attribute.String("IndexKeys", strings.Join(resp.Keys, ",")),
@@ -453,6 +454,7 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 		}
 
 		resp, err := conn.AddKeys(context.Background(), &lbReq1)
+		c.JoinFetchKeys.Add(int64(len(resp.Keys)))
 		if err != nil {
 			log.Fatal().Msgf("Failed to fetch index keys from load balancer!: %s \n", err)
 		}
@@ -591,6 +593,7 @@ func (c *myResolver) doJoin(q *resolver.ParsedQuery, localRequestID int64) (*que
 		// log.Info().Msgf("Join Request Key Size: %d, %s", len(reqKeys), reqKeys)
 		span.AddEvent("Fetching Values")
 		storeKeys, storeVals := c.simpleFetch(reqKeys, reqValues, localRequestID)
+		c.JoinFetchKeys.Add(int64(len(storeKeys)))
 		span.AddEvent("Fetched Values")
 
 		if c.JoinBloomOptimized {
