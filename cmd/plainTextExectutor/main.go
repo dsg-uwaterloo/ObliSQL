@@ -24,6 +24,7 @@ func main() {
 	redisPort := flag.String("rp", "6379", "Redis Host")
 	addrPort := flag.String("p", "9090", "Executor Port")
 	tracingBool := flag.Bool("t", false, "Tracing Boolean") //Default no tracing is on.
+	traceFileLocation := flag.String("l", "../../tracefiles/serverInput.txt", "TraceFileLocation")
 
 	flag.Parse()
 
@@ -59,7 +60,7 @@ func main() {
 	)
 
 	// Initialize the executor service with Redis connection and tracingProvider
-	executor := executorPlaintxt.NewExecutor(*redisHost, *redisPort, tracer)
+	executor := executorPlaintxt.NewExecutor(*redisHost, *redisPort, tracer, *traceFileLocation)
 
 	// Register the service with the gRPC server
 	executorPlaintxtApi.RegisterPlainTextExecutorServer(grpcServer, executor)
