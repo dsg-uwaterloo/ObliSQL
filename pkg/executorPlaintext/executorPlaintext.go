@@ -161,7 +161,7 @@ func loadTrace(tracefile string) (*executorPlaintxt.RequestBatch, error) {
 	return req, nil
 }
 
-func NewExecutor(redisHost string, redisPort string, traceProvider trace.Tracer) *Executor {
+func NewExecutor(redisHost string, redisPort string, traceProvider trace.Tracer, traceFileLocation string) *Executor {
 	addr := redisHost + ":" + redisPort
 
 	rdb := redis.NewClient(&redis.Options{
@@ -175,7 +175,7 @@ func NewExecutor(redisHost string, redisPort string, traceProvider trace.Tracer)
 		tracer: traceProvider,
 	}
 
-	traceFileloc := "../../tracefiles/serverInput.txt"
+	traceFileloc := traceFileLocation
 	traceData, err := loadTrace(traceFileloc)
 
 	if err != nil {
