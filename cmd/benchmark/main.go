@@ -23,6 +23,7 @@ func main() {
 	pPtr := flag.String("p", "9900", "Resolver Hosts")
 	sPtr := flag.Int("s", 2000, "Maximum in-flight requests")
 	tPtr := flag.Int("t", 30, "Duration to run benchmark (in seconds)")
+	qTypePtr := flag.String("q", "default", "Query Type (Scaling,BDB,Epinions,Default)")
 
 	flag.Parse()
 
@@ -65,6 +66,7 @@ func main() {
 	if len(clients) == 0 {
 		log.Fatal("No resolvers available to connect.")
 	}
+	fmt.Println("Query Type:", *qTypePtr)
 
-	benchmark.StartBench(&clients, *sPtr, *tPtr)
+	benchmark.StartBench(&clients, *sPtr, *tPtr, *qTypePtr)
 }

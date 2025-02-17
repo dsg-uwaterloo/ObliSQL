@@ -5,3 +5,6 @@ tracefiles
 cmakebuild
 commands.txt
 latencies_benchmark*.txt
+resolver
+batchManager
+cmd/benchmark/benchmark

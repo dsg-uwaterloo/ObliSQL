@@ -193,7 +193,7 @@ func runBenchmark(resolverClient *[]resolver.ResolverClient, requests *[]Query, 
 	return ops, err, averageLatency
 }
 
-func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDuration int) {
+func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDuration int, queryType string) {
 	itemIDFile := os.Getenv("ITEM_ID_FILE")
 	if itemIDFile == "" {
 		itemIDFile = "../../pkg/benchmark/benchmarkIdLists/i_id.csv"
@@ -247,13 +247,33 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 
 	requestsWarmup := []Query{}
 	for len(requestsWarmup) < 50000 {
-		//u_id,i_id,a_id
-		requestsWarmup = append(requestsWarmup, getTestCases(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
-	}
+		if queryType == "default" {
+			requestsWarmup = append(requestsWarmup, getTestCases(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+		} else if queryType == "scaling" {
+			requestsWarmup = append(requestsWarmup, getTestCasesScaling(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
+		} else if queryType == "epinions" {
+			requestsWarmup = append(requestsWarmup, getTestCasesEpinion(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+
+		} else if queryType == "bdb" {
+			requestsWarmup = append(requestsWarmup, getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+
+		}
+	}
 	requestsBench := []Query{}
 	for len(requestsBench) < 500000 {
-		requestsBench = append(requestsBench, getTestCases(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+		if queryType == "default" {
+			requestsBench = append(requestsBench, getTestCases(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+		} else if queryType == "scaling" {
+			requestsBench = append(requestsBench, getTestCasesScaling(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+
+		} else if queryType == "epinions" {
+			requestsBench = append(requestsBench, getTestCasesEpinion(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+
+		} else if queryType == "bdb" {
+			requestsBench = append(requestsBench, getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+
+		}
 	}
 
 	fmt.Println("In-Flight Requests:", inFlight)
