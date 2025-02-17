@@ -15,6 +15,7 @@ type Query struct {
 }
 
 // Helper function to generate a random date between a given start and end date
+
 // func getRandomDateRangeWithMaxLength(start, end time.Time, maxLength int) (string, string) {
 // 	startUnix := start.Unix()
 // 	endUnix := end.Unix()
