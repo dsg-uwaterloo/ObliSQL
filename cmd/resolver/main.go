@@ -30,6 +30,7 @@ func main() {
 	tracingBool := flag.Bool("t", false, "Tracing Boolean") //Default no tracing is on.
 	bloomBool := flag.Bool("bf", false, "Use Bloom Filter for ranges")
 	optiBoolJoin := flag.Bool("jo", false, "Optimized Bloom Filter")
+	bdbSelect := flag.Bool("bdb", false, "Run BigDataBench Metadata")
 
 	flag.Parse()
 
@@ -65,7 +66,13 @@ func main() {
 	)
 
 	// Locations: --UPDATE TO BE PASSED VIA COMMAND LINE.
-	metaDataLoc := "../../metaData/metadata.txt"
+	metaDataLoc := ""
+	if *bdbSelect {
+		metaDataLoc = "../../metaData/metadataBDB.txt"
+	} else {
+		metaDataLoc = "../../metaData/metadata.txt"
+	}
+
 	joinMapLoc := "../../metaData/JoinMaps/join_map.json"
 	traceLoc := "../../tracefiles/serverInput50.txt"
 
