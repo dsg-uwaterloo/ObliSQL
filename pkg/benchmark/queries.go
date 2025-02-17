@@ -131,9 +131,12 @@ func getRandomRangeFromList(list *[]string, k int) (string, string) {
 
 	// Generate a random starting index
 	randomStart := rng.Intn(maxStart + 1)
+	start := (*list)[randomStart]
+	startInt, _ := strconv.Atoi((*list)[randomStart])
+	end := strconv.Itoa(startInt + k)
 
 	// Return the first and last elements of the selected range
-	return (*list)[randomStart], (*list)[randomStart+k-1]
+	return start, end
 }
 
 func getRandomDateRange(start, end time.Time, length int) (string, string) {
