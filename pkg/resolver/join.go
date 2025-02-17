@@ -522,14 +522,25 @@ func (c *myResolver) constructRequestValues(pkMap map[string][]string, q *resolv
 	for _, v := range q.ColToGet {
 		splitStrings := strings.Split(v, ".")
 		parsedTableName, colToGet := splitStrings[0], splitStrings[1]
+		if colToGet == "*" {
+			searchCols := c.metaData[parsedTableName].ColNames
+			for _, pkVal := range pkMap[parsedTableName] {
+				for _, col := range searchCols {
+					keyVal := fmt.Sprintf("%s/%s/%s", parsedTableName, col, pkVal)
+					requestKeys = append(requestKeys, keyVal)
+					requestValues = append(requestValues, "")
 
-		for _, pkVal := range pkMap[parsedTableName] {
-			keyVal := fmt.Sprintf("%s/%s/%s", parsedTableName, colToGet, pkVal)
-			requestKeys = append(requestKeys, keyVal)
-			requestValues = append(requestValues, "")
+				}
+			}
+		} else {
+			for _, pkVal := range pkMap[parsedTableName] {
+				keyVal := fmt.Sprintf("%s/%s/%s", parsedTableName, colToGet, pkVal)
+				requestKeys = append(requestKeys, keyVal)
+				requestValues = append(requestValues, "")
+			}
 		}
-	}
 
+	}
 	return requestKeys, requestValues
 }
 
