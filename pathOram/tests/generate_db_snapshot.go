@@ -23,9 +23,13 @@ the values it's looking for cuz the decryption results in an arbitrary value/obj
 The batching mechanism returns a -1 for any key it didn't find.
 */
 
+/*
+set standard Z = 4
+*/
+
 const (
-	logCapacity = 22      // Logarithm base 2 of capacity (1024 buckets)
-	Z           = 5       // Number of blocks per bucket
+	logCapacity = 19
+	Z           = 4       // Number of blocks per bucket
 	stashSize   = 7000000 // Maximum number of blocks in stash
 )
 
@@ -40,6 +44,9 @@ func main() {
 	key := hash.Sum(nil)
 
 	// -----------
+
+	fmt.Println("Building ORAM snapshot with logCapacity: ", logCapacity)
+	fmt.Println("Building ORAM snapshot with Z value: ", Z)
 
 	// Initialize ORAM
 	o, err := oram.NewORAM(logCapacity, Z, stashSize, "127.0.0.1:6379", false, key)
@@ -65,7 +72,7 @@ func main() {
 
 	// Load data from tracefile and create Request objects
 	var requests []request.Request
-	file, err := os.Open("/Users/nachiketrao/Desktop/URA/serverInput.txt") // TODO: define tracefile path here
+	file, err := os.Open("/Users/nachiketrao/Desktop/URA/Tracefiles/fiveExecutors/serverInput_4.txt") // TODO: define tracefile path here
 	if err != nil {
 		log.Fatalf("failed to open tracefile: %v", err)
 	}

@@ -15,7 +15,7 @@ import (
 
 const (
 	logCapacity = 10 // Logarithm base 2 of capacity (1024 buckets)
-	Z           = 5  // Number of blocks per bucket
+	Z           = 4  // Number of blocks per bucket
 	stashSize   = 20 // Maximum number of blocks in stash
 )
 

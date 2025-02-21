@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	logCapacity = 16      // Logarithm base 2 of capacity (1024 buckets)
-	Z           = 5       // Number of blocks per bucket
+	logCapacity = 19      // Logarithm base 2 of capacity (1024 buckets)
+	Z           = 4       // Number of blocks per bucket
 	stashSize   = 7000000 // Maximum number of blocks in stash
 )
 
@@ -59,7 +59,7 @@ func main() {
 
 	// Load data from tracefile and create Request objects
 	var getRequests []request.Request
-	file, err := os.Open("/Users/nachiketrao/Desktop/URA/testServerInput.txt") // TODO: define tracefile path here
+	file, err := os.Open("/Users/nachiketrao/Desktop/URA/Tracefiles/ThreeExecutors/serverInput_2.txt") // TODO: define tracefile path here
 	if err != nil {
 		log.Fatalf("failed to open tracefile: %v", err)
 	}
