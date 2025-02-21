@@ -34,7 +34,7 @@ func (e MyOram) ExecuteBatch(ctx context.Context, req *executor.RequestBatchORAM
 	fmt.Printf("Got a request with ID: %d \n", req.RequestId)
 
 	// set batchsize
-	batchSize := 10
+	batchSize := 60
 
 	// Batching(requests []request.Request, batchSize int)
 
