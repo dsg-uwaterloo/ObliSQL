@@ -75,7 +75,7 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, useSnapshot bool, 
 func (oram *ORAM) loadSnapshotMaps() {
 	// Read from snapshot.json
 	// Open the file for reading
-	file, err := os.Open("proxy_snapshot.json")
+	file, err := os.Open("/Users/nachiketrao/Desktop/URA/obliq-nachi/ObliSQL/pathOram/proxy_snapshot.json")
 	if err != nil {
 		fmt.Printf("Error opening file: %v\n", err)
 		return // No need to return anything here, just exit the function
@@ -132,6 +132,9 @@ func (oram *ORAM) loadSnapshotMaps() {
 		fmt.Println("Error: StashMap data is not of expected type")
 	}
 }
+
+// Tree height (real depth) is (o.LogCapacity + 1)
+// Number of leaves is (2 ^ (o.LogCapacity))
 
 // Initializing ORAM and populating with key = -1
 func (o *ORAM) initialize() {
@@ -245,6 +248,8 @@ func (o *ORAM) WritePath(bucketInfo []int, requests *[]bucketRequest.BucketReque
 
 	toDeleteLocal := make([]string, 0) // indices/blockIds/keys of blocks in currentStash to delete
 
+	// Determine what blocks from stash can go into Bucket under consideration
+	// A block can only be inserted into Bucket if its current leaf path and Block's level/leaf intersect
 	for key, currentBlock := range currentStash {
 		currentBlockLeaf := o.Keymap[currentBlock.Key]
 		if o.canInclude(currentBlockLeaf, leaf, level) {
@@ -327,7 +332,7 @@ func (o *ORAM) WritePaths(previousPositionLeaves []int) {
 		nestedList = append(nestedList, []int{bucketId, leafLevel[0], leafLevel[1]})
 	}
 
-	// Now we have all the bucketIDs that we need to fill
+	// Now we have all the bucketIDs that we need to fill - these are all the bucketIDs ReadPaths read in for us
 
 	// Iterate through the nested list
 	for _, entry := range nestedList {
@@ -367,37 +372,37 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 
 	//determine keys from position map for all of them ; if something doesn't exist, add it to Keymap and stash as done in Access()
 	previousPositionLeavesMap := make(map[int]struct{})
+
+	// previousPositionLeaves: List of Unique leaves
+	// - true leaves for first time keys in batch that already exist in system
+	// - fake leaves for keys never seen before (GET or PUT)
+	// - fake leaves for keys already seen in batch
 	var previousPositionLeaves []int
 
 	for _, req := range requests {
 
-		// TODO: if it's a get request, don't add the new block in
 		_, keyReadBefore := fakeReadMap[req.Key]
 		var previousPositionLeaf = -1
 
-		if !keyReadBefore {
+		if !keyReadBefore { // if seeing key for first time in batch
 			var exists bool
 			previousPositionLeaf, exists = o.Keymap[req.Key]
-			// if !exists {
-			// 	previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
-			// 	o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
-			// }
-			// fakeReadMap[req.Key] = true
-			if !exists {
-				if req.Value == "" {
-					// GET request for a new key, perform a random fake read, don't add a block
-					previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
-					fakeReadMap[req.Key] = true
+
+			if !exists { // if key doesn't exist in Keymap
+				if req.Value == "" { // New key: GET request
+					// GET request for a new key, perform a random fake read, don't add a block, need to return -1
+					previousPositionLeaf = crypto.GetRandomInt(1 << o.LogCapacity)
 					// Skip adding to stash
-				} else {
+				} else { // New key: PUT request
 					// PUT request for a new key, add block to stash
-					previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
+					previousPositionLeaf = crypto.GetRandomInt(1 << o.LogCapacity)
 					o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
-					fakeReadMap[req.Key] = true
 				}
 			}
-		} else {
-			previousPositionLeaf = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
+			fakeReadMap[req.Key] = true // This key has now been visited; future appearances in batch should lead to fake reads
+
+		} else { // if key seen before in batch
+			previousPositionLeaf = crypto.GetRandomInt(1 << o.LogCapacity)
 		}
 
 		// ensure there are no duplicates in previousPositionLeaves - otherwise writepaths may overwrite content
@@ -407,7 +412,7 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 		}
 
 		// randomly remap key
-		o.Keymap[req.Key] = crypto.GetRandomInt(1 << (o.LogCapacity - 1))
+		o.Keymap[req.Key] = crypto.GetRandomInt(1 << o.LogCapacity)
 	}
 
 	// perform read path, go through all paths at once and find non overlapping buckets, fetch all from redis at once - read path use redis MGET

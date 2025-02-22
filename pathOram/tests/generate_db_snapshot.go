@@ -28,7 +28,7 @@ set standard Z = 4
 */
 
 const (
-	logCapacity = 19
+	logCapacity = 22
 	Z           = 4       // Number of blocks per bucket
 	stashSize   = 7000000 // Maximum number of blocks in stash
 )
@@ -72,7 +72,7 @@ func main() {
 
 	// Load data from tracefile and create Request objects
 	var requests []request.Request
-	file, err := os.Open("/Users/nachiketrao/Desktop/URA/Tracefiles/fiveExecutors/serverInput_4.txt") // TODO: define tracefile path here
+	file, err := os.Open("/Users/nachiketrao/Desktop/URA/Tracefiles/serverInput.txt") // TODO: define tracefile path here
 	if err != nil {
 		log.Fatalf("failed to open tracefile: %v", err)
 	}
@@ -162,8 +162,8 @@ func main() {
 	// =============================================================
 
 	// Trigger a save to dump.rdb
-	fmt.Println("Triggering RDB snapshot save (BGSAVE)...")
-	err = o.RedisClient.Client.BgSave(o.RedisClient.Ctx).Err() // BGSAVE command
+	fmt.Println("Triggering RDB snapshot save (SAVE)...")
+	err = o.RedisClient.Client.Save(o.RedisClient.Ctx).Err() // SAVE command
 	if err != nil {
 		log.Fatalf("Error triggering RDB snapshot save: %v", err)
 	}
