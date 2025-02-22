@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	executor "github.com/project/ObliSql/api/oramExecutor"
 	// "github.com/redis/go-redis/v9"
@@ -19,10 +21,32 @@ const (
 	stashSize   = 100000 // Maximum number of blocks in stash
 )
 
+type Operation struct {
+	RequestID uint64
+	Key       string
+	Value     string
+	Index     int
+}
+
+type ResponseTracker struct {
+	Values    []string
+	Count     int32 // Use atomic operations
+	Completed chan struct{}
+}
+
 type MyOram struct {
 	executor.UnimplementedExecutorServer
-	// rdb *redis.Client
 	o *ORAM
+
+	opMutex sync.Mutex
+	opCond  *sync.Cond
+	opQueue []Operation
+
+	trackerMutex sync.Mutex
+	trackers     map[uint64]*ResponseTracker
+
+	requestID uint64 // atomic
+	batchSize int
 }
 
 type StringPair struct {
@@ -30,53 +54,105 @@ type StringPair struct {
 	Second string
 }
 
-func (e MyOram) ExecuteBatch(ctx context.Context, req *executor.RequestBatchORAM) (*executor.RespondBatchORAM, error) {
-	fmt.Printf("Got a request with ID: %d \n", req.RequestId)
-
-	// set batchsize
-	batchSize := 60
-
-	// Batching(requests []request.Request, batchSize int)
-
-	var replyKeys []string
-	var replyVals []string
-
-	for start := 0; start < len(req.Values); start += batchSize {
-
-		var requestList []Request
-		var returnValues []string
-
-		end := start + batchSize
-		if end > len(req.Values) {
-			end = len(req.Values) // Ensure we don't go out of bounds
-		}
-
-		// Slice the keys and values for the current batch
-		batchKeys := req.Keys[start:end]
-		batchValues := req.Values[start:end]
-
-		for i := range batchKeys {
-			// Read operation
-			currentRequest := Request{
-				Key:   batchKeys[i],
-				Value: batchValues[i],
-			}
-
-			requestList = append(requestList, currentRequest)
-		}
-
-		returnValues, _ = e.o.Batching(requestList, batchSize)
-
-		replyKeys = append(replyKeys, batchKeys...)
-		replyVals = append(replyVals, returnValues...)
-
+func (e *MyOram) ExecuteBatch(ctx context.Context, req *executor.RequestBatchORAM) (*executor.RespondBatchORAM, error) {
+	if len(req.Keys) != len(req.Values) {
+		return nil, fmt.Errorf("keys and values length mismatch")
 	}
 
+	// Generate unique request ID
+	id := atomic.AddUint64(&e.requestID, 1)
+	numOps := len(req.Keys)
+
+	// Setup response tracker
+	tracker := &ResponseTracker{
+		Values:    make([]string, numOps),
+		Count:     0,
+		Completed: make(chan struct{}),
+	}
+
+	// Register tracker
+	e.trackerMutex.Lock()
+	e.trackers[id] = tracker
+	e.trackerMutex.Unlock()
+
+	// Queue operations
+	e.opMutex.Lock()
+	for i := 0; i < numOps; i++ {
+		e.opQueue = append(e.opQueue, Operation{
+			RequestID: id,
+			Key:       req.Keys[i],
+			Value:     req.Values[i],
+			Index:     i,
+		})
+	}
+	e.opCond.Signal() // Notify batch processor
+	e.opMutex.Unlock()
+
+	// Wait for completion
+	<-tracker.Completed
+
+	// Return response with original request ID
 	return &executor.RespondBatchORAM{
 		RequestId: req.RequestId,
-		Keys:      replyKeys,
-		Values:    replyVals,
+		Keys:      req.Keys,
+		Values:    tracker.Values,
 	}, nil
+}
+
+func (e *MyOram) processBatches() {
+	for {
+		e.opMutex.Lock()
+		// Wait for operations to process
+		for len(e.opQueue) == 0 {
+			e.opCond.Wait()
+		}
+
+		// Determine batch size
+		batchSize := e.batchSize
+		if len(e.opQueue) < batchSize {
+			e.opCond.Wait()
+		}
+		batchOps := e.opQueue[:batchSize]
+		e.opQueue = e.opQueue[batchSize:]
+		e.opMutex.Unlock()
+
+		// Prepare ORAM batch request
+		var requestList []Request
+		for _, op := range batchOps {
+			requestList = append(requestList, Request{
+				Key:   op.Key,
+				Value: op.Value,
+			})
+		}
+
+		// Execute ORAM batch
+		returnValues, err := e.o.Batching(requestList, batchSize)
+		if err != nil {
+			// Handle error (e.g., log and continue)
+			fmt.Printf("ORAM batch error: %v\n", err)
+			continue
+		}
+
+		// Distribute responses to trackers
+		e.trackerMutex.Lock()
+		for i, op := range batchOps {
+			tracker, exists := e.trackers[op.RequestID]
+			if !exists {
+				continue // Tracker already removed
+			}
+
+			// Update value atomically
+			tracker.Values[op.Index] = returnValues[i]
+			count := atomic.AddInt32(&tracker.Count, 1)
+
+			// Check if all responses received
+			if int(count) == len(tracker.Values) {
+				close(tracker.Completed)
+				delete(e.trackers, op.RequestID)
+			}
+		}
+		e.trackerMutex.Unlock()
+	}
 }
 
 func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, useSnapshot bool, key []byte) (*MyOram, error) {
@@ -167,8 +243,13 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, 
 	}
 
 	myOram := &MyOram{
-		o: oram,
+		o:         oram,
+		batchSize: 60, // Set from config or constant
+		trackers:  make(map[uint64]*ResponseTracker),
+		opQueue:   make([]Operation, 0),
 	}
+	myOram.opCond = sync.NewCond(&myOram.opMutex)
+	go myOram.processBatches() // Start batch processing
 
 	return myOram, nil
 }
