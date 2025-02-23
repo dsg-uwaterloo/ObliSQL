@@ -117,33 +117,6 @@ func (r *myResolver) InitDB(ctx context.Context, filePath string) bool {
 	return success.Value
 }
 
-// func (r *myResolver) readJoinMap(filePath string) {
-// 	//MetaData
-// 	file, err := os.Open(filePath)
-// 	if err != nil {
-// 		log.Fatal().Msgf("Error opening metadata file: %s\n", err)
-// 		return
-// 	}
-// 	defer file.Close()
-
-// 	byteValue, err := io.ReadAll(file)
-// 	if err != nil {
-// 		log.Fatal().Msgf("Error reading metadata file: %s\n", err)
-// 		return
-// 	}
-
-// 	var data map[string]interface{}
-// 	err = json.Unmarshal(byteValue, &data)
-// 	if err != nil {
-// 		log.Fatal().Msgf("Error unmarshaling JSON: %s\n", err)
-// 		return
-// 	}
-
-// 	r.JoinMap = data
-
-// 	time.Sleep(1 * time.Second)
-// }
-
 func (r *myResolver) readMetaData(filePath string) {
 	//MetaData
 	file, err := os.Open(filePath)
@@ -170,6 +143,39 @@ func (r *myResolver) readMetaData(filePath string) {
 	// }
 	r.metaData = data
 }
+
+func (r *myResolver) readJSONToMap(filePath string) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Fatal().Msgf("Error opening metadata file: %s\n", err)
+	}
+	defer file.Close()
+
+	byteValue, err := io.ReadAll(file)
+	if err != nil {
+		log.Fatal().Msgf("Error reading metadata file: %s\n", err)
+	}
+
+	var data map[string]string
+	err = json.Unmarshal(byteValue, &data)
+	if err != nil {
+		log.Fatal().Msgf("Error unmarshaling JSON: %s\n", err)
+	}
+
+	// Convert the map[string]string to map[string]int
+	convertedData := make(map[string]int)
+	for k, v := range data {
+		intValue, err := strconv.Atoi(v)
+		if err != nil {
+			log.Fatal().Msgf("Error converting value to int: %s\n", err)
+		}
+		convertedData[k] = intValue
+	}
+
+	// Store the converted data in the resolver
+	r.PartitionMap = convertedData
+}
+
 func (r *myResolver) createFilters(keys []string) {
 	// Map to store separate filters for each table/index combination
 	filters := make(map[string]*blobloom.Filter)
@@ -368,8 +374,9 @@ func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLoc
 	// service.readJoinMap(joinMapLoc)
 	// service.InitDB(ctx, traceLocation) //Initialize the DB
 
-	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_review_trust.json", "review,trust")
-	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_item_review.json", "review,item")
+	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_review_trust.json", "review,trust") //PK,FK
+	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_item_review.json", "review,item")   //PK,FK
+	service.readJSONToMap("../../metaData/partitionMap/max_chunk_sizes.json")
 
 	if service.UseBloom {
 		files, err := os.ReadDir("../../metaData/filters")

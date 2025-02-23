@@ -20,6 +20,7 @@ type myResolver struct {
 	metaData           map[string]MetaData
 	JoinMap            []string
 	Filters            map[string]*blobloom.Filter
+	PartitionMap       map[string]int
 	localRequestID     atomic.Int64
 	tracer             trace.Tracer
 	requestsDone       atomic.Int64

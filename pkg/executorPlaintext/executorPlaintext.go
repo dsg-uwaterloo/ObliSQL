@@ -26,7 +26,7 @@ type StringPair struct {
 }
 
 func (e Executor) ExecuteBatch(ctx context.Context, req *executorPlaintxt.RequestBatch) (*executorPlaintxt.RespondBatch, error) {
-	// log.Info().Msgf("Got a request with ID: %d", req.RequestId)
+	// log.Info().Msgf("Got a request with ID with Keys:", req.Keys)
 	threadCtx := context.Background()
 	var runningKeys []StringPair
 	localCache := make(map[string]string)
@@ -92,6 +92,7 @@ func (e Executor) ExecuteBatch(ctx context.Context, req *executorPlaintxt.Reques
 			Values:    nil,
 		}, err
 	}
+	// log.Info().Msgf("Sending Back:", replyKeys, replyVals)
 
 	return &executorPlaintxt.RespondBatch{
 		RequestId: req.RequestId,
