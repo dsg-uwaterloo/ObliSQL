@@ -251,121 +251,82 @@ func (o *ORAM) ReadPaths(leafs []int) {
 }
 
 func (o *ORAM) WritePath(bucketInfo []int, requests *[]bucketRequest.BucketRequest) {
-
-	buckedId := bucketInfo[0]
+	bucketId := bucketInfo[0]
 	leaf := bucketInfo[1]
 	level := bucketInfo[2]
 
-	//newBucketsWritten := make(map[int]struct{})
+	// Collect up to Z blocks that belong in this bucket
+	toInsert := make([]block.Block, 0, o.Z)
+	toDelete := make([]string, 0, o.Z)
 
-	// Step 1: Get all blocks from stash
-	currentStash := make(map[string]block.Block)
-	for blockId, block := range o.StashMap {
-		currentStash[blockId] = block
-	}
-
-	toDelete := make(map[string]struct{}) // track blocks that need to be deleted from stash
-
-	toInsert := make(map[string]block.Block) // blocks to be inserted in the bucket (up to Z)
-
-	toDeleteLocal := make([]string, 0) // indices/blockIds/keys of blocks in currentStash to delete
-
-	// Determine what blocks from stash can go into Bucket under consideration
-	// A block can only be inserted into Bucket if its current leaf path and Block's level/leaf intersect
-	for key, currentBlock := range currentStash {
+	for key, blk := range o.StashMap {
+		if len(toInsert) == o.Z {
+			break // bucket is already full
+		}
 		currentBlockLeaf := o.Keymap[key]
+		// If this block can be placed on this bucket
 		if o.canInclude(currentBlockLeaf, leaf, level) {
-			// fmt.Println("This block can be written to Tree with key: ", currentBlock.Key)
-			toInsert[key] = currentBlock
-			toDelete[key] = struct{}{}
-			toDeleteLocal = append(toDeleteLocal, key) // add the key for block we want to delete
-			if len(toInsert) == o.Z {
-				break
-			}
+			toInsert = append(toInsert, blk)
+			toDelete = append(toDelete, key)
 		}
 	}
 
-	// Delete inserted blocks from currentStash
-	for _, key := range toDeleteLocal {
-		delete(currentStash, key)
-	}
-
-	// Prepare the bucket for writing
-
+	// Build the final bucket
 	bkt := bucket.Bucket{
 		Blocks: make([]block.Block, o.Z),
 	}
+	copy(bkt.Blocks, toInsert)
 
-	i := 0
-	for _, block := range toInsert {
-		bkt.Blocks[i] = block
-		i++
-		if i >= o.Z {
-			break
-		}
-	}
-
-	// If there are fewer blocks than o.Z, fill the remaining slots with dummy blocks
-	for i < o.Z {
+	// Fill the rest with dummy blocks
+	for i := len(toInsert); i < o.Z; i++ {
 		bkt.Blocks[i] = globalDummyBlock
-		i++
 	}
 
-	*requests = append(*requests, bucketRequest.BucketRequest{
-		BucketId: buckedId,
-		Bucket:   bkt,
-	})
-
-	// Update the stash map by removing the newly inserted blocks
-	for key := range toDelete {
+	// Remove the inserted blocks from stash
+	for _, key := range toDelete {
 		delete(o.StashMap, key)
 	}
 
+	// Accumulate this bucket into the list of buckets to write
+	*requests = append(*requests, bucketRequest.BucketRequest{
+		BucketId: bucketId,
+		Bucket:   bkt,
+	})
 }
 
 func (o *ORAM) WritePaths(previousPositionLeaves []int) {
-
 	requests := make([]bucketRequest.BucketRequest, 0)
-	bucketsToFillMap := make(map[int][]int) // Map to store bucketId and its associated [leaf, level]
+	bucketsToFillMap := make(map[int][]int)
 
+	// 1) Collect the unique buckets from all leaf paths
 	for _, leaf := range previousPositionLeaves {
 		for level := o.LogCapacity; level >= 0; level-- {
 			bucketId := o.bucketForLevelLeaf(level, leaf)
-			bucketsToFillMap[bucketId] = []int{leaf, level} // Store leaf and level for each bucketId
+			bucketsToFillMap[bucketId] = []int{leaf, level}
 		}
 	}
 
-	// Extract keys from the map
+	// 2) Sort bucket IDs as before
 	var bucketIds []int
 	for bucketId := range bucketsToFillMap {
 		bucketIds = append(bucketIds, bucketId)
 	}
-
-	// Sort bucketIds in descending order
 	sort.Slice(bucketIds, func(i, j int) bool {
+		// Keep your chosen order (descending)
 		return bucketIds[i] > bucketIds[j]
 	})
 
-	// Create a nested list [bucketId:[leaf, level]]
-	var nestedList [][]int
+	// 3) Write each bucket
 	for _, bucketId := range bucketIds {
-		// Access leaf and level for the current bucketId
 		leafLevel := bucketsToFillMap[bucketId]
-		nestedList = append(nestedList, []int{bucketId, leafLevel[0], leafLevel[1]})
+		// bucketInfo = [bucketId, leaf, level]
+		o.WritePath([]int{bucketId, leafLevel[0], leafLevel[1]}, &requests)
 	}
 
-	// Now we have all the bucketIDs that we need to fill - these are all the bucketIDs ReadPaths read in for us
-
-	// Iterate through the nested list
-	for _, entry := range nestedList {
-		o.WritePath(entry, &requests)
-	}
-
-	// Set the requests in Redis
+	// 4) Execute the Redis pipeline/batch write
 	if err := o.RedisClient.WriteBucketsToDb(requests); err != nil {
-		fmt.Println("Error writing buckets : ", err)
+		fmt.Println("Error writing buckets:", err)
 	}
-
 }
 
 /*
@@ -402,42 +363,40 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 	var previousPositionLeaves []int
 
 	for _, req := range requests {
-
 		_, keyReadBefore := fakeReadMap[req.Key]
 		var previousPositionLeaf = -1
 
-		if !keyReadBefore { // if seeing key for first time in batch
+		if !keyReadBefore { // First occurrence in batch
 			var exists bool
+			// Use the original key to check Keymap
 			previousPositionLeaf, exists = o.Keymap[req.Key]
 
-			if !exists { // if key doesn't exist in Keymap
-				if req.Value == "" { // New key: GET request
-					// GET request for a new key, perform a random fake read, don't add a block, need to return -1
+			if !exists { // Key not in Keymap
+				if req.Value == "" { // GET for new key: fake read
 					previousPositionLeaf = crypto.GetRandomInt(1 << o.LogCapacity)
-					// Skip adding to stash
-				} else { // New key: PUT request
-					// PUT request for a new key, add block to stash
+				} else { // PUT for new key: add to stash
 					previousPositionLeaf = crypto.GetRandomInt(1 << o.LogCapacity)
 					newBlock, err := block.NewBlock(req.Key, req.Value)
 					if err != nil {
-						return nil, fmt.Errorf("error creating block for key %s: %v", req.Key, err)
+						return nil, fmt.Errorf("error creating block: %v", err)
 					}
+					// Use the trimmed key (req.Key) as the stash key
 					o.StashMap[req.Key] = *newBlock
 				}
 			}
-			fakeReadMap[req.Key] = true // This key has now been visited; future appearances in batch should lead to fake reads
+			fakeReadMap[req.Key] = true
 
-		} else { // if key seen before in batch
+		} else { // Key seen before: fake read
 			previousPositionLeaf = crypto.GetRandomInt(1 << o.LogCapacity)
 		}
 
-		// ensure there are no duplicates in previousPositionLeaves - otherwise writepaths may overwrite content
-		if _, alreadyExists := previousPositionLeavesMap[previousPositionLeaf]; !alreadyExists {
+		// Ensure unique leaves
+		if _, exists := previousPositionLeavesMap[previousPositionLeaf]; !exists {
 			previousPositionLeavesMap[previousPositionLeaf] = struct{}{}
-			previousPositionLeaves = append(previousPositionLeaves, previousPositionLeaf) // previousPositionLeaves goes from index 0..batchSize - 1
+			previousPositionLeaves = append(previousPositionLeaves, previousPositionLeaf)
 		}
 
-		// randomly remap key
+		// Update Keymap with the original key (trimmed)
 		o.Keymap[req.Key] = crypto.GetRandomInt(1 << o.LogCapacity)
 	}
 
@@ -450,21 +409,16 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 
 	// Craft reply to requests
 	for i, req := range requests {
-		if req.Value != "" {
-			// Replying to PUT requests
+		if req.Value != "" { // PUT: update stash
 			newBlock, err := block.NewBlock(req.Key, req.Value)
 			if err != nil {
-				return nil, fmt.Errorf("error creating block for key %s: %v", req.Key, err)
+				return nil, fmt.Errorf("error creating block: %v", err)
 			}
 			o.StashMap[req.Key] = *newBlock
-			if block, exists := o.StashMap[req.Key]; exists {
-				values[i] = block.GetValue()
-			}
-		} else if block, exists := o.StashMap[req.Key]; exists {
-			// Replying to GET requests that access existing data
+			values[i] = req.Value // Echo back the value
+		} else if block, exists := o.StashMap[req.Key]; exists { // GET: existing key
 			values[i] = block.GetValue()
-		} else {
-			// Replying to GET requests trying to access non-existent keys
+		} else { // GET: non-existent key
 			values[i] = "-1"
 		}
 	}
@@ -479,6 +433,8 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 	// already filled buckets
 
 	o.WritePaths(previousPositionLeaves)
+
+	//fmt.Printf("Stash size after batch: %d\n", len(o.StashMap))
 
 	// return the results to the batch in an array
 	return values, nil

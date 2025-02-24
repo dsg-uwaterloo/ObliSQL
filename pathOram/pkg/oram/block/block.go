@@ -1,6 +1,7 @@
 package block
 
 import (
+	"bytes"
 	"errors"
 )
 
@@ -33,10 +34,10 @@ func NewBlock(key, value string) (*Block, error) {
 
 // GetKey returns the key as a string, trimming trailing null bytes.
 func (b *Block) GetKey() string {
-	return string(b.Key[:])
+	return string(bytes.TrimRight(b.Key[:], "\x00")) // Trim trailing nulls
 }
 
 // GetValue returns the value as a string, trimming trailing null bytes.
 func (b *Block) GetValue() string {
-	return string(b.Value[:])
+	return string(bytes.TrimRight(b.Value[:], "\x00")) // Trim trailing nulls
 }
