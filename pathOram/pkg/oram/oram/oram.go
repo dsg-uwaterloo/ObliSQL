@@ -17,7 +17,14 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
+type tempBlock struct {
+	Key   string `json:"Key"`
+	Value string `json:"Value"`
+}
+
 //  Core ORAM functions
+
+var globalDummyBlock block.Block
 
 type ORAM struct {
 	LogCapacity int // height of the tree or logarithm base 2 of capacity (i.e. capacity is 2 to the power of this value)
@@ -36,6 +43,15 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, useSnapshot bool, 
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// create dummy block
+	dummyKey := [32]byte{}
+	copy(dummyKey[:], "-1")
+	dummyValue := [512]byte{}
+	globalDummyBlock = block.Block{
+		Key:   dummyKey,
+		Value: dummyValue,
 	}
 
 	client, err := redis.NewRedisClient(redisAddr, key)
@@ -119,8 +135,13 @@ func (oram *ORAM) loadSnapshotMaps() {
 				fmt.Printf("Error marshaling stash block data: %v\n", err)
 				continue
 			}
+			var tb tempBlock
+			err = json.Unmarshal(stashBlockData, &tb)
+
 			var blockData block.Block
-			err = json.Unmarshal(stashBlockData, &blockData)
+			copy(blockData.Key[:], tb.Key)
+			copy(blockData.Value[:], tb.Value)
+			oram.StashMap[tb.Key] = blockData
 			if err != nil {
 				fmt.Printf("Error unmarshaling stash block: %v\n", err)
 				continue
@@ -146,10 +167,11 @@ func (o *ORAM) initialize() {
 		bucket := bucket.Bucket{
 			Blocks: make([]block.Block, o.Z),
 		}
-		for j := range bucket.Blocks {
-			bucket.Blocks[j].Key = "-1"
-			bucket.Blocks[j].Value = ""
+
+		for j := 0; j < o.Z; j++ {
+			bucket.Blocks[j] = globalDummyBlock
 		}
+
 		o.RedisClient.WriteBucketToDb(i, bucket) // initialize dosen't use redis batching mechanism to write: NOTE: don't run this initialize formally for experiments
 
 		bar.Add(1)
@@ -219,9 +241,9 @@ func (o *ORAM) ReadPaths(leafs []int) {
 	for _, bucketData := range bucketsData {
 		for _, block := range bucketData.Blocks {
 			// Skip "empty" blocks
-			if block.Key != "-1" {
-				// fmt.Println("Read block from Tree and put in stash with key: ", block.Key)
-				o.StashMap[block.Key] = block
+			keyStr := block.GetKey()
+			if keyStr != "-1" {
+				o.StashMap[keyStr] = block
 			}
 		}
 	}
@@ -251,11 +273,11 @@ func (o *ORAM) WritePath(bucketInfo []int, requests *[]bucketRequest.BucketReque
 	// Determine what blocks from stash can go into Bucket under consideration
 	// A block can only be inserted into Bucket if its current leaf path and Block's level/leaf intersect
 	for key, currentBlock := range currentStash {
-		currentBlockLeaf := o.Keymap[currentBlock.Key]
+		currentBlockLeaf := o.Keymap[key]
 		if o.canInclude(currentBlockLeaf, leaf, level) {
 			// fmt.Println("This block can be written to Tree with key: ", currentBlock.Key)
-			toInsert[currentBlock.Key] = currentBlock
-			toDelete[currentBlock.Key] = struct{}{}
+			toInsert[key] = currentBlock
+			toDelete[key] = struct{}{}
 			toDeleteLocal = append(toDeleteLocal, key) // add the key for block we want to delete
 			if len(toInsert) == o.Z {
 				break
@@ -285,7 +307,7 @@ func (o *ORAM) WritePath(bucketInfo []int, requests *[]bucketRequest.BucketReque
 
 	// If there are fewer blocks than o.Z, fill the remaining slots with dummy blocks
 	for i < o.Z {
-		bkt.Blocks[i] = block.Block{Key: "-1", Value: ""}
+		bkt.Blocks[i] = globalDummyBlock
 		i++
 	}
 
@@ -396,7 +418,11 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 				} else { // New key: PUT request
 					// PUT request for a new key, add block to stash
 					previousPositionLeaf = crypto.GetRandomInt(1 << o.LogCapacity)
-					o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
+					newBlock, err := block.NewBlock(req.Key, req.Value)
+					if err != nil {
+						return nil, fmt.Errorf("error creating block for key %s: %v", req.Key, err)
+					}
+					o.StashMap[req.Key] = *newBlock
 				}
 			}
 			fakeReadMap[req.Key] = true // This key has now been visited; future appearances in batch should lead to fake reads
@@ -426,11 +452,17 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 	for i, req := range requests {
 		if req.Value != "" {
 			// Replying to PUT requests
-			o.StashMap[req.Key] = block.Block{Key: req.Key, Value: req.Value}
-			values[i] = o.StashMap[req.Key].Value
+			newBlock, err := block.NewBlock(req.Key, req.Value)
+			if err != nil {
+				return nil, fmt.Errorf("error creating block for key %s: %v", req.Key, err)
+			}
+			o.StashMap[req.Key] = *newBlock
+			if block, exists := o.StashMap[req.Key]; exists {
+				values[i] = block.GetValue()
+			}
 		} else if block, exists := o.StashMap[req.Key]; exists {
 			// Replying to GET requests that access existing data
-			values[i] = block.Value
+			values[i] = block.GetValue()
 		} else {
 			// Replying to GET requests trying to access non-existent keys
 			values[i] = "-1"

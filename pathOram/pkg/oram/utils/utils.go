@@ -16,9 +16,9 @@ func PrintTree(o *oram.ORAM) {
 		b, _ := o.RedisClient.ReadBucketFromDb(i)
 		indent := strings.Repeat("  ", o.GetDepth(i))
 		for _, blk := range b.Blocks {
-			if blk.Key != "-1" {
+			if blk.GetKey() != "-1" {
 				fmt.Printf("%sBucket %d:\n", indent, i)
-				fmt.Printf("%s  Key=%s, Value=%s\n", indent, blk.Key, blk.Value)
+				fmt.Printf("%s  Key=%s, Value=%s\n", indent, blk.GetKey(), blk.GetValue())
 			}
 		}
 	}
@@ -28,7 +28,7 @@ func PrintTree(o *oram.ORAM) {
 func PrintStashMap(o *oram.ORAM) {
 	fmt.Println("Stash Map contents:")
 	for _, blk := range o.StashMap {
-		fmt.Printf("Key: %s, Value: %s\n", blk.Key, blk.Value)
+		fmt.Printf("Key: %s, Value: %s\n", blk.GetKey(), blk.GetValue())
 	}
 }
 

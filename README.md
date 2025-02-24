@@ -20,6 +20,10 @@ Make sure to place the tracefile and define the path at `TODO: define tracefile 
 
 The generated snapshot in : dump.rdb and proxy_snapshot.json in the root of this directory
 
+RUN SCRIPT:
+`./generate_db_snapshot.sh gen 22 "/path/to/custom_tracefile.txt" 1000`
+
+
 ## How to use snapshot:
 Set correct value for arguments logCapacity, Z, stashSize, set the -snapshot flag, tracefile path.
 

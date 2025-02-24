@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"pathOram/pkg/oram/bucket"
 	"pathOram/pkg/oram/bucketRequest"
 	"pathOram/pkg/oram/crypto"
@@ -47,11 +46,6 @@ func (r *RedisClient) FlushData() {
 	r.Client.FlushAll(ctx)
 }
 
-// type BucketRequest struct {
-//     bucketId int
-//     bucket   bucket.Bucket
-// }
-
 func (r *RedisClient) WriteBucketsToDb(requests []bucketRequest.BucketRequest) error {
 	// Prepare data for MSET
 	msetArgs := make([]interface{}, 0, len(requests)*2)
@@ -72,7 +66,7 @@ func (r *RedisClient) WriteBucketsToDb(requests []bucketRequest.BucketRequest) e
 	}
 
 	// Use MSET to set multiple key-value pairs at once
-	_, err := r.Client.MSet(r.Ctx, msetArgs...).Result() // Use MSet method directly
+	_, err := r.Client.MSet(r.Ctx, msetArgs...).Result()
 	return err
 }
 
@@ -108,6 +102,9 @@ func (r *RedisClient) ReadBucketsFromDb(indices map[int]struct{}) (map[int]bucke
 			return nil, err
 		}
 
+		// Print size of bucket in KB
+		// fmt.Printf("Processing bucket %s, size: %.2f KB\n", keys[i], float64(len(decryptedData))/1024.0)
+
 		// Unmarshal the decrypted data into a bucket
 		var bucket1 bucket.Bucket
 		err = json.Unmarshal(decryptedData, &bucket1)
@@ -137,7 +134,6 @@ func (r *RedisClient) WriteBucketToDb(index int, bucket bucket.Bucket) error {
 
 	key := fmt.Sprintf("bucket:%d", index)
 	err = r.Client.Set(r.Ctx, key, encryptedData, 0).Err()
-	//fmt.Println("writing current request to redis; redis side ")
 	return err
 }
 
@@ -152,6 +148,9 @@ func (r *RedisClient) ReadBucketFromDb(index int) (bucket.Bucket, error) {
 	if err != nil {
 		return bucket.Bucket{}, err
 	}
+
+	// Print size of bucket in KB
+	// fmt.Printf("Processing bucket %s, size: %.2f KB\n", key, float64(len(decryptedData))/1024.0)
 
 	var bucket1 bucket.Bucket
 	err = json.Unmarshal(decryptedData, &bucket1)
