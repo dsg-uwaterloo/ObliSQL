@@ -2,13 +2,13 @@ package redis
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"pathOram/pkg/oram/bucket"
 	"pathOram/pkg/oram/bucketRequest"
 	"pathOram/pkg/oram/crypto"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 /*
@@ -51,7 +51,7 @@ func (r *RedisClient) WriteBucketsToDb(requests []bucketRequest.BucketRequest) e
 	msetArgs := make([]interface{}, 0, len(requests)*2)
 
 	for _, req := range requests {
-		data, err := json.Marshal(req.Bucket)
+		data, err := msgpack.Marshal(req.Bucket) // Replace json.Marshal
 		if err != nil {
 			return err
 		}
@@ -107,7 +107,7 @@ func (r *RedisClient) ReadBucketsFromDb(indices map[int]struct{}) (map[int]bucke
 
 		// Unmarshal the decrypted data into a bucket
 		var bucket1 bucket.Bucket
-		err = json.Unmarshal(decryptedData, &bucket1)
+		err = msgpack.Unmarshal(decryptedData, &bucket1) // Replace json.Unmarshal
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +122,7 @@ func (r *RedisClient) ReadBucketsFromDb(indices map[int]struct{}) (map[int]bucke
 }
 
 func (r *RedisClient) WriteBucketToDb(index int, bucket bucket.Bucket) error {
-	data, err := json.Marshal(bucket)
+	data, err := msgpack.Marshal(bucket) // Replace json.Marshal
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (r *RedisClient) ReadBucketFromDb(index int) (bucket.Bucket, error) {
 	// fmt.Printf("Processing bucket %s, size: %.2f KB\n", key, float64(len(decryptedData))/1024.0)
 
 	var bucket1 bucket.Bucket
-	err = json.Unmarshal(decryptedData, &bucket1)
+	err = msgpack.Unmarshal(decryptedData, &bucket1) // Replace json.Unmarshal
 	if err != nil {
 		return bucket.Bucket{}, err
 	}
