@@ -216,7 +216,7 @@ func (c *myResolver) constructRequestAndFetch(pkList []string, requestID int64, 
 			valReq.Values = append(valReq.Values, "")
 		}
 	}
-	c.selectFetchKeys.Add(int64(len(valReq.Keys)))
+	c.SelectFetchKeys.Add(int64(len(valReq.Keys)))
 
 	conn, err := c.GetBatchClient()
 	if err != nil {
@@ -260,7 +260,7 @@ func (c *myResolver) getFullColumn(tableName, colName string, localRequestID int
 		req.Keys = append(req.Keys, temp)
 		req.Values = append(req.Values, "")
 	}
-	c.selectFetchKeys.Add(int64(len(req.Keys)))
+	c.SelectFetchKeys.Add(int64(len(req.Keys)))
 
 	conn, err := c.GetBatchClient()
 	if err != nil {
