@@ -24,7 +24,7 @@ type myResolver struct {
 	localRequestID     atomic.Int64
 	tracer             trace.Tracer
 	requestsDone       atomic.Int64
-	selectIndexKeys    atomic.Int64
+	SelectIndexKeys    atomic.Int64
 	SelectFetchKeys    atomic.Int64
 	selectRequests     atomic.Int64
 	JoinFetchKeys      atomic.Int64

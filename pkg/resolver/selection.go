@@ -399,7 +399,7 @@ func (c *myResolver) filterPkUsingIndex(q *resolver.ParsedQuery, localRequestID 
 			return nil, fmt.Errorf("unknown search type: %s", v)
 		}
 	}
-	c.selectIndexKeys.Add(int64(len(indexReqKeys.Keys)))
+	c.SelectIndexKeys.Add(int64(len(indexReqKeys.Keys)))
 	// log.Debug().Msgf(strconv.Itoa(len(indexReqKeys.Keys)))
 
 	if len(indexReqKeys.Keys) == 0 {

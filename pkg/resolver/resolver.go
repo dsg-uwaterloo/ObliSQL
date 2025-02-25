@@ -354,7 +354,7 @@ func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLoc
 		tracer:          tracer,
 		requestsDone:    atomic.Int64{},
 		Filters:         make(map[string]*blobloom.Filter),
-		selectIndexKeys: atomic.Int64{},
+		SelectIndexKeys: atomic.Int64{},
 		SelectFetchKeys: atomic.Int64{},
 		selectRequests:  atomic.Int64{},
 		JoinFetchKeys:   atomic.Int64{},

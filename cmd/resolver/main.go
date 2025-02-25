@@ -96,6 +96,7 @@ func main() {
 		case sig := <-sigCh:
 			// fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
 			fmt.Println("Total Keys recieved in Joins:", resolverService.JoinFetchKeys.Load())
+			fmt.Println("Total Range Index Keys Created -- DEFAULT CASE:", resolverService.SelectIndexKeys.Load())
 			fmt.Println("Total Range Index Keys Created:", resolverService.Created.Load())
 			fmt.Println("Total Range Index Keys Inserted after bloom:", resolverService.Inserted.Load())
 			fmt.Println("Total Keys fetched after filtering:", resolverService.SelectFetchKeys.Load())
@@ -106,6 +107,7 @@ func main() {
 		case <-timer.C:
 			// fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
 			fmt.Println("Total Keys recieved in Joins:", resolverService.JoinFetchKeys.Load())
+			fmt.Println("Total Range Index Keys Created -- DEFAULT CASE:", resolverService.SelectIndexKeys.Load())
 			fmt.Println("Total Range Index Keys Created:", resolverService.Created.Load())
 			fmt.Println("Total Range Index Keys Inserted after bloom:", resolverService.Inserted.Load())
 			fmt.Println("Total Keys fetched after filtering:", resolverService.SelectFetchKeys.Load())
