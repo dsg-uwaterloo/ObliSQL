@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	executor "github.com/project/ObliSql/api/oramExecutor"
 	// "github.com/redis/go-redis/v9"
@@ -19,71 +21,153 @@ const (
 	stashSize   = 100000 // Maximum number of blocks in stash
 )
 
-type MyOram struct {
-	executor.UnimplementedExecutorServer
-	// rdb *redis.Client
-	o *ORAM
+type Operation struct {
+	RequestID uint64
+	Key       string
+	Value     string
+	Index     int
 }
 
-type tempBlock struct {
-	Key   string `json:"Key"`
-	Value string `json:"Value"`
+type KVPair struct {
+	channelId string
+	Key       string
+	Value     string
 }
+
+type responseChannel struct {
+	m       *sync.RWMutex
+	channel chan KVPair
+}
+
+type MyOram struct {
+	executor.UnimplementedExecutorServer
+	o *ORAM
+
+	batchSize int
+
+	channelMap    map[string]responseChannel
+	requestNumber atomic.Int64
+	channelLock   sync.RWMutex
+
+	oramExecutorChannel chan *KVPair
+}
+
 type StringPair struct {
 	First  string
 	Second string
 }
 
-func (e MyOram) ExecuteBatch(ctx context.Context, req *executor.RequestBatchORAM) (*executor.RespondBatchORAM, error) {
-	fmt.Printf("Got a request with ID: %d \n", req.RequestId)
-
-	// set batchsize
-	batchSize := 60
-
-	// Batching(requests []request.Request, batchSize int)
-
-	var replyKeys []string
-	var replyVals []string
-
-	for start := 0; start < len(req.Values); start += batchSize {
-
-		var requestList []Request
-		var returnValues []string
-
-		end := start + batchSize
-		if end > len(req.Values) {
-			end = len(req.Values) // Ensure we don't go out of bounds
-		}
-
-		// Slice the keys and values for the current batch
-		batchKeys := req.Keys[start:end]
-		batchValues := req.Values[start:end]
-
-		for i := range batchKeys {
-			// Read operation
-			currentRequest := Request{
-				Key:   batchKeys[i],
-				Value: batchValues[i],
-			}
-
-			requestList = append(requestList, currentRequest)
-		}
-
-		returnValues, _ = e.o.Batching(requestList, batchSize)
-
-		replyKeys = append(replyKeys, batchKeys...)
-		replyVals = append(replyVals, returnValues...)
-
+func (e *MyOram) ExecuteBatch(ctx context.Context, req *executor.RequestBatchORAM) (*executor.RespondBatchORAM, error) {
+	if len(req.Keys) != len(req.Values) {
+		return nil, fmt.Errorf("keys and values length mismatch")
 	}
 
+	reqNum := e.requestNumber.Add(1) // New id for this client/batch channel
+
+	recv_resp := make([]KVPair, 0, len(req.Keys)) // This will store completed key value pairs
+
+	channelId := fmt.Sprintf("%d-%d", req.RequestId, reqNum)
+	localRespChannel := make(chan KVPair, len(req.Keys))
+
+	e.channelLock.Lock() // Add channel to global map
+	e.channelMap[channelId] = responseChannel{
+		m:       &sync.RWMutex{},
+		channel: localRespChannel,
+	}
+	e.channelLock.Unlock()
+
+	sent := 0
+	for i, key := range req.Keys {
+		value := req.Values[i]
+		kv := &KVPair{
+			channelId: channelId,
+			Key:       key,
+			Value:     value,
+		}
+		// Block if the channel is full
+		sent++
+		e.oramExecutorChannel <- kv
+	}
+
+	// Finished adding keys to ORAM channel
+
+	// Now wait for responses
+	for i := 0; i < len(req.Keys); i++ {
+		item := <-localRespChannel
+		recv_resp = append(recv_resp, item)
+	}
+
+	close(localRespChannel)
+
+	e.channelLock.Lock()
+	delete(e.channelMap, channelId)
+	e.channelLock.Unlock()
+
+	sendKeys := make([]string, 0, len(req.Keys))
+	sendVal := make([]string, 0, len(req.Keys))
+
+	for _, v := range recv_resp {
+		sendKeys = append(sendKeys, v.Key)
+		sendVal = append(sendVal, v.Value)
+	}
+
+	// Return response with original request ID
 	return &executor.RespondBatchORAM{
 		RequestId: req.RequestId,
-		Keys:      replyKeys,
-		Values:    replyVals,
+		Keys:      sendKeys,
+		Values:    sendVal,
 	}, nil
 }
 
-func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, useSnapshot bool, key []byte) (*MyOram, error) {
+func (e *MyOram) processBatches() {
+	for {
+
+		if len(e.oramExecutorChannel) >= e.batchSize {
+			var requestList []Request
+
+			var chanIds []string
+
+			for i := 0; i < e.batchSize; i++ {
+				op := <-e.oramExecutorChannel // Read from channel
+
+				chanIds = append(chanIds, op.channelId)
+
+				requestList = append(requestList, Request{
+					Key:   op.Key,
+					Value: op.Value,
+				})
+			}
+			// Execute ORAM batch
+			returnValues, err := e.o.Batching(requestList, e.batchSize)
+			if err != nil {
+				// Handle error (e.g., log and continue)
+				fmt.Printf("ORAM batch error: %v\n", err)
+				continue
+			}
+
+			channelCache := make(map[string]chan KVPair, e.batchSize)
+
+			e.channelLock.RLock()
+			for _, v := range chanIds {
+
+				channelCache[v] = e.channelMap[v].channel
+
+			}
+			e.channelLock.RUnlock()
+
+			for i := 0; i < e.batchSize; i++ {
+				newKVPair := KVPair{
+					Key:   requestList[i].Key,
+					Value: returnValues[i],
+				}
+				responseChannel := channelCache[chanIds[i]]
+				responseChannel <- newKVPair
+			}
+		}
+	}
+}
+
+func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, useSnapshot bool, batchSize int, key []byte) (*MyOram, error) {
 	// If key is not provided (nil or empty), generate a random key
 	if len(key) == 0 {
 		var err error
@@ -111,6 +195,7 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, 
 		// Load the Stashmap and Keymap into memory
 		// Allow redis to update state using dump.rdb
 		oram.loadSnapshotMaps()
+		fmt.Println("ORAM snapshot loaded successfully!")
 	} else {
 		// Clear the Redis database to ensure a fresh start
 		if err := client.FlushDB(); err != nil {
@@ -151,7 +236,7 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, 
 		}
 
 		// Initialize DB with tracefile contents and display a progress bar
-		batchSize := 60
+		batchSize := batchSize
 		bar := progressbar.Default(int64(len(requests)), "Setting values...")
 
 		for start := 0; start < len(requests); start += batchSize {
@@ -171,8 +256,16 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, 
 	}
 
 	myOram := &MyOram{
-		o: oram,
+		o:                   oram,
+		batchSize:           batchSize, // Set from config or constant
+		channelMap:          make(map[string]responseChannel),
+		channelLock:         sync.RWMutex{},
+		oramExecutorChannel: make(chan *KVPair),
 	}
+	fmt.Println("Oram Batch Size set as: ", myOram.batchSize)
+	myOram.oramExecutorChannel = make(chan *KVPair, 100000)
+
+	go myOram.processBatches() // Start batch processing
 
 	return myOram, nil
 }
@@ -181,7 +274,7 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, 
 func (oram *ORAM) loadSnapshotMaps() {
 	// Read from snapshot.json
 	// Open the file for reading
-	file, err := os.Open("proxy_snapshot.json")
+	file, err := os.Open("/Users/haseeb/Desktop/ORAMTEST/proxy_snapshot.json")
 	if err != nil {
 		fmt.Printf("Error opening file: %v\n", err)
 		return // No need to return anything here, just exit the function
@@ -225,13 +318,8 @@ func (oram *ORAM) loadSnapshotMaps() {
 				fmt.Printf("Error marshaling stash block data: %v\n", err)
 				continue
 			}
-			var tb tempBlock
-			err = json.Unmarshal(stashBlockData, &tb)
-
 			var blockData Block
-			copy(blockData.Key[:], tb.Key)
-			copy(blockData.Value[:], tb.Value)
-			oram.StashMap[tb.Key] = blockData
+			err = json.Unmarshal(stashBlockData, &blockData)
 			if err != nil {
 				fmt.Printf("Error unmarshaling stash block: %v\n", err)
 				continue
@@ -242,4 +330,5 @@ func (oram *ORAM) loadSnapshotMaps() {
 	} else {
 		fmt.Println("Error: StashMap data is not of expected type")
 	}
+	fmt.Println("KeymapSize: ", len(oram.keyMap))
 }
