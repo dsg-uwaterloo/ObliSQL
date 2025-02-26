@@ -2,8 +2,10 @@ package resolver_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 	"sort"
 	"sync"
@@ -22,6 +24,32 @@ type TestCase struct {
 	expectedAns  *resolver.QueryResponse
 }
 
+const defaultFilePath = "./PartitionTest/partitonTestResult.json"
+
+func readJSONFile(filePath string) ([]string, []string, error) {
+	if filePath == "" {
+		filePath = defaultFilePath
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+
+	var data struct {
+		Comments  []string `json:"comments"`
+		FoundKeys []string `json:"foundKeys"`
+	}
+
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(&data)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return data.Comments, data.FoundKeys, nil
+}
 func sortKeysAndValues(keys []string, values []string) ([]string, []string) {
 	type keyValue struct {
 		key   string
@@ -527,6 +555,10 @@ func getTestCasesWithInserts() []TestCase {
 }
 
 func getTestCases() []TestCase {
+	values, keys, err := readJSONFile("")
+	if err != nil {
+		fmt.Errorf("Could not read Partition Results for test")
+	}
 	testCases := []TestCase{
 		{
 
@@ -962,6 +994,23 @@ func getTestCases() []TestCase {
 				Values: []string{"4"},
 			},
 		},
+		{
+			name: "Partitionede Index Key",
+			//select avg(review.rating) from review,item where review.u_id=target.target_u_id and r.i_id = ? and t.source_u_id = ?
+			requestQuery: &resolver.ParsedQuery{
+				ClientId:   "1",
+				QueryType:  "select",
+				TableName:  "review",
+				ColToGet:   []string{"comment"},
+				SearchCol:  []string{"u_id"},
+				SearchVal:  []string{"4"},
+				SearchType: []string{"point"},
+			},
+			expectedAns: &resolver.QueryResponse{
+				Keys:   keys,
+				Values: values,
+			},
+		},
 	}
 	return testCases
 }
@@ -969,6 +1018,7 @@ func getTestCases() []TestCase {
 func TestSelectSequential(t *testing.T) {
 	fmt.Println("-------------------------------")
 	fmt.Println("Testing Sequential Select")
+
 	resolver_addr := "localhost:9900"
 	conn, err := grpc.NewClient(resolver_addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(644000*300), grpc.MaxCallSendMsgSize(644000*300)))
 	if err != nil {
@@ -979,7 +1029,7 @@ func TestSelectSequential(t *testing.T) {
 	testcases := getTestCases()
 
 	for _, tc := range testcases {
-		// if tc.name != "Join Aggregate with two search filters" {
+		// if tc.name != "Partitionede Index Key" {
 		// 	continue
 		// }
 		t.Run(tc.name, func(t *testing.T) {
