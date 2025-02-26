@@ -96,6 +96,10 @@ func main() {
 		case sig := <-sigCh:
 			// fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
 			fmt.Println("Total Keys recieved in Joins:", resolverService.JoinFetchKeys.Load())
+			fmt.Println("Total Range Index Keys Created -- DEFAULT CASE:", resolverService.SelectIndexKeys.Load())
+			fmt.Println("Total Range Index Keys Created:", resolverService.Created.Load())
+			fmt.Println("Total Range Index Keys Inserted after bloom:", resolverService.Inserted.Load())
+			fmt.Println("Total Keys fetched after filtering:", resolverService.SelectFetchKeys.Load())
 			fmt.Printf("Received signal: %v. Shutting down server...\n", sig)
 			grpcServer.GracefulStop()
 			cancel()
@@ -103,6 +107,10 @@ func main() {
 		case <-timer.C:
 			// fmt.Println(resolverService.Created.Load(), resolverService.Inserted.Load())
 			fmt.Println("Total Keys recieved in Joins:", resolverService.JoinFetchKeys.Load())
+			fmt.Println("Total Range Index Keys Created -- DEFAULT CASE:", resolverService.SelectIndexKeys.Load())
+			fmt.Println("Total Range Index Keys Created:", resolverService.Created.Load())
+			fmt.Println("Total Range Index Keys Inserted after bloom:", resolverService.Inserted.Load())
+			fmt.Println("Total Keys fetched after filtering:", resolverService.SelectFetchKeys.Load())
 			fmt.Println("Timeout reached. Shutting down server...")
 			grpcServer.GracefulStop()
 			cancel()

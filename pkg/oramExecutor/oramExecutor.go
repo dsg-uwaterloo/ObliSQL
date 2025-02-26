@@ -49,6 +49,10 @@ type MyOram struct {
 	batchSize int
 }
 
+type tempBlock struct {
+	Key   string `json:"Key"`
+	Value string `json:"Value"`
+}
 type StringPair struct {
 	First  string
 	Second string
@@ -223,7 +227,7 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, 
 		}
 
 		// Initialize DB with tracefile contents and display a progress bar
-		batchSize := 10
+		batchSize := 60
 		bar := progressbar.Default(int64(len(requests)), "Setting values...")
 
 		for start := 0; start < len(requests); start += batchSize {
@@ -302,8 +306,13 @@ func (oram *ORAM) loadSnapshotMaps() {
 				fmt.Printf("Error marshaling stash block data: %v\n", err)
 				continue
 			}
+			var tb tempBlock
+			err = json.Unmarshal(stashBlockData, &tb)
+
 			var blockData Block
-			err = json.Unmarshal(stashBlockData, &blockData)
+			copy(blockData.Key[:], tb.Key)
+			copy(blockData.Value[:], tb.Value)
+			oram.StashMap[tb.Key] = blockData
 			if err != nil {
 				fmt.Printf("Error unmarshaling stash block: %v\n", err)
 				continue
