@@ -2,10 +2,10 @@ package oramexecutor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 type RedisClient struct {
@@ -45,7 +45,7 @@ func (r *RedisClient) WriteBucketsToDb(requests []BucketRequest) error {
 	msetArgs := make([]interface{}, 0, len(requests)*2)
 
 	for _, req := range requests {
-		data, err := msgpack.Marshal(req.Bucket) // Replace json.Marshal
+		data, err := json.Marshal(req.Bucket)
 		if err != nil {
 			return err
 		}
@@ -60,7 +60,7 @@ func (r *RedisClient) WriteBucketsToDb(requests []BucketRequest) error {
 	}
 
 	// Use MSET to set multiple key-value pairs at once
-	_, err := r.Client.MSet(r.Ctx, msetArgs...).Result()
+	_, err := r.Client.MSet(r.Ctx, msetArgs...).Result() // Use MSet method directly
 	return err
 }
 
@@ -96,12 +96,9 @@ func (r *RedisClient) ReadBucketsFromDb(indices map[int]struct{}) (map[int]Bucke
 			return nil, err
 		}
 
-		// Print size of bucket in KB
-		// fmt.Printf("Processing bucket %s, size: %.2f KB\n", keys[i], float64(len(decryptedData))/1024.0)
-
 		// Unmarshal the decrypted data into a bucket
 		var bucket1 Bucket
-		err = msgpack.Unmarshal(decryptedData, &bucket1) // Replace json.Unmarshal
+		err = json.Unmarshal(decryptedData, &bucket1)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +113,7 @@ func (r *RedisClient) ReadBucketsFromDb(indices map[int]struct{}) (map[int]Bucke
 }
 
 func (r *RedisClient) WriteBucketToDb(index int, bucket Bucket) error {
-	data, err := msgpack.Marshal(bucket) // Replace json.Marshal
+	data, err := json.Marshal(bucket)
 	if err != nil {
 		return err
 	}
@@ -143,11 +140,8 @@ func (r *RedisClient) ReadBucketFromDb(index int) (Bucket, error) {
 		return Bucket{}, err
 	}
 
-	// Print size of bucket in KB
-	// fmt.Printf("Processing bucket %s, size: %.2f KB\n", key, float64(len(decryptedData))/1024.0)
-
 	var bucket1 Bucket
-	err = msgpack.Unmarshal(decryptedData, &bucket1) // Replace json.Unmarshal
+	err = json.Unmarshal(decryptedData, &bucket1)
 	if err != nil {
 		return Bucket{}, err
 	}

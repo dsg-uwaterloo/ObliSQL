@@ -25,10 +25,6 @@ type MyOram struct {
 	o *ORAM
 }
 
-type tempBlock struct {
-	Key   string `json:"Key"`
-	Value string `json:"Value"`
-}
 type StringPair struct {
 	First  string
 	Second string
@@ -225,13 +221,8 @@ func (oram *ORAM) loadSnapshotMaps() {
 				fmt.Printf("Error marshaling stash block data: %v\n", err)
 				continue
 			}
-			var tb tempBlock
-			err = json.Unmarshal(stashBlockData, &tb)
-
 			var blockData Block
-			copy(blockData.Key[:], tb.Key)
-			copy(blockData.Value[:], tb.Value)
-			oram.StashMap[tb.Key] = blockData
+			err = json.Unmarshal(stashBlockData, &blockData)
 			if err != nil {
 				fmt.Printf("Error unmarshaling stash block: %v\n", err)
 				continue
