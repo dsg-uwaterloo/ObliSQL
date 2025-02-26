@@ -167,7 +167,7 @@ func (e *MyOram) processBatches() {
 	}
 }
 
-func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, useSnapshot bool, key []byte) (*MyOram, error) {
+func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, useSnapshot bool, batchSize int, key []byte) (*MyOram, error) {
 	// If key is not provided (nil or empty), generate a random key
 	if len(key) == 0 {
 		var err error
@@ -236,7 +236,7 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, 
 		}
 
 		// Initialize DB with tracefile contents and display a progress bar
-		batchSize := 60
+		batchSize := batchSize
 		bar := progressbar.Default(int64(len(requests)), "Setting values...")
 
 		for start := 0; start < len(requests); start += batchSize {
@@ -257,12 +257,12 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, 
 
 	myOram := &MyOram{
 		o:                   oram,
-		batchSize:           60, // Set from config or constant
+		batchSize:           batchSize, // Set from config or constant
 		channelMap:          make(map[string]responseChannel),
 		channelLock:         sync.RWMutex{},
 		oramExecutorChannel: make(chan *KVPair),
 	}
-
+	fmt.Println("Oram Batch Size set as: ", myOram.batchSize)
 	myOram.oramExecutorChannel = make(chan *KVPair, 100000)
 
 	go myOram.processBatches() // Start batch processing
@@ -274,7 +274,7 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, 
 func (oram *ORAM) loadSnapshotMaps() {
 	// Read from snapshot.json
 	// Open the file for reading
-	file, err := os.Open("proxy_snapshot.json")
+	file, err := os.Open("/Users/haseeb/Desktop/ORAMTEST/proxy_snapshot.json")
 	if err != nil {
 		fmt.Printf("Error opening file: %v\n", err)
 		return // No need to return anything here, just exit the function
@@ -330,4 +330,5 @@ func (oram *ORAM) loadSnapshotMaps() {
 	} else {
 		fmt.Println("Error: StashMap data is not of expected type")
 	}
+	fmt.Println("KeymapSize: ", len(oram.keyMap))
 }
