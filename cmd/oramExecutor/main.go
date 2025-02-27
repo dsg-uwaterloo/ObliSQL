@@ -28,6 +28,7 @@ func main() {
 	logCap := flag.Int("l", 22, "Logarithm base 2 of capacity")
 	zVal := flag.Int("z", 5, "Number of blocks per bucket")
 	stashSize := flag.Int("s", 8000000, "Maximum number of blocks in Stash")
+	snapLocation := flag.String("sl", "", "Location for snapshot.json")
 	traceLocation := flag.String("tl", "../../tracefiles/serverInputTEST.txt", "Location to tracefile for initializing DB")
 	useSnapshot := flag.Bool("snapshot", false, "Use database snapshot") // use flag like -snapshot
 	batchSize := flag.Int("br", 10, "Batch size for ORAM")
@@ -59,7 +60,7 @@ func main() {
 
 	// Initialize the executor service with Redis connection and tracingProvider
 
-	executor, err := oramexecutor.NewORAM(*logCap, *zVal, *stashSize, redisAddress, *traceLocation, *useSnapshot, *batchSize, key)
+	executor, err := oramexecutor.NewORAM(*logCap, *zVal, *stashSize, redisAddress, *traceLocation, *snapLocation, *useSnapshot, *batchSize, key)
 
 	if err != nil {
 		log.Fatal().Msgf("Failed to initialize ORAM! %s \n", err)

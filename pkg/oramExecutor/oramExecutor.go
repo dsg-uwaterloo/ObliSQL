@@ -167,7 +167,7 @@ func (e *MyOram) processBatches() {
 	}
 }
 
-func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, useSnapshot bool, batchSize int, key []byte) (*MyOram, error) {
+func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, snapLocation string, useSnapshot bool, batchSize int, key []byte) (*MyOram, error) {
 	// If key is not provided (nil or empty), generate a random key
 	if len(key) == 0 {
 		var err error
@@ -194,7 +194,7 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, 
 	if useSnapshot {
 		// Load the Stashmap and Keymap into memory
 		// Allow redis to update state using dump.rdb
-		oram.loadSnapshotMaps()
+		oram.loadSnapshotMaps(snapLocation)
 		fmt.Println("ORAM snapshot loaded successfully!")
 	} else {
 		// Clear the Redis database to ensure a fresh start
@@ -271,10 +271,11 @@ func NewORAM(LogCapacity, Z, StashSize int, redisAddr string, tracefile string, 
 }
 
 // Load Keymap and Stashmap into memory
-func (oram *ORAM) loadSnapshotMaps() {
+func (oram *ORAM) loadSnapshotMaps(snapLocation string) {
 	// Read from snapshot.json
 	// Open the file for reading
-	file, err := os.Open("/Users/haseeb/Desktop/ORAMTEST/proxy_snapshot.json")
+	fmt.Println("Using Snap Location: ", snapLocation)
+	file, err := os.Open(snapLocation)
 	if err != nil {
 		fmt.Printf("Error opening file: %v\n", err)
 		return // No need to return anything here, just exit the function
