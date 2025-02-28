@@ -356,7 +356,15 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 		}
 	}
 
-	resp, err := c.indexFetchUtil(&lbReq, localRequestID)
+	conn, err := c.GetBatchClient()
+	if err != nil {
+		log.Fatal().Msgf("Failed to get Batch Client!")
+	}
+	resp, err := conn.AddKeys(context.Background(), &lbReq)
+	if err != nil {
+		log.Fatal().Msgf("Failed to fetch index keys from load balancer!: %s \n", err)
+	}
+
 	if err != nil {
 		log.Fatal().Msgf("Failed to fetch index keys from load balancer!: %s \n", err)
 	}

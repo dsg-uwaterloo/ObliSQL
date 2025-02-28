@@ -327,6 +327,7 @@ func (c *myResolver) indexFetchUtil(indexReq *loadbalancer.LoadBalanceRequest, l
 	}
 	resp, err := conn.AddKeys(context.Background(), &newRequest)
 	if err != nil {
+		fmt.Println("Error Fetching Keys: ", err)
 		return nil, err
 	}
 
