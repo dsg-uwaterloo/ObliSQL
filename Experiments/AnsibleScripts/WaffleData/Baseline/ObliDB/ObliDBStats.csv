@@ -1,0 +1,4 @@
+id,Query,Category,Throughput,AvgLatency(s),iterations
+1,ObliDB,Point&Range,96.73,0.01034,10000
+2,ObliDB,Point&Range,96.79,0.01033,10000
+3,ObliDB,Point&Range,96.74,0.01034,10000

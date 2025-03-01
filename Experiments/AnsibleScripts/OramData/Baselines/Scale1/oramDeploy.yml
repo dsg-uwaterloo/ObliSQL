@@ -1,0 +1,160 @@
+---
+- name: Deploy and Manage Processes
+  hosts: all
+  become: no  # Use sudo if required
+  vars:
+    oram_cmd: "./oramExecutor -br {{r}} -l 20 -z 4 -tl ./tracefiles/serverInput.txt -sl /hdd1/haseeb/ObliSQL/cmd/oramExecutor/Scale1Epinion/proxy_snapshot.json -rh {{ hostvars['redis_server'].ansible_host }} -rp 6381 -snapshot"
+    batcher_cmd_oram: "./batchManager -p 9500 -R {{r}} -Z 600 -num 1 -T Oram -X 2 -hosts {{ hostvars['waffle_server'].ansible_host }} -ports 9090"
+    resolver_cmd: "./resolver -bh {{ hostvars['batcher_server'].ansible_host }} -bf"
+    
+    # Pass Arguments
+    benchmark_cmd: "./benchmark -h {{ hostvars['resolver_server'].ansible_host }} {{ benchmark_args }}"
+    benchmark_output: "/tmp/benchmark_output.txt"
+
+  tasks:
+
+    - name: Kill any process running on port 9090 on waffle machine
+      when: "'waffle' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9090) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9090"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9500 on batcher machine
+      when: "'batcher' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9500) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9500"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9800 on resolver
+      when: "'resolver' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9800) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9800"
+      ignore_errors: yes
+
+    - name: Stop Redis on tem202 (ports 6381)
+      when: "'redis' in group_names"
+      shell: |
+        cd /hdd2/haseebNew/EpinionsSnapshots/workingDir &&
+        redis-cli -p 6381 shutdown nosave &&
+        rm -f dump.rdb
+      ignore_errors: yes
+
+    - name: Configure Redis
+      when: "'redis' in group_names"
+      shell: |
+        rm -f /hdd2/haseebNew/EpinionsSnapshots/workingDir/dump.rdb &&
+        cp /hdd2/haseebNew/EpinionsSnapshots/ScaleOne/snapshot_redis.rdbb /hdd2/haseebNew/EpinionsSnapshots/workingDir &&
+        mv /hdd2/haseebNew/EpinionsSnapshots/workingDir/snapshot_redis.rdbb /hdd2/haseebNew/EpinionsSnapshots/workingDir/dump.rdb
+      register: redis_configured
+
+
+    - name: Start Redis
+      when: "'redis' in group_names"
+      shell: |
+        redis-server --port 6381 --protected-mode no --dir /hdd2/haseebNew/EpinionsSnapshots/workingDir/ --daemonize yes
+      register: redis_start
+
+    - name: Wait for Redis to start and load snapshot
+      pause:
+        seconds: 30
+
+    - name: Start ORAM on tem111
+      when: "'waffle' in group_names"
+      shell: |
+        sudo rm -f /tmp/oram-batching.log &&
+        sudo rm -f /tmp/oram-req.log &&
+        cd /hdd1/haseeb/ObliSQL/cmd/oramExecutor &&
+        rm -f proxy_snapshot.json &&
+        cp ./Scale1Epinion/proxy_snapshot.json . &&
+        nohup {{ oram_cmd }} > /tmp/oram.log 2>&1 & echo $! > /tmp/oram.pid
+      register: waffle_start
+      async: 0
+      poll: 0
+
+    - name: Wait for Oram to start (wait 1 minute)
+      when: "'waffle' in group_names"
+      pause:
+        seconds: 30
+
+    - name: Start Batcher on tem123
+      when: "'batcher' in group_names"
+      shell: "nohup {{ batcher_cmd_oram }} > /tmp/batcher.log 2>&1 & echo $! > /tmp/batcher.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/batchManager # Replace with the actual directory
+      register: batcher_start
+      async: 0
+      poll: 0
+
+    - name: Wait for Batcher to start (optional)
+      pause:
+        seconds: 5
+
+    - name: Start Resolver on tem112
+      when: "'resolver' in group_names"
+      shell: "nohup {{ resolver_cmd }} > /tmp/resolver.log 2>&1 & echo $! > /tmp/resolver.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/resolver  # Replace with the actual directory
+      register: resolver_start
+      async: 0
+      poll: 0
+
+    - name: Wait for Resolver to start (optional)
+      pause:
+        seconds: 10
+    
+    - name: Start Benchmark on tem121
+      when: "'benchmark' in group_names"
+      shell: |
+        cd /hdd1/haseeb/ObliSQL/cmd/benchmark &&
+        sudo rm -f /tmp/benchmark_output.txt &&
+        {{ benchmark_cmd }} > {{ benchmark_output }} 2>&1
+      register: benchmark_run
+
+    - name: Retrieve Benchmark Output
+      when: "'benchmark' in group_names"
+      fetch:
+        src: "{{ benchmark_output }}"
+        dest: "{{ output_filename }}"
+        flat: yes
+
+
+    - name: Stop Oram on tem112
+      when: "'oram' in group_names"
+      shell: "pkill -f proxy_server"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9090 on waffle machine
+      when: "'waffle' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9090) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9090"
+      ignore_errors: yes
+
+
+    - name: Stop Resolver on tem123
+      when: "'resolver' in group_names"
+      shell: "kill $(cat /tmp/resolver.pid)"
+      ignore_errors: yes
+
+    - name: Stop Batcher on tem101
+      when: "'batcher' in group_names"
+      shell: "kill $(cat /tmp/batcher.pid)"
+      ignore_errors: yes
+
+    - name: Stop Redis on tem202
+      when: "'redis' in group_names"
+      shell: |
+        cd /hdd1/haseeb/nachiket/redis_scale1_new/redis1 &&
+        redis-cli -p 6381 shutdown nosave &&
+        rm -f dump.rdb
+      ignore_errors: yes
+    
+    - name: Clean up PID files
+      when: "'waffle' in group_names or 'batcher' in group_names or 'resolver' in group_names"
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/waffle.pid
+        - /tmp/batcher.pid
+        - /tmp/resolver.pid
+      ignore_errors: yes

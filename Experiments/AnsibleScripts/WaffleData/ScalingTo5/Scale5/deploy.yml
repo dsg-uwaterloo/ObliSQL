@@ -1,0 +1,312 @@
+---
+- name: Deploy and Manage Processes
+  hosts: all
+  become: no
+  vars:
+    waffle_one_cmd: "./bin/proxy_server -l ./tracefiles/fiveExecutors/serverInput_0.txt -b {{b}} -r {{r}} -f {{fd}} -d {{d}} -c 2 -n 4 -h {{ hostvars['redis_server_one'].ansible_host }} -p {{ hostvars['redis_server_one'].redis_port }}"
+    waffle_two_cmd: "./bin/proxy_server -l ./tracefiles/fiveExecutors/serverInput_1.txt -b {{b}} -r {{r}} -f {{fd}} -d {{d}} -c 2 -n 4 -h {{ hostvars['redis_server_two'].ansible_host }} -p {{ hostvars['redis_server_two'].redis_port }}"
+    waffle_three_cmd: "./bin/proxy_server -l ./tracefiles/fiveExecutors/serverInput_2.txt -b {{b}} -r {{r}} -f {{fd}} -d {{d}} -c 2 -n 4 -h {{ hostvars['redis_server_three'].ansible_host }} -p {{ hostvars['redis_server_three'].redis_port }}"
+    waffle_four_cmd: "./bin/proxy_server -l ./tracefiles/fiveExecutors/serverInput_3.txt -b {{b}} -r {{r}} -f {{fd}} -d {{d}} -c 2 -n 4 -h {{ hostvars['redis_server_four'].ansible_host }} -p {{ hostvars['redis_server_four'].redis_port }}"
+    waffle_five_cmd: "./bin/proxy_server -l ./tracefiles/fiveExecutors/serverInput_4.txt -b {{b}} -r {{r}} -f {{fd}} -d {{d}} -c 2 -n 4 -h {{ hostvars['redis_server_five'].ansible_host }} -p {{ hostvars['redis_server_five'].redis_port }}"
+
+    batcher_one_cmd: "./batchManager -p {{ hostvars['batcher_one'].batcher_port }} -R {{r}} -Z 300 -num {{sf}} -T Waffle -X 2 -hosts {{ hostvars['waffle_one'].ansible_host }},{{ hostvars['waffle_two'].ansible_host }},{{ hostvars['waffle_three'].ansible_host }},{{ hostvars['waffle_four'].ansible_host }},{{ hostvars['waffle_five'].ansible_host }} -ports {{ hostvars['waffle_one'].waffle_port }},{{ hostvars['waffle_two'].waffle_port }},{{ hostvars['waffle_three'].waffle_port }},{{ hostvars['waffle_four'].waffle_port }},{{ hostvars['waffle_five'].waffle_port }}"
+    # Updating batchers to use waffle_five
+    batcher_two_cmd: "{{ batcher_one_cmd | replace('batcher_one', 'batcher_two') }}"
+    batcher_three_cmd: "{{ batcher_one_cmd | replace('batcher_one', 'batcher_three') }}"
+    batcher_four_cmd: "{{ batcher_one_cmd | replace('batcher_one', 'batcher_four') }}"
+    batcher_five_cmd: "{{ batcher_one_cmd | replace('batcher_one', 'batcher_five') }}"
+
+    resolver_one_cmd: "./resolver -p {{hostvars['resolver_one'].resolver_port}} -bh {{ hostvars['batcher_one'].ansible_host }},{{ hostvars['batcher_two'].ansible_host }},{{ hostvars['batcher_three'].ansible_host }},{{ hostvars['batcher_four'].ansible_host }},{{ hostvars['batcher_five'].ansible_host }}  -bp {{ hostvars['batcher_one'].batcher_port }},{{ hostvars['batcher_two'].batcher_port }},{{ hostvars['batcher_three'].batcher_port }},{{ hostvars['batcher_four'].batcher_port }},{{ hostvars['batcher_five'].batcher_port }} -bf"
+    resolver_two_cmd: "./resolver -p {{hostvars['resolver_two'].resolver_port}} -bh {{ hostvars['batcher_one'].ansible_host }},{{ hostvars['batcher_two'].ansible_host }},{{ hostvars['batcher_three'].ansible_host }},{{ hostvars['batcher_four'].ansible_host }},{{ hostvars['batcher_five'].ansible_host }}  -bp {{ hostvars['batcher_one'].batcher_port }},{{ hostvars['batcher_two'].batcher_port }},{{ hostvars['batcher_three'].batcher_port }},{{ hostvars['batcher_four'].batcher_port }},{{ hostvars['batcher_five'].batcher_port }} -bf"
+    resolver_three_cmd: "./resolver -p {{hostvars['resolver_three'].resolver_port}} -bh {{ hostvars['batcher_one'].ansible_host }},{{ hostvars['batcher_two'].ansible_host }},{{ hostvars['batcher_three'].ansible_host }},{{ hostvars['batcher_four'].ansible_host }},{{ hostvars['batcher_five'].ansible_host }}  -bp {{ hostvars['batcher_one'].batcher_port }},{{ hostvars['batcher_two'].batcher_port }},{{ hostvars['batcher_three'].batcher_port }},{{ hostvars['batcher_four'].batcher_port }},{{ hostvars['batcher_five'].batcher_port }} -bf"
+    resolver_four_cmd: "./resolver -p {{hostvars['resolver_four'].resolver_port}} -bh {{ hostvars['batcher_one'].ansible_host }},{{ hostvars['batcher_two'].ansible_host }},{{ hostvars['batcher_three'].ansible_host }},{{ hostvars['batcher_four'].ansible_host }},{{ hostvars['batcher_five'].ansible_host }}  -bp {{ hostvars['batcher_one'].batcher_port }},{{ hostvars['batcher_two'].batcher_port }},{{ hostvars['batcher_three'].batcher_port }},{{ hostvars['batcher_four'].batcher_port }},{{ hostvars['batcher_five'].batcher_port }} -bf"
+    resolver_five_cmd: "./resolver -p {{hostvars['resolver_five'].resolver_port}} -bh {{ hostvars['batcher_one'].ansible_host }},{{ hostvars['batcher_two'].ansible_host }},{{ hostvars['batcher_three'].ansible_host }},{{ hostvars['batcher_four'].ansible_host }},{{ hostvars['batcher_five'].ansible_host }}  -bp {{ hostvars['batcher_one'].batcher_port }},{{ hostvars['batcher_two'].batcher_port }},{{ hostvars['batcher_three'].batcher_port }},{{ hostvars['batcher_four'].batcher_port }},{{ hostvars['batcher_five'].batcher_port }} -bf"
+
+    benchmark_cmd: "./benchmark -h {{ hostvars['resolver_one'].ansible_host }},{{ hostvars['resolver_two'].ansible_host }},{{ hostvars['resolver_three'].ansible_host }},{{ hostvars['resolver_four'].ansible_host }},{{ hostvars['resolver_five'].ansible_host }} -p {{ hostvars['resolver_one'].resolver_port }},{{ hostvars['resolver_two'].resolver_port }},{{ hostvars['resolver_three'].resolver_port }},{{ hostvars['resolver_four'].resolver_port }},{{ hostvars['resolver_five'].resolver_port }} {{ benchmark_args }}"
+    benchmark_output: "/tmp/benchmark_output.txt"
+
+  tasks:
+    - name: Flush Redis One
+      when: inventory_hostname == "redis_server_one"
+      shell: "redis-cli -p {{ hostvars['redis_server_one'].redis_port }}  flushall"
+      register: redis_flush_one
+
+    - name: Flush Redis Two
+      when: inventory_hostname == "redis_server_two"
+      shell: "redis-cli -p {{ hostvars['redis_server_two'].redis_port }}  flushall"
+      register: redis_flush_two
+
+    - name: Flush Redis Three
+      when: inventory_hostname == "redis_server_three"
+      shell: "redis-cli -p {{ hostvars['redis_server_three'].redis_port }}  flushall"
+      register: redis_flush_two
+
+    - name: Flush Redis Four
+      when: inventory_hostname == "redis_server_four"
+      shell: "redis-cli -p {{ hostvars['redis_server_four'].redis_port }}  flushall"
+      register: redis_flush_four
+
+    - name: Flush Redis Five
+      when: inventory_hostname == "redis_server_five"
+      shell: "redis-cli -p {{ hostvars['redis_server_five'].redis_port }}  flushall"
+      register: redis_flush_five
+
+    - name: Start Waffle One
+      when: inventory_hostname == "waffle_one"
+      shell: "nohup {{ waffle_one_cmd }} > /tmp/waffle_one.log 2>&1 & echo $! > /tmp/waffle_one.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/waffle
+      register: waffle_zero_start
+      async: 0
+      poll: 0
+
+    - name: Start Waffle Two
+      when: inventory_hostname == "waffle_two"
+      shell: "nohup {{ waffle_two_cmd }} > /tmp/waffle_two.log 2>&1 & echo $! > /tmp/waffle_two.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/waffle
+      register: waffle_two_start
+      async: 0
+      poll: 0
+
+    - name: Start Waffle Three
+      when: inventory_hostname == "waffle_three"
+      shell: "nohup {{ waffle_three_cmd }} > /tmp/waffle_three.log 2>&1 & echo $! > /tmp/waffle_three.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/waffle
+      register: waffle_three_start
+      async: 0
+      poll: 0
+
+    - name: Start Waffle Four
+      when: inventory_hostname == "waffle_four"
+      shell: "nohup {{ waffle_four_cmd }} > /tmp/waffle_four.log 2>&1 & echo $! > /tmp/waffle_four.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/waffle
+      register: waffle_four_start
+      async: 0
+      poll: 0
+    
+    - name: Start Waffle Five
+      when: inventory_hostname == "waffle_five"
+      shell: "nohup {{ waffle_five_cmd }} > /tmp/waffle_five.log 2>&1 & echo $! > /tmp/waffle_five.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/waffle
+      register: waffle_five_start
+      async: 0
+      poll: 0
+
+
+    - name: Wait for Executors to start
+      run_once: true
+      pause:
+        seconds: 40
+
+
+    - name: Start Batcher One
+      when: inventory_hostname == "batcher_one"
+      shell: "nohup {{ batcher_one_cmd }} > /tmp/batcher_one.log 2>&1 & echo $! > /tmp/batcher_one.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/batchManager
+      register: batcher_zero_start
+      async: 0
+      poll: 0
+    
+    - name: Start Batcher Two
+      when: inventory_hostname == "batcher_two"
+      shell: "nohup {{ batcher_two_cmd }} > /tmp/batcher_two.log 2>&1 & echo $! > /tmp/batcher_two.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/batchManager
+      register: batcher_one_start
+      async: 0
+      poll: 0
+
+    - name: Start Batcher Three
+      when: inventory_hostname == "batcher_three"
+      shell: "nohup {{ batcher_three_cmd }} > /tmp/batcher_three.log 2>&1 & echo $! > /tmp/batcher_three.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/batchManager
+      register: batcher_three_start
+      async: 0
+      poll: 0
+
+    - name: Start Batcher Four
+      when: inventory_hostname == "batcher_four"
+      shell: "nohup {{ batcher_four_cmd }} > /tmp/batcher_four.log 2>&1 & echo $! > /tmp/batcher_four.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/batchManager
+      register: batcher_four_start
+      async: 0
+      poll: 0
+    
+    - name: Start Batcher Five
+      when: inventory_hostname == "batcher_five"
+      shell: "nohup {{ batcher_five_cmd }} > /tmp/batcher_five.log 2>&1 & echo $! > /tmp/batcher_five.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/batchManager
+      register: batcher_five_start
+      async: 0
+      poll: 0
+
+    - name: Wait for Batchers to start
+      pause:
+        seconds: 20
+
+    - name: Start Resolver One
+      when: inventory_hostname == "resolver_one"
+      shell: "nohup {{ resolver_one_cmd }} > /tmp/resolver_zero.log 2>&1 & echo $! > /tmp/resolver_zero.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/resolver
+      register: resolver_zero_start
+      async: 0
+      poll: 0
+
+    - name: Start Resolver Two
+      when: inventory_hostname == "resolver_two"
+      shell: "nohup {{ resolver_two_cmd }} > /tmp/resolver_two.log 2>&1 & echo $! > /tmp/resolver_two.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/resolver
+      register: resolver_two_start
+      async: 0
+      poll: 0
+    
+    - name: Start Resolver Three
+      when: inventory_hostname == "resolver_three"
+      shell: "nohup {{ resolver_three_cmd }} > /tmp/resolver_three.log 2>&1 & echo $! > /tmp/resolver_three.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/resolver
+      register: resolver_three_start
+      async: 0
+      poll: 0
+
+    - name: Start Resolver Four
+      when: inventory_hostname == "resolver_four"
+      shell: "nohup {{ resolver_four_cmd }} > /tmp/resolver_four.log 2>&1 & echo $! > /tmp/resolver_four.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/resolver
+      register: resolver_four_start
+      async: 0
+      poll: 0
+
+    - name: Start Resolver Five
+      when: inventory_hostname == "resolver_five"
+      shell: "nohup {{ resolver_five_cmd }} > /tmp/resolver_five.log 2>&1 & echo $! > /tmp/resolver_five.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/resolver
+      register: resolver_five_start
+      async: 0
+      poll: 0
+
+    - name: Wait for Resolvers to start
+      pause:
+        seconds: 20
+
+    - name: Start Benchmark
+      when: inventory_hostname == "benchmark_server"
+      shell: "{{ benchmark_cmd }} > {{ benchmark_output }} 2>&1"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/benchmark
+      register: benchmark_run
+
+    - name: Retrieve Benchmark Output
+      when: inventory_hostname == "benchmark_server"
+      fetch:
+        src: "{{ benchmark_output }}"
+        dest: "{{ output_filename }}"
+        flat: yes
+
+    - name: Stop Waffle-One
+      when: "'waffle-one' in group_names"
+      shell: "pkill -f proxy_server || kill $(cat /tmp/waffle_one.pid)"
+      ignore_errors: yes
+    
+    - name: Stop Waffle-Two
+      when: "'waffle-two' in group_names"
+      shell: "pkill -f proxy_server || kill $(cat /tmp/waffle_two.pid)"
+      ignore_errors: yes
+
+    - name: Stop Waffle-Three
+      when: "'waffle-three' in group_names"
+      shell: "pkill -f proxy_server || kill $(cat /tmp/waffle_three.pid)"
+      ignore_errors: yes
+
+    - name: Stop Waffle-Four
+      when: "'waffle-four' in group_names"
+      shell: "pkill -f proxy_server || kill $(cat /tmp/waffle_four.pid)"
+      ignore_errors: yes
+    
+    - name: Stop Waffle-Four
+      when: "'waffle-five' in group_names"
+      shell: "pkill -f proxy_server || kill $(cat /tmp/waffle_five.pid)"
+      ignore_errors: yes
+
+
+    - name: Stop Batcher-one
+      when: "'batcher-one' in group_names"
+      shell: "pkill -f batchManager || kill $(cat /tmp/batcher_one.pid)"
+      ignore_errors: yes
+    
+    - name: Stop Batcher-two
+      when: "'batcher-two' in group_names"
+      shell: "pkill -f batchManager || kill $(cat /tmp/batcher_two.pid)"
+      ignore_errors: yes
+
+    - name: Stop Batcher-three
+      when: "'batcher-three' in group_names"
+      shell: "pkill -f batchManager || kill $(cat /tmp/batcher_three.pid)"
+      ignore_errors: yes
+
+    - name: Stop Batcher-four
+      when: "'batcher-four' in group_names"
+      shell: "pkill -f batchManager || kill $(cat /tmp/batcher_four.pid)"
+      ignore_errors: yes
+
+    - name: Stop Batcher-five
+      when: "'batcher-five' in group_names"
+      shell: "pkill -f batchManager || kill $(cat /tmp/batcher_five.pid)"
+      ignore_errors: yes    
+
+    - name: Killing Resolvers
+      when: "'resolvers' in group_names"
+      shell: "pkill -f resolver || kill $(cat /tmp/resolver_zero.pid) || kill $(cat /tmp/resolver_one.pid) || kill $(cat /tmp/resolver_two.pid) || kill $(cat /tmp/resolver_three.pid) || kill $(cat /tmp/resolver_four.pid)"
+      ignore_errors: yes
+
+    - name: Killing Resolvers
+      when: "'resolver-two' in group_names"
+      shell: "pkill -f resolver || kill $(cat /tmp/resolver_two.pid)"
+      ignore_errors: yes
+    
+    - name: Killing Resolvers
+      when: "'resolver-three' in group_names"
+      shell: "pkill -f resolver || kill $(cat /tmp/resolver_three.pid)"
+      ignore_errors: yes
+
+    - name: Killing Resolvers
+      when: "'resolver-four' in group_names"
+      shell: "pkill -f resolver || kill $(cat /tmp/resolver_four.pid)"
+      ignore_errors: yes
+    
+    - name: Killing Resolvers
+      when: "'resolver-five' in group_names"
+      shell: "pkill -f resolver || kill $(cat /tmp/resolver_four.pid)"
+      ignore_errors: yes
+
+    - name: Clean up PID files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/waffle_one.pid
+        - /tmp/waffle_two.pid
+        - /tmp/waffle_three.pid
+        - /tmp/waffle_four.pid
+        - /tmp/batcher_one.pid
+        - /tmp/batcher_two.pid
+        - /tmp/batcher_three.pid
+        - /tmp/batcher_four.pid
+        - /tmp/resolver_zero.pid
+        - /tmp/resolver_one.pid
+        - /tmp/resolver_two.pid
+        - /tmp/resolver_three.pid
+        - /tmp/resolver_four.pid
+      ignore_errors: yes

@@ -1,0 +1,26 @@
+{
+ "Start timestamp (milliseconds)": 1739814945683,
+ "Current Timestamp (milliseconds)": 1739814983808,
+ "Elapsed Time (nanoseconds)": 30000013844,
+ "DBMS Type": "COCKROACHDB",
+ "DBMS Version": "CockroachDB CCL v24.3.5 (x86_64-pc-linux-gnu, built 2025/02/03 17:28:15, go1.22.8 X:nocoverageredesign)",
+ "Benchmark Type": "epinions",
+ "Final State": "EXIT",
+ "Measured Requests": 210748,
+ "isolation": "TRANSACTION_READ_UNCOMMITTED",
+ "scalefactor": "150",
+ "terminals": "1000",
+ "Latency Distribution": {
+  "95th Percentile Latency (microseconds)": 322989,
+  "Maximum Latency (microseconds)": 1126733,
+  "Median Latency (microseconds)": 123566,
+  "Minimum Latency (microseconds)": 22074,
+  "25th Percentile Latency (microseconds)": 61772,
+  "90th Percentile Latency (microseconds)": 273203,
+  "99th Percentile Latency (microseconds)": 432176,
+  "75th Percentile Latency (microseconds)": 195848,
+  "Average Latency (microseconds)": 141471
+ },
+ "Throughput (requests/second)": 7024.930091562261,
+ "Goodput (requests/second)": 8306.796166690461
+}

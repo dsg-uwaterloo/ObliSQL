@@ -1,0 +1,26 @@
+Connected to Resolver tem123:9900
+Query Type: bdb
+Read 150001 records for ../../pkg/benchmark/benchmarkIdLists/i_id.csv
+Read 300001 records for ../../pkg/benchmark/benchmarkIdLists/u_id.csv
+Read 417649 records for ../../pkg/benchmark/benchmarkIdLists/a_id.csv
+Read 135 records for ../../pkg/benchmark/benchmarkIdLists/pageRank.csv
+In-Flight Requests: 50
+Non-Empty Requests: 1119
+Warmup Done! 1119 0
+-------
+Running Benchmark! 30 seconds 
+Ops/s,4038,Err,0
+Non-Empty Requests: 4038
+Total Ops: 4038
+Total Err: 0
+Average Latency: 365 ms
+
+
+Total Range Index Keys Created -- DEFAULT CASE: 6317 --> Total Index Values fetched (Point + Range)
+Total Range Index Keys Created: 15828 (Total Index Values Created for Range)
+Total Range Index Keys Inserted after bloom: 3698 (Total Index Values after filtering)
+Total Keys fetched after filtering: 13166 (Total Values Fetched)
+
+Total Ops = 5157
+Index Requests/Query = 1.22 Keys/Query
+Total Values Fetched/Query = 2.55 Keys/Query

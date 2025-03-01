@@ -1,0 +1,226 @@
+===============================================
+Running benchmark with -s 25
+Alpha = 497827.75000
+N = 6095882
+B_R = 20
+B = 33
+R = 20
+F_D = 1
+D = 792465
+Cache Size = 121917
+===============================================
+Benchmark Arguments: -s 25 -q scaling
+Benchmark Output Filename: B_33_s_25_3.txt
+
+
+PLAY [Deploy and Manage Processes] *********************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [benchmark_server]
+ok: [batcher_server]
+ok: [waffle_server]
+ok: [resolver_server]
+ok: [redis_server]
+
+TASK [Kill any process running on port 9090 on waffle machine] *****************
+skipping: [batcher_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+skipping: [redis_server]
+changed: [waffle_server]
+
+TASK [Kill any process running on port 9500 on batcher machine] ****************
+skipping: [waffle_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+skipping: [redis_server]
+ [ERROR]: User interrupted execution
+Benchmark with -s 25 failed. Check Ansible output for details.
+
+All benchmarks completed.
+===============================================
+Running benchmark with -s 25
+Alpha = 497827.75000
+N = 6095882
+B_R = 20
+B = 33
+R = 20
+F_D = 1
+D = 792465
+Cache Size = 121917
+===============================================
+Benchmark Arguments: -s 25 -q scaling
+Benchmark Output Filename: B_33_s_25_3.txt
+
+
+PLAY [Deploy and Manage Processes] *********************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [benchmark_server]
+ok: [resolver_server]
+ok: [batcher_server]
+ok: [waffle_server]
+ok: [redis_server]
+
+TASK [Kill any process running on port 9090 on waffle machine] *****************
+skipping: [batcher_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+skipping: [redis_server]
+changed: [waffle_server]
+
+TASK [Kill any process running on port 9500 on batcher machine] ****************
+skipping: [waffle_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+skipping: [redis_server]
+changed: [batcher_server]
+
+TASK [Kill any process running on port 9800 on resolver] ***********************
+skipping: [waffle_server]
+skipping: [batcher_server]
+skipping: [benchmark_server]
+skipping: [redis_server]
+changed: [resolver_server]
+
+TASK [Stop Redis on tem202 (ports 6381)] ***************************************
+skipping: [waffle_server]
+skipping: [batcher_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+changed: [redis_server]
+
+TASK [Configure Redis] *********************************************************
+skipping: [waffle_server]
+skipping: [batcher_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+changed: [redis_server]
+
+TASK [Start Redis] *************************************************************
+skipping: [waffle_server]
+skipping: [batcher_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+changed: [redis_server]
+
+TASK [Wait for Redis to start and load snapshot] *******************************
+Pausing for 30 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [waffle_server]
+
+TASK [Start ORAM on tem111] ****************************************************
+skipping: [batcher_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+skipping: [redis_server]
+changed: [waffle_server]
+
+TASK [Wait for Oram to start (wait 1 minute)] **********************************
+Pausing for 30 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [waffle_server]
+
+TASK [Start Batcher on tem123] *************************************************
+skipping: [waffle_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+skipping: [redis_server]
+changed: [batcher_server]
+
+TASK [Wait for Batcher to start (optional)] ************************************
+Pausing for 5 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [waffle_server]
+
+TASK [Start Resolver on tem112] ************************************************
+skipping: [waffle_server]
+skipping: [batcher_server]
+skipping: [benchmark_server]
+skipping: [redis_server]
+changed: [resolver_server]
+
+TASK [Wait for Resolver to start (optional)] ***********************************
+Pausing for 10 seconds
+(ctrl+C then 'C' = continue early, ctrl+C then 'A' = abort)
+ok: [waffle_server]
+
+TASK [Start Benchmark on tem121] ***********************************************
+skipping: [waffle_server]
+skipping: [batcher_server]
+skipping: [resolver_server]
+skipping: [redis_server]
+changed: [benchmark_server]
+
+TASK [Retrieve Benchmark Output] ***********************************************
+skipping: [waffle_server]
+skipping: [batcher_server]
+skipping: [resolver_server]
+skipping: [redis_server]
+changed: [benchmark_server]
+
+TASK [Stop Oram on tem112] *****************************************************
+skipping: [waffle_server]
+skipping: [batcher_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+skipping: [redis_server]
+
+TASK [Kill any process running on port 9090 on waffle machine] *****************
+skipping: [batcher_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+skipping: [redis_server]
+changed: [waffle_server]
+
+TASK [Stop Resolver on tem123] *************************************************
+skipping: [waffle_server]
+skipping: [batcher_server]
+skipping: [benchmark_server]
+skipping: [redis_server]
+changed: [resolver_server]
+
+TASK [Stop Batcher on tem101] **************************************************
+skipping: [waffle_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+skipping: [redis_server]
+fatal: [batcher_server]: FAILED! => {"changed": true, "cmd": "kill $(cat /tmp/batcher.pid)", "delta": "0:00:00.005260", "end": "2025-02-26 22:46:45.078838", "msg": "non-zero return code", "rc": 1, "start": "2025-02-26 22:46:45.073578", "stderr": "/bin/sh: 1: kill: No such process", "stderr_lines": ["/bin/sh: 1: kill: No such process"], "stdout": "", "stdout_lines": []}
+...ignoring
+
+TASK [Stop Redis on tem202] ****************************************************
+skipping: [waffle_server]
+skipping: [batcher_server]
+skipping: [resolver_server]
+skipping: [benchmark_server]
+fatal: [redis_server]: FAILED! => {"changed": true, "cmd": "cd /hdd1/haseeb/nachiket/redis_scale1_new/redis1 &&\nredis-cli -p 6381 shutdown nosave &&\nrm -f dump.rdb\n", "delta": "0:00:00.003216", "end": "2025-02-26 22:46:46.412241", "msg": "non-zero return code", "rc": 2, "start": "2025-02-26 22:46:46.409025", "stderr": "/bin/sh: 1: cd: can't cd to /hdd1/haseeb/nachiket/redis_scale1_new/redis1", "stderr_lines": ["/bin/sh: 1: cd: can't cd to /hdd1/haseeb/nachiket/redis_scale1_new/redis1"], "stdout": "", "stdout_lines": []}
+...ignoring
+
+TASK [Clean up PID files] ******************************************************
+skipping: [benchmark_server] => (item=/tmp/waffle.pid) 
+skipping: [benchmark_server] => (item=/tmp/batcher.pid) 
+skipping: [benchmark_server] => (item=/tmp/resolver.pid) 
+skipping: [redis_server] => (item=/tmp/waffle.pid) 
+skipping: [redis_server] => (item=/tmp/batcher.pid) 
+skipping: [redis_server] => (item=/tmp/resolver.pid) 
+ok: [batcher_server] => (item=/tmp/waffle.pid)
+ok: [waffle_server] => (item=/tmp/waffle.pid)
+ok: [resolver_server] => (item=/tmp/waffle.pid)
+changed: [waffle_server] => (item=/tmp/batcher.pid)
+changed: [batcher_server] => (item=/tmp/batcher.pid)
+ok: [resolver_server] => (item=/tmp/batcher.pid)
+ok: [resolver_server] => (item=/tmp/resolver.pid)
+changed: [batcher_server] => (item=/tmp/resolver.pid)
+ok: [waffle_server] => (item=/tmp/resolver.pid)
+
+PLAY RECAP *********************************************************************
+batcher_server             : ok=5    changed=4    unreachable=0    failed=0    skipped=13   rescued=0    ignored=1   
+benchmark_server           : ok=3    changed=2    unreachable=0    failed=0    skipped=15   rescued=0    ignored=0   
+redis_server               : ok=5    changed=4    unreachable=0    failed=0    skipped=13   rescued=0    ignored=1   
+resolver_server            : ok=5    changed=3    unreachable=0    failed=0    skipped=13   rescued=0    ignored=0   
+waffle_server              : ok=9    changed=4    unreachable=0    failed=0    skipped=13   rescued=0    ignored=0   
+
+Benchmark with -s 25 completed successfully.
+Output saved to B_33_s_25_3.txt.
+
+All benchmarks completed.
