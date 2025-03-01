@@ -289,85 +289,85 @@ func (c *myResolver) getListFromInterface(pkList interface{}) []string {
 	return newList
 }
 
-func (c *myResolver) indexFetchUtil(indexReq *loadbalancer.LoadBalanceRequest, localRequestID int64) (*loadbalancer.LoadBalanceResponse, error) {
-	conn, err := c.GetBatchClient()
-	if err != nil {
-		log.Fatal().Msgf("Failed to get Batch Client!")
-	}
-	keysWithPartitions := []string{}
-	newValues := []string{}
+// func (c *myResolver) indexFetchUtil(indexReq *loadbalancer.LoadBalanceRequest, localRequestID int64) (*loadbalancer.LoadBalanceResponse, error) {
+// 	conn, err := c.GetBatchClient()
+// 	if err != nil {
+// 		log.Fatal().Msgf("Failed to get Batch Client!")
+// 	}
+// 	keysWithPartitions := []string{}
+// 	newValues := []string{}
 
-	// Track original keys for merging
-	mergedResults := make(map[string][]string)
-	originalKeyExists := make(map[string]bool) // Track if an original key exists
+// 	// Track original keys for merging
+// 	mergedResults := make(map[string][]string)
+// 	originalKeyExists := make(map[string]bool) // Track if an original key exists
 
-	for _, key := range indexReq.Keys {
-		keysWithPartitions = append(keysWithPartitions, key)
-		newValues = append(newValues, "")
-		originalKeyExists[key] = true // Mark that the original key was requested
+// 	for _, key := range indexReq.Keys {
+// 		keysWithPartitions = append(keysWithPartitions, key)
+// 		newValues = append(newValues, "")
+// 		originalKeyExists[key] = true // Mark that the original key was requested
 
-		if partitionCount, ok := c.PartitionMap[key]; ok {
-			// Initialize base key in map to store merged partitions
-			mergedResults[key] = []string{}
+// 		if partitionCount, ok := c.PartitionMap[key]; ok {
+// 			// Initialize base key in map to store merged partitions
+// 			mergedResults[key] = []string{}
 
-			// Append partitioned keys
-			for i := 1; i <= partitionCount; i++ {
-				partitionedKey := fmt.Sprintf("%s/%d", key, i)
-				keysWithPartitions = append(keysWithPartitions, partitionedKey)
-				newValues = append(newValues, "")
-			}
-		}
-	}
+// 			// Append partitioned keys
+// 			for i := 1; i <= partitionCount; i++ {
+// 				partitionedKey := fmt.Sprintf("%s/%d", key, i)
+// 				keysWithPartitions = append(keysWithPartitions, partitionedKey)
+// 				newValues = append(newValues, "")
+// 			}
+// 		}
+// 	}
 
-	// Send the request with expanded keys
-	newRequest := loadbalancer.LoadBalanceRequest{
-		Keys:      keysWithPartitions,
-		Values:    newValues,
-		RequestId: localRequestID,
-	}
-	resp, err := conn.AddKeys(context.Background(), &newRequest)
-	if err != nil {
-		fmt.Println("Error Fetching Keys: ", err)
-		return nil, err
-	}
+// 	// Send the request with expanded keys
+// 	newRequest := loadbalancer.LoadBalanceRequest{
+// 		Keys:      keysWithPartitions,
+// 		Values:    newValues,
+// 		RequestId: localRequestID,
+// 	}
+// 	resp, err := conn.AddKeys(context.Background(), &newRequest)
+// 	if err != nil {
+// 		fmt.Println("Error Fetching Keys: ", err)
+// 		return nil, err
+// 	}
 
-	// Maps to hold final results
-	finalKeys := []string{}
-	finalValues := []string{}
+// 	// Maps to hold final results
+// 	finalKeys := []string{}
+// 	finalValues := []string{}
 
-	// Process response values
-	for i, key := range resp.Keys {
-		value := resp.Values[i]
+// 	// Process response values
+// 	for i, key := range resp.Keys {
+// 		value := resp.Values[i]
 
-		// Identify if the key is a partitioned key (e.g., "review/u_id_index/4/1")
-		baseKey := key
-		if idx := strings.LastIndex(key, "/"); idx != -1 {
-			baseKey = key[:idx] // Extract "review/u_id_index/4"
-		}
+// 		// Identify if the key is a partitioned key (e.g., "review/u_id_index/4/1")
+// 		baseKey := key
+// 		if idx := strings.LastIndex(key, "/"); idx != -1 {
+// 			baseKey = key[:idx] // Extract "review/u_id_index/4"
+// 		}
 
-		if _, exists := mergedResults[baseKey]; exists {
-			// Append both partitioned values AND original key's value into the base key
-			mergedResults[baseKey] = append(mergedResults[baseKey], value)
-		} else if originalKeyExists[key] {
-			// If it's an original key with no partitions, store it normally
-			mergedResults[key] = append(mergedResults[key], value)
-		} else {
-			// Otherwise, store as a normal (non-partitioned) value
-			finalKeys = append(finalKeys, key)
-			finalValues = append(finalValues, value)
-		}
-	}
+// 		if _, exists := mergedResults[baseKey]; exists {
+// 			// Append both partitioned values AND original key's value into the base key
+// 			mergedResults[baseKey] = append(mergedResults[baseKey], value)
+// 		} else if originalKeyExists[key] {
+// 			// If it's an original key with no partitions, store it normally
+// 			mergedResults[key] = append(mergedResults[key], value)
+// 		} else {
+// 			// Otherwise, store as a normal (non-partitioned) value
+// 			finalKeys = append(finalKeys, key)
+// 			finalValues = append(finalValues, value)
+// 		}
+// 	}
 
-	// Construct the final response with merged values
-	for key, values := range mergedResults {
-		finalKeys = append(finalKeys, key)
-		finalValues = append(finalValues, strings.Join(values, ","))
-	}
+// 	// Construct the final response with merged values
+// 	for key, values := range mergedResults {
+// 		finalKeys = append(finalKeys, key)
+// 		finalValues = append(finalValues, strings.Join(values, ","))
+// 	}
 
-	// Return response with merged values
-	// fmt.Println(len(finalKeys), finalKeys)
-	return &loadbalancer.LoadBalanceResponse{
-		Keys:   finalKeys,
-		Values: finalValues,
-	}, nil
-}
+// 	// Return response with merged values
+// 	// fmt.Println(len(finalKeys), finalKeys)
+// 	return &loadbalancer.LoadBalanceResponse{
+// 		Keys:   finalKeys,
+// 		Values: finalValues,
+// 	}, nil
+// }

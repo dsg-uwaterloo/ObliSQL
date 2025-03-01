@@ -1,6 +1,5 @@
 #include "encryption_engine.h"
 #include <bits/types/cookie_io_functions_t.h>
-#include <cstdio>
 #include <iostream>
 
 std::string encryption_engine::extractKey(const std::string& encryptedKey) {
@@ -537,7 +536,7 @@ int encryption_engine::hmac_it(const byte* msg, size_t mlen, byte** val, size_t*
 
 std::string encryption_engine::encrypt(const std::string &plain_text) {
     // std::cout<<plain_text.length()<<std::endl;
-    unsigned char cipher_text[1024];
+    unsigned char cipher_text[4096*50];
     int text_len = encrypt((unsigned char *)plain_text.c_str(), plain_text.length(), encryption_key_, iv_, cipher_text);
     assert(text_len > 0);
     std::string str((const char *)cipher_text, text_len);
@@ -545,7 +544,7 @@ std::string encryption_engine::encrypt(const std::string &plain_text) {
 };
 
 std::string encryption_engine::decrypt(const std::string &cipher_text) {
-    unsigned char text[1024];
+    unsigned char text[4096*50];
     int text_len = decrypt((unsigned char *)cipher_text.c_str(), cipher_text.length(), encryption_key_, iv_, text);
     assert(text_len > 0);
     return std::string(text, std::find(text, text + text_len, '\0'));
@@ -560,58 +559,27 @@ std::string encryption_engine::hmac(const std::string &key) {
 };
 
 std::string encryption_engine::encryptNonDeterministic(const std::string &plain_text) {
-    std::string padded_plain_text = plain_text;
-    
-    // Ensure plaintext is exactly 512 bytes before encryption
-    if (padded_plain_text.length() < 512) {
-        padded_plain_text.append(512 - padded_plain_text.length(), '\0'); // Zero padding
-    }
+    return encrypt(plain_text + "#" + gen_random(rand()%10));
+};
 
-    return encrypt(padded_plain_text);
-}
-
-
-std::string encryption_engine::decryptNonDeterministic(const std::string &cipher_text) {
-    std::string decrypted_text = decrypt(cipher_text);
-
-    // Trim null padding if necessary
-    return decrypted_text.substr(0, decrypted_text.find_last_not_of('\0') + 1);
-}
+std::string encryption_engine::decryptNonDeterministic(const std::string &cipher_text){
+    return extractKey(decrypt(cipher_text));
+};
 
 std::string encryption_engine::getencryption_string_(){
     return encryption_string_;
 };
 
-// std::string encryption_engine::prf_encrypt(const std::string& key, const std::string& plaintext) {
-//     unsigned char* result = new unsigned char[32];
-//     unsigned int resultlen;
-
-//     HMAC(EVP_sha256(), key.c_str(), key.length(), reinterpret_cast<const unsigned char*>(plaintext.c_str()), plaintext.length(), result, &resultlen);
-
-//     std::string ciphertext(reinterpret_cast<char*>(result), resultlen);
-//     delete[] result;
-//     if (plaintext.length()>32){
-//     std::cout<<plaintext<<":"<<plaintext.length()<<":"<<ciphertext.length()<<std::endl;
-//     }
-//     return ciphertext;
-// };
-
 std::string encryption_engine::prf_encrypt(const std::string& key, const std::string& plaintext) {
-    std::vector<unsigned char> result(EVP_MAX_MD_SIZE);
-    unsigned int resultlen = 0;
+    unsigned char* result = new unsigned char[32];
+    unsigned int resultlen;
 
-    HMAC(EVP_sha256(), key.c_str(), key.length(), 
-         reinterpret_cast<const unsigned char*>(plaintext.c_str()), plaintext.length(), 
-         result.data(), &resultlen);
+    HMAC(EVP_sha256(), key.c_str(), key.length(), reinterpret_cast<const unsigned char*>(plaintext.c_str()), plaintext.length(), result, &resultlen);
 
-    // Check if result is not 32 bytes #32 byte key
-    if (resultlen != 32) {
-        std::cerr << "ERROR: Unexpected ciphertext length: " << resultlen << " bytes instead of 32." << std::endl;
-    }
-
-    return std::string(reinterpret_cast<char*>(result.data()), resultlen);
-}
-
+    std::string ciphertext(reinterpret_cast<char*>(result), resultlen);
+    delete[] result;
+    return ciphertext;
+};
 
 std::string encryption_engine::prf(const std::string& plain_text) {
     return prf_encrypt(encryption_string_, plain_text);

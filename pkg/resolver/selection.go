@@ -365,6 +365,7 @@ func (c *myResolver) filterPkFromColumns(colData map[string]*queryResponse, q *r
 }
 
 func (c *myResolver) filterPkUsingIndex(q *resolver.ParsedQuery, localRequestID int64) ([]string, error) {
+	ctx := context.Background()
 	indexReqKeys := loadbalancer.LoadBalanceRequest{
 		Keys:      []string{},
 		Values:    []string{},
@@ -406,8 +407,13 @@ func (c *myResolver) filterPkUsingIndex(q *resolver.ParsedQuery, localRequestID 
 		//Filter resulted in no valid finds
 		return nil, nil
 	}
-	resp, err := c.indexFetchUtil(&indexReqKeys, localRequestID)
-	// resp, err := conn.AddKeys(ctx, &indexReqKeys)
+
+	conn, err := c.GetBatchClient()
+	if err != nil {
+		log.Fatal().Msgf("Failed to get batch Client!")
+	}
+
+	resp, err := conn.AddKeys(ctx, &indexReqKeys)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch index value: %w", err)
 	}
