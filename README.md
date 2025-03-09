@@ -62,7 +62,7 @@ sh bench.sh --s-values <in-flight request list>
 10. By default we use the epinions dataset. To run the Big Data Benchmark, please pass `-bdb` to the resolver process and `-q bdb` to the benchmark process. This is already done in all ansible files provided for big data benchmark. 
 
 
-### Running Epinions with Oram
+### Running Epinions/Big Data Benchmark with Oram
 *Note:* Due to high overhead incurred by ORAM, we provide redis-snapshots that contain the correct dataset and position map. This improves loading time from hours to a couple of minutes. 
 
 1. Download ORAM tracefiles from the provided link.
