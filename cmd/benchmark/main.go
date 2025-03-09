@@ -24,6 +24,8 @@ func main() {
 	sPtr := flag.Int("s", 2000, "Maximum in-flight requests")
 	tPtr := flag.Int("t", 30, "Duration to run benchmark (in seconds)")
 	qTypePtr := flag.String("q", "default", "Query Type (Scaling,BDB,Epinions,Default)")
+	joinRangePtr := flag.Int("jr", 0, "Join Bloom Check --> 1, Range Bloom --> 2")
+	rangeSize := flag.Int("rs", 5, "Range size if jr is 2")
 
 	flag.Parse()
 
@@ -68,5 +70,5 @@ func main() {
 	}
 	fmt.Println("Query Type:", *qTypePtr)
 
-	benchmark.StartBench(&clients, *sPtr, *tPtr, *qTypePtr)
+	benchmark.StartBench(&clients, *sPtr, *tPtr, *qTypePtr, *joinRangePtr, *rangeSize)
 }

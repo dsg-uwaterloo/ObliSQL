@@ -193,7 +193,7 @@ func runBenchmark(resolverClient *[]resolver.ResolverClient, requests *[]Query, 
 	return ops, err, averageLatency
 }
 
-func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDuration int, queryType string) {
+func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDuration int, queryType string, joinRange int, rangeSize int) {
 	itemIDFile := os.Getenv("ITEM_ID_FILE")
 	if itemIDFile == "" {
 		itemIDFile = "../../pkg/benchmark/benchmarkIdLists/i_id.csv"
@@ -248,7 +248,7 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 	requestsWarmup := []Query{}
 	for len(requestsWarmup) < 50000 {
 		if queryType == "default" {
-			requestsWarmup = append(requestsWarmup, getTestCases(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+			requestsWarmup = append(requestsWarmup, getTestCases(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed, joinRange, rangeSize)...)
 		} else if queryType == "scaling" {
 			requestsWarmup = append(requestsWarmup, getTestCasesScaling(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
@@ -263,7 +263,7 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 	requestsBench := []Query{}
 	for len(requestsBench) < 500000 {
 		if queryType == "default" {
-			requestsBench = append(requestsBench, getTestCases(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+			requestsBench = append(requestsBench, getTestCases(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed, joinRange, rangeSize)...)
 		} else if queryType == "scaling" {
 			requestsBench = append(requestsBench, getTestCasesScaling(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
