@@ -230,12 +230,12 @@ func (o *ORAM) ReadPaths(leafs []int) map[int]struct{} {
 }
 
 func (o *ORAM) WritePaths(oldLeaves map[string]int, bucketIndices map[int]struct{}) {
-
 	newBuckets := make(map[int]bucket.Bucket)
 
+	// Initialize all buckets we need to write
 	for idx := range bucketIndices {
 		newBuckets[idx] = bucket.Bucket{
-			Blocks:         make([]block.Block, 0, o.Z), // make zero-length slice with capacity o.Z
+			Blocks:         make([]block.Block, 0, o.Z),
 			RealBlockCount: 0,
 		}
 	}
@@ -243,72 +243,60 @@ func (o *ORAM) WritePaths(oldLeaves map[string]int, bucketIndices map[int]struct
 	toDelete := make([]string, 0)
 
 	for key, block := range o.StashMap {
+		newLeafID := o.Keymap[key]
+		oldLeafID, hasOldPath := oldLeaves[key]
 
-		var new_leaf_id = o.Keymap[key]
-
+		// Iterate through each level (from root to leaf)
 		for level := o.LogCapacity; level >= 0; level-- {
-			bucketIdPath1 := o.bucketForLevelLeaf(level, new_leaf_id)
-			bucketIdPath2 := -1
-			var old_leaf_id, exists = oldLeaves[key]
-			if exists {
-				bucketIdPath2 = o.bucketForLevelLeaf(level, old_leaf_id)
+			bucketIDNew := o.bucketForLevelLeaf(level, newLeafID)
+
+			// If the block has an old path, check if it intersects with the new path
+			if hasOldPath {
+				bucketIDOld := o.bucketForLevelLeaf(level, oldLeafID)
+				if bucketIDOld != bucketIDNew {
+					continue // Skip if paths don't intersect at this level
+				}
 			}
 
-			if bucketIdPath2 == -1 {
-				// case where there is only 1 path
-				// check if bucket has space to fit this block
-				if newBuckets[bucketIdPath1].RealBlockCount < o.Z {
-					bucket := newBuckets[bucketIdPath1]
-					bucket.Blocks = append(newBuckets[bucketIdPath1].Blocks, block)
-					bucket.RealBlockCount++
-					newBuckets[bucketIdPath1] = bucket
-					toDelete = append(toDelete, key)
-					break
-				}
-			} else {
-				// case where we need to consider intersection of path 1 and path 2
-				if bucketIdPath1 == bucketIdPath2 {
-					if newBuckets[bucketIdPath1].RealBlockCount < o.Z {
-						bucket := newBuckets[bucketIdPath1]
-						bucket.Blocks = append(newBuckets[bucketIdPath1].Blocks, block)
-						bucket.RealBlockCount++
-						newBuckets[bucketIdPath1] = bucket
-						toDelete = append(toDelete, key)
-						break
-					}
-				}
+			// Check if this bucket is in the set we're writing to
+			if _, exists := bucketIndices[bucketIDNew]; !exists {
+				continue
+			}
+
+			// If bucket has space, place the block
+			if newBuckets[bucketIDNew].RealBlockCount < o.Z {
+				newBucket := newBuckets[bucketIDNew]
+				newBucket.Blocks = append(newBucket.Blocks, block)
+				newBucket.RealBlockCount++
+				newBuckets[bucketIDNew] = newBucket
+				toDelete = append(toDelete, key)
+				break // Block placed, move to next block
 			}
 		}
 	}
 
+	// Remove placed blocks from stash
 	for _, key := range toDelete {
 		delete(o.StashMap, key)
 	}
 
+	// Pad buckets with dummy blocks and prepare Redis requests
 	requests := make([]bucketRequest.BucketRequest, 0)
-
-	// pad blocks list in all buckets
 	for idx := range bucketIndices {
-		i := newBuckets[idx].RealBlockCount
-
-		bucket := newBuckets[idx] // copy out
-		for i < o.Z {
+		bucket := newBuckets[idx]
+		for len(bucket.Blocks) < o.Z {
 			bucket.Blocks = append(bucket.Blocks, block.Block{Key: "-1", Value: ""})
-			i++
 		}
-		newBuckets[idx] = bucket // put back
-
 		requests = append(requests, bucketRequest.BucketRequest{
 			BucketId: idx,
-			Bucket:   newBuckets[idx],
+			Bucket:   bucket,
 		})
 	}
 
-	// Set the requests in Redis
+	// Write all updated buckets to Redis
 	if err := o.RedisClient.WriteBucketsToDb(requests); err != nil {
-		fmt.Println("Error writing buckets : ", err)
+		fmt.Println("Error writing buckets:", err)
 	}
-
 }
 
 /*
