@@ -242,11 +242,12 @@ func (o *ORAM) WritePaths(oldLeaves map[string]int, bucketIndices map[int]struct
 
 	toDelete := make([]string, 0)
 
+	// Iterate through stashmap for eviction
 	for key, block := range o.StashMap {
 		newLeafID := o.Keymap[key]
 		oldLeafID, hasOldPath := oldLeaves[key]
 
-		// Iterate through each level (from root to leaf)
+		// Iterate through each level (leaf to root)
 		for level := o.LogCapacity; level >= 0; level-- {
 			bucketIDNew := o.bucketForLevelLeaf(level, newLeafID)
 
@@ -254,28 +255,28 @@ func (o *ORAM) WritePaths(oldLeaves map[string]int, bucketIndices map[int]struct
 			if hasOldPath {
 				bucketIDOld := o.bucketForLevelLeaf(level, oldLeafID)
 				if bucketIDOld != bucketIDNew {
-					continue // Skip if paths don't intersect at this level
+					continue // Skip if paths don't intersect at this level - need to check intersection further up
 				}
 			}
 
-			// Check if this bucket is in the set we're writing to
+			// Check if this bucket is in the set we're writing to - it SHOULD be by default, but for sanity
 			if _, exists := bucketIndices[bucketIDNew]; !exists {
 				continue
 			}
 
-			// If bucket has space, place the block
+			// If bucket not full, place block
 			if newBuckets[bucketIDNew].RealBlockCount < o.Z {
 				newBucket := newBuckets[bucketIDNew]
 				newBucket.Blocks = append(newBucket.Blocks, block)
 				newBucket.RealBlockCount++
 				newBuckets[bucketIDNew] = newBucket
 				toDelete = append(toDelete, key)
-				break // Block placed, move to next block
+				break // Block placed - move to next block
 			}
 		}
 	}
 
-	// Remove placed blocks from stash
+	// Delete placed blocks from stash
 	for _, key := range toDelete {
 		delete(o.StashMap, key)
 	}
@@ -293,26 +294,11 @@ func (o *ORAM) WritePaths(oldLeaves map[string]int, bucketIndices map[int]struct
 		})
 	}
 
-	// Write all updated buckets to Redis
+	// Write to Redis
 	if err := o.RedisClient.WriteBucketsToDb(requests); err != nil {
 		fmt.Println("Error writing buckets:", err)
 	}
 }
-
-/*
-initialize fully for now beforehand
-
-create separate repo for base pathoram
-
-batching optimization is kind of like:
-run readpath on 50 - but maintain set and fetch every block only once, one redis request for all 50
-
-write/read stashmap[key] for all 50
-
-writepath to 50 previousPositionLeafs and try to clear out stash -  1 redis request
-
-many batches come in; go routines?
-*/
 
 func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, error) {
 
