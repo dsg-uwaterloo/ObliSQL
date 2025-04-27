@@ -21,23 +21,27 @@ import (
 )
 
 const (
-	logCapacity = 10 // Logarithm base 2 of capacity (1024 buckets)
-	Z           = 4  // Number of blocks per bucket
-	stashSize   = 20 // Maximum number of blocks in stash
+	logCapacity = 10  // Logarithm base 2 of capacity (1024 buckets)
+	Z           = 4   // Number of blocks per bucket
+	stashSize   = 100 // Maximum number of blocks in stash
 )
 
 /*
 This test case inserts 1000 values into the key-value store and then retrieves the key:values, asserting their correctness.
 */
-func TestORAMReadWrite(t *testing.T) {
-	// Initialize your ORAM structure or use a mocked instance
+/*
+This test case inserts 1000 values into the key-value store and then retrieves them 5 times,
+asserting their correctness in each iteration.
+*/
+func TestORAMReadWriteRepeatedReads(t *testing.T) {
+	// Initialize ORAM
 	o, err := oram.NewORAM(logCapacity, Z, stashSize, "127.0.0.1:6379", false, nil)
 	if err != nil {
 		t.Fatalf("Error initializing ORAM: %v", err)
 	}
 	defer o.RedisClient.Close()
 
-	totalOperations := 1000 // Number of operations you plan to perform
+	totalOperations := 1000 // Number of operations
 
 	// Create PUT requests
 	putRequests := make([]request.Request, totalOperations)
@@ -59,12 +63,10 @@ func TestORAMReadWrite(t *testing.T) {
 		}
 	}
 
-	// Batch size for processing requests
 	batchSize := 50 // Adjust batch size as needed
 
 	// Process PUT requests in batches
 	writeProgress := progressbar.Default(int64(totalOperations), "Writing: ")
-
 	for i := 0; i < totalOperations; i += batchSize {
 		end := i + batchSize
 		if end > totalOperations {
@@ -76,41 +78,39 @@ func TestORAMReadWrite(t *testing.T) {
 		}
 		writeProgress.Add(end - i)
 	}
-
 	writeProgress.Finish()
 
-	// fmt.Println("Printing the tree")
-	// utils.PrintTree(o)
-
-	fmt.Println("Printing the stash...")
+	fmt.Println("Stash after writes:")
 	utils.PrintStashMap(o)
 
-	// Process GET requests in batches and verify results
-	readProgress := progressbar.Default(int64(totalOperations), "Reading: ")
+	// Read all values 5 times
+	for readIteration := 1; readIteration <= 5; readIteration++ {
+		t.Logf("--- Reading iteration %d ---", readIteration)
 
-	for i := 0; i < totalOperations; i += batchSize {
-		end := i + batchSize
-		if end > totalOperations {
-			end = totalOperations
-		}
-		results, err := o.Batching(getRequests[i:end], batchSize)
-		if err != nil {
-			t.Fatalf("Error during GET batching: %v", err)
-		}
-
-		// Verify each key-value pair for the current batch
-		for j := 0; j < end-i; j++ {
-			key := getRequests[i+j].Key
-			expectedValue := fmt.Sprintf("Value%s", key)
-			if results[j] != expectedValue {
-				t.Errorf("Mismatched value for key %s: expected %s, got %s", key, expectedValue, results[j])
+		readProgress := progressbar.Default(int64(totalOperations), fmt.Sprintf("Reading (Iter %d): ", readIteration))
+		for i := 0; i < totalOperations; i += batchSize {
+			end := i + batchSize
+			if end > totalOperations {
+				end = totalOperations
 			}
+			results, err := o.Batching(getRequests[i:end], batchSize)
+			if err != nil {
+				t.Fatalf("Error during GET batching (Iter %d): %v", readIteration, err)
+			}
+
+			// Verify each key-value pair
+			for j := 0; j < end-i; j++ {
+				key := getRequests[i+j].Key
+				expectedValue := fmt.Sprintf("Value%s", key)
+				if results[j] != expectedValue {
+					t.Errorf("Mismatch in Iter %d for key %s: expected %s, got %s", readIteration, key, expectedValue, results[j])
+				}
+			}
+			readProgress.Add(end - i)
 		}
-		readProgress.Add(end - i)
+		readProgress.Finish()
+
+		fmt.Printf("Stash after read iteration %d:\n", readIteration)
+		utils.PrintStashMap(o)
 	}
-
-	readProgress.Finish()
-
-	fmt.Println("Printing the stash...")
-	utils.PrintStashMap(o)
 }
