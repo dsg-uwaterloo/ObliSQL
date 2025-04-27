@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"sort"
 
 	"pathOram/pkg/oram/block"
 	"pathOram/pkg/oram/bucket"
@@ -190,7 +189,7 @@ func (o *ORAM) canInclude(entryLeaf, leaf, level int) bool {
 }
 
 // ReadPath reads the paths from the root to the given leaves and optionally populates the stash.
-func (o *ORAM) ReadPaths(leafs []int) {
+func (o *ORAM) ReadPaths(leafs []int) map[int]struct{} {
 
 	// Calculate the maximum valid leaf value
 	maxLeaf := (1 << o.LogCapacity) - 1
@@ -226,117 +225,83 @@ func (o *ORAM) ReadPaths(leafs []int) {
 		}
 	}
 
+	return uniqueBuckets
+
 }
 
-func (o *ORAM) WritePath(bucketInfo []int, requests *[]bucketRequest.BucketRequest) {
+func (o *ORAM) WritePaths(oldLeaves map[string]int, bucketIndices map[int]struct{}) {
 
-	buckedId := bucketInfo[0]
-	leaf := bucketInfo[1]
-	level := bucketInfo[2]
+	newBuckets := make(map[int]bucket.Bucket)
 
-	//newBucketsWritten := make(map[int]struct{})
-
-	// Step 1: Get all blocks from stash
-	currentStash := make(map[string]block.Block)
-	for blockId, block := range o.StashMap {
-		currentStash[blockId] = block
+	for idx := range bucketIndices {
+		newBuckets[idx] = bucket.Bucket{
+			Blocks:         make([]block.Block, 0, o.Z), // make zero-length slice with capacity o.Z
+			RealBlockCount: 0,
+		}
 	}
 
-	toDelete := make(map[string]struct{}) // track blocks that need to be deleted from stash
+	toDelete := make([]string, 0)
 
-	toInsert := make(map[string]block.Block) // blocks to be inserted in the bucket (up to Z)
+	for key, block := range o.StashMap {
 
-	toDeleteLocal := make([]string, 0) // indices/blockIds/keys of blocks in currentStash to delete
+		var new_leaf_id = o.Keymap[key]
 
-	// Determine what blocks from stash can go into Bucket under consideration
-	// A block can only be inserted into Bucket if its current leaf path and Block's level/leaf intersect
-	for key, currentBlock := range currentStash {
-		currentBlockLeaf := o.Keymap[currentBlock.Key]
-		if o.canInclude(currentBlockLeaf, leaf, level) {
-			// fmt.Println("This block can be written to Tree with key: ", currentBlock.Key)
-			toInsert[currentBlock.Key] = currentBlock
-			toDelete[currentBlock.Key] = struct{}{}
-			toDeleteLocal = append(toDeleteLocal, key) // add the key for block we want to delete
-			if len(toInsert) == o.Z {
-				break
+		for level := o.LogCapacity; level >= 0; level-- {
+			bucketIdPath1 := o.bucketForLevelLeaf(level, new_leaf_id)
+			bucketIdPath2 := -1
+			var old_leaf_id, exists = oldLeaves[key]
+			if exists {
+				bucketIdPath2 = o.bucketForLevelLeaf(level, old_leaf_id)
+			}
+
+			if bucketIdPath2 == -1 {
+				// case where there is only 1 path
+				// check if bucket has space to fit this block
+				if newBuckets[bucketIdPath1].RealBlockCount < o.Z {
+					bucket := newBuckets[bucketIdPath1]
+					bucket.Blocks = append(newBuckets[bucketIdPath1].Blocks, block)
+					bucket.RealBlockCount++
+					newBuckets[bucketIdPath1] = bucket
+					toDelete = append(toDelete, key)
+					break
+				}
+			} else {
+				// case where we need to consider intersection of path 1 and path 2
+				if bucketIdPath1 == bucketIdPath2 {
+					if newBuckets[bucketIdPath1].RealBlockCount < o.Z {
+						bucket := newBuckets[bucketIdPath1]
+						bucket.Blocks = append(newBuckets[bucketIdPath1].Blocks, block)
+						bucket.RealBlockCount++
+						newBuckets[bucketIdPath1] = bucket
+						toDelete = append(toDelete, key)
+						break
+					}
+				}
 			}
 		}
 	}
 
-	// Delete inserted blocks from currentStash
-	for _, key := range toDeleteLocal {
-		delete(currentStash, key)
-	}
-
-	// Prepare the bucket for writing
-
-	bkt := bucket.Bucket{
-		Blocks: make([]block.Block, o.Z),
-	}
-
-	i := 0
-	for _, block := range toInsert {
-		bkt.Blocks[i] = block
-		i++
-		if i >= o.Z {
-			break
-		}
-	}
-
-	// If there are fewer blocks than o.Z, fill the remaining slots with dummy blocks
-	for i < o.Z {
-		bkt.Blocks[i] = block.Block{Key: "-1", Value: ""}
-		i++
-	}
-
-	*requests = append(*requests, bucketRequest.BucketRequest{
-		BucketId: buckedId,
-		Bucket:   bkt,
-	})
-
-	// Update the stash map by removing the newly inserted blocks
-	for key := range toDelete {
+	for _, key := range toDelete {
 		delete(o.StashMap, key)
 	}
 
-}
-
-func (o *ORAM) WritePaths(previousPositionLeaves []int) {
-
 	requests := make([]bucketRequest.BucketRequest, 0)
-	bucketsToFillMap := make(map[int][]int) // Map to store bucketId and its associated [leaf, level]
 
-	for _, leaf := range previousPositionLeaves {
-		for level := o.LogCapacity; level >= 0; level-- {
-			bucketId := o.bucketForLevelLeaf(level, leaf)
-			bucketsToFillMap[bucketId] = []int{leaf, level} // Store leaf and level for each bucketId
+	// pad blocks list in all buckets
+	for idx := range bucketIndices {
+		i := newBuckets[idx].RealBlockCount
+
+		bucket := newBuckets[idx] // copy out
+		for i < o.Z {
+			bucket.Blocks = append(bucket.Blocks, block.Block{Key: "-1", Value: ""})
+			i++
 		}
-	}
+		newBuckets[idx] = bucket // put back
 
-	// Extract keys from the map
-	var bucketIds []int
-	for bucketId := range bucketsToFillMap {
-		bucketIds = append(bucketIds, bucketId)
-	}
-
-	// Sort bucketIds in descending order
-	sort.Slice(bucketIds, func(i, j int) bool {
-		return bucketIds[i] > bucketIds[j]
-	})
-
-	// Create a nested list [bucketId:[leaf, level]]
-	var nestedList [][]int
-	for _, bucketId := range bucketIds {
-		// Access leaf and level for the current bucketId
-		leafLevel := bucketsToFillMap[bucketId]
-		nestedList = append(nestedList, []int{bucketId, leafLevel[0], leafLevel[1]})
-	}
-
-	// Now we have all the bucketIDs that we need to fill - these are all the bucketIDs ReadPaths read in for us
-
-	// Iterate through the nested list
-	for _, entry := range nestedList {
-		o.WritePath(entry, &requests)
+		requests = append(requests, bucketRequest.BucketRequest{
+			BucketId: idx,
+			Bucket:   newBuckets[idx],
+		})
 	}
 
 	// Set the requests in Redis
@@ -379,6 +344,8 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 	// - fake leaves for keys already seen in batch
 	var previousPositionLeaves []int
 
+	oldLeaves := make(map[string]int)
+
 	for _, req := range requests {
 
 		_, keyReadBefore := fakeReadMap[req.Key]
@@ -405,6 +372,8 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 			previousPositionLeaf = crypto.GetRandomInt(1 << o.LogCapacity)
 		}
 
+		oldLeaves[req.Key] = previousPositionLeaf // keep track of old leaf for each key
+
 		// ensure there are no duplicates in previousPositionLeaves - otherwise writepaths may overwrite content
 		if _, alreadyExists := previousPositionLeavesMap[previousPositionLeaf]; !alreadyExists {
 			previousPositionLeavesMap[previousPositionLeaf] = struct{}{}
@@ -412,12 +381,18 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 		}
 
 		// randomly remap key
-		o.Keymap[req.Key] = crypto.GetRandomInt(1 << o.LogCapacity)
+		o.Keymap[req.Key] = crypto.GetRandomInt(1 << o.LogCapacity) // keep track of new leaf for each key
 	}
 
 	// perform read path, go through all paths at once and find non overlapping buckets, fetch all from redis at once - read path use redis MGET
 	// adding all blocks to stash
-	o.ReadPaths(previousPositionLeaves)
+	var bucketIndices map[int]struct{} = o.ReadPaths(previousPositionLeaves)
+
+	/*
+		Optimization v1
+		previousPositionLeaves: all leaves for requested keys (these could be real or fake, but they were requested)
+		newLeaves: for all requested keys, o.Keymap now has NEW leaf ids
+	*/
 
 	// Retrieve values from stash map for all keys in requests and load them into an array
 	values := make([]string, len(requests))
@@ -446,7 +421,7 @@ func (o *ORAM) Batching(requests []request.Request, batchSize int) ([]string, er
 	// no point in redoing, this is an optmization. also, the other path may write -1s into
 	// already filled buckets
 
-	o.WritePaths(previousPositionLeaves)
+	o.WritePaths(oldLeaves, bucketIndices)
 
 	// return the results to the batch in an array
 	return values, nil
