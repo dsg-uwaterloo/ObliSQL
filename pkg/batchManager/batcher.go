@@ -49,6 +49,7 @@ type myBatcher struct {
 	executors         map[int][]ExecutorClient
 	numClients        int
 	tracer            trace.Tracer
+	fakeRequestsOff   bool
 	executorChannels  map[int]chan *KVPair // Per-executor channels
 	channelMap        map[string]responseChannel
 	channelLock       sync.RWMutex
@@ -282,9 +283,12 @@ func (lb *myBatcher) centralCoordinator() {
 				batch = append(batch, kv)
 			}
 			// Add fake requests to make up to R if n < lb.R
-			for len(batch) < lb.R {
-				temp := &KVPair{Key: "Fake", Value: "", channelId: "noChannel"}
-				batch = append(batch, temp)
+			if !lb.fakeRequestsOff {
+				// log.Info().Msgf("Adding Fake Requests", len(batch))
+				for len(batch) < lb.R {
+					temp := &KVPair{Key: "Fake", Value: "", channelId: "noChannel"}
+					batch = append(batch, temp)
+				}
 			}
 			batches[i] = batch
 		}
@@ -295,8 +299,12 @@ func (lb *myBatcher) centralCoordinator() {
 		for i := 0; i < lb.executorNumber; i++ {
 			batch := batches[i]
 			if len(batch) == 0 {
-				//Add error for this should never happen.
-				continue
+				if lb.fakeRequestsOff {
+					log.Info().Msg("Skipping over a batch, Happens when fake requests are turned off")
+					continue
+				} else {
+					log.Fatal().Msg("Should never have an empty batch!")
+				}
 			}
 			go func(executorID int, batch []*KVPair) {
 				lb.executeBatch(executorID, batch)
@@ -447,7 +455,7 @@ func (lb *myBatcher) batchWorker(client ExecutorClient, idx int, workerId int) {
 	}
 }
 
-func NewBatcher(ctx context.Context, R int, executorNumber int, waitTime int, executorType string, executorHosts string, executorPorts string, numClients int, tracer trace.Tracer) *myBatcher {
+func NewBatcher(ctx context.Context, R int, executorNumber int, waitTime int, executorType string, executorHosts string, executorPorts string, numClients int, fakeReqPtr bool, tracer trace.Tracer) *myBatcher {
 	hosts := strings.Split(executorHosts, ",")
 	ports := strings.Split(executorPorts, ",")
 
@@ -469,6 +477,7 @@ func NewBatcher(ctx context.Context, R int, executorNumber int, waitTime int, ex
 		TotalKeysSeen:     atomic.Int64{},
 		aggBatchIds:       atomic.Int64{},
 		executorWorkerIds: make(map[int][]int),
+		fakeRequestsOff:   fakeReqPtr,
 	}
 
 	// // Initialize batchChannel before any goroutines start
@@ -477,6 +486,7 @@ func NewBatcher(ctx context.Context, R int, executorNumber int, waitTime int, ex
 	// }
 
 	service.connectToExecutors(ctx, hosts, ports, numClients)
+	log.Info().Msgf("Fake Requests Off?: %t", service.fakeRequestsOff)
 
 	log.Info().Msgf("Number of Executors: %d", executorNumber)
 	for i := 0; i < executorNumber; i++ {

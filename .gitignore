@@ -6,4 +6,3 @@ cmakebuild
 commands.txt
 latencies_benchmark*.txt
 batchManager
-cmd/benchmark/benchmark
