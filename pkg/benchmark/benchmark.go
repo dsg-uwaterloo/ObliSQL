@@ -258,8 +258,24 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		} else if queryType == "bdb" {
 			requestsWarmup = append(requestsWarmup, getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
+		} else if queryType == "zipf" {
+			source := rand.NewSource(selectionSeed)
+			rng := rand.New(source)
+			zipfU := rand.NewZipf(rng, 1.1, 1, 299999)
+			zipfI := rand.NewZipf(rng, 1.1, 1, 149999)
+			zipfA := rand.NewZipf(rng, 1.1, 1, 78660)
+
+			startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(2060, 12, 31, 0, 0, 0, 0, time.UTC)
+			totalDays := int(endDate.Sub(startDate).Hours() / 24)
+			zipfDate := rand.NewZipf(rng, 1.1, 1, uint64(totalDays-2))
+
+			requestsWarmup = append(requestsWarmup, getZipfQueries(zipfU, zipfI, zipfA, zipfDate)...)
+
 		}
 	}
+	// analysis := AnalyzeSearchColDistribution(requestsWarmup)
+	// PrintDistributionStats(analysis)
 	requestsBench := []Query{}
 	for len(requestsBench) < 500000 {
 		if queryType == "default" {
@@ -272,6 +288,20 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 
 		} else if queryType == "bdb" {
 			requestsBench = append(requestsBench, getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+
+		} else if queryType == "zipf" {
+			source := rand.NewSource(selectionSeed)
+			rng := rand.New(source)
+			zipfU := rand.NewZipf(rng, 1.1, 1, 299999)
+			zipfI := rand.NewZipf(rng, 1.1, 1, 149999)
+			zipfA := rand.NewZipf(rng, 1.1, 1, 78660)
+
+			startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(2060, 12, 31, 0, 0, 0, 0, time.UTC)
+			totalDays := int(endDate.Sub(startDate).Hours() / 24)
+			zipfDate := rand.NewZipf(rng, 1.1, 1, uint64(totalDays-2))
+
+			requestsBench = append(requestsBench, getZipfQueries(zipfU, zipfI, zipfA, zipfDate)...)
 
 		}
 	}
