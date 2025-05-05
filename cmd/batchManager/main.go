@@ -97,8 +97,17 @@ func main() {
 
 		select {
 		case sig := <-sigCh:
+			fmt.Printf("Total Key Added: %v", batchService.TotalKeysSeen.Load())
+			fmt.Println()
+			fmt.Printf("Total Fake Keys Added: %v", batchService.TotalFakeAdded.Load())
+			fmt.Println()
 			fmt.Printf("Received signal: %v. Shutting down server...\n", sig)
+
 		case <-timer.C:
+			fmt.Printf("Total Key Added: %v", batchService.TotalKeysSeen.Load())
+			fmt.Println()
+			fmt.Printf("Total Fake Keys Added: %v", batchService.TotalFakeAdded.Load())
+			fmt.Println()
 			fmt.Println("Timeout reached. Shutting down server...")
 		}
 		// Gracefully stop the gRPC server

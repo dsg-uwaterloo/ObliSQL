@@ -58,6 +58,7 @@ type myBatcher struct {
 	executorWorkerIds map[int][]int
 	TotalKeysSeen     atomic.Int64
 	aggBatchIds       atomic.Int64
+	TotalFakeAdded    atomic.Int64
 }
 
 func (lb *myBatcher) ConnectPing(ctx context.Context, req *loadBalancer.ClientConnect) (*loadBalancer.ClientConnect, error) {
@@ -286,6 +287,7 @@ func (lb *myBatcher) centralCoordinator() {
 			if !lb.fakeRequestsOff {
 				// log.Info().Msgf("Adding Fake Requests", len(batch))
 				for len(batch) < lb.R {
+					lb.TotalFakeAdded.Add(1)
 					temp := &KVPair{Key: "Fake", Value: "", channelId: "noChannel"}
 					batch = append(batch, temp)
 				}
@@ -306,10 +308,12 @@ func (lb *myBatcher) centralCoordinator() {
 					log.Fatal().Msg("Should never have an empty batch!")
 				}
 			}
+			lb.TotalKeysSeen.Add(int64(len(batch)))
 			go func(executorID int, batch []*KVPair) {
 				lb.executeBatch(executorID, batch)
 			}(i, batch)
 		}
+		timer.Reset(waitDuration)
 	}
 }
 
@@ -478,6 +482,7 @@ func NewBatcher(ctx context.Context, R int, executorNumber int, waitTime int, ex
 		aggBatchIds:       atomic.Int64{},
 		executorWorkerIds: make(map[int][]int),
 		fakeRequestsOff:   fakeReqPtr,
+		TotalFakeAdded:    atomic.Int64{},
 	}
 
 	// // Initialize batchChannel before any goroutines start
