@@ -244,6 +244,8 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		log.Fatal(err)
 	}
 	selectionSeed := int64(13091999) //Random Seed
+	// currSeed := time.Now().UnixNano()
+	// fmt.Println(currSeed)
 
 	requestsWarmup := []Query{}
 	for len(requestsWarmup) < 50000 {
@@ -261,9 +263,9 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		} else if queryType == "zipf" {
 			source := rand.NewSource(selectionSeed)
 			rng := rand.New(source)
-			zipfU := rand.NewZipf(rng, 1.1, 1, 299999)
-			zipfI := rand.NewZipf(rng, 1.1, 1, 149999)
-			zipfA := rand.NewZipf(rng, 1.1, 1, 78660)
+			zipfU := rand.NewZipf(rng, 1.1, 1000, 299999)
+			zipfI := rand.NewZipf(rng, 1.1, 1000, 149999)
+			zipfA := rand.NewZipf(rng, 1.1, 1000, 78660)
 
 			startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 			endDate := time.Date(2060, 12, 31, 0, 0, 0, 0, time.UTC)
@@ -274,8 +276,7 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 
 		}
 	}
-	// analysis := AnalyzeSearchColDistribution(requestsWarmup)
-	// PrintDistributionStats(analysis)
+
 	requestsBench := []Query{}
 	for len(requestsBench) < 500000 {
 		if queryType == "default" {
@@ -292,9 +293,9 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		} else if queryType == "zipf" {
 			source := rand.NewSource(selectionSeed)
 			rng := rand.New(source)
-			zipfU := rand.NewZipf(rng, 1.1, 1, 299999)
-			zipfI := rand.NewZipf(rng, 1.1, 1, 149999)
-			zipfA := rand.NewZipf(rng, 1.1, 1, 78660)
+			zipfU := rand.NewZipf(rng, 1.1, 1000, 299999)
+			zipfI := rand.NewZipf(rng, 1.1, 1000, 149999)
+			zipfA := rand.NewZipf(rng, 1.1, 1000, 78660)
 
 			startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 			endDate := time.Date(2060, 12, 31, 0, 0, 0, 0, time.UTC)
@@ -304,6 +305,12 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 			requestsBench = append(requestsBench, getZipfQueries(zipfU, zipfI, zipfA, zipfDate)...)
 
 		}
+	}
+
+	if queryType == "zipf" {
+		analysis := AnalyzeSearchColDistribution(requestsBench)
+		PrintDistributionStats(analysis)
+		fmt.Println(strings.Repeat("-", 50))
 	}
 
 	fmt.Println("In-Flight Requests:", inFlight)
