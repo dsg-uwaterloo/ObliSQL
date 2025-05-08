@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/pingcap/go-ycsb/pkg/generator"
 	"github.com/project/ObliSql/api/resolver"
 )
 
@@ -263,22 +264,27 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		} else if queryType == "zipf" {
 			source := rand.NewSource(selectionSeed)
 			rng := rand.New(source)
-			zipfU := rand.NewZipf(rng, 1.1, 1000, 299999)
-			zipfI := rand.NewZipf(rng, 1.1, 1000, 149999)
-			zipfA := rand.NewZipf(rng, 1.1, 1000, 78660)
 
-			startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-			endDate := time.Date(2060, 12, 31, 0, 0, 0, 0, time.UTC)
+			zipfU := generator.NewZipfianWithRange(10000, 30000, 0.99)
+			zipfI := generator.NewZipfianWithRange(10000, 30000, 0.99)
+			zipfA := generator.NewZipfianWithRange(10000, 30000, 0.99)
+			// zipfU := rand.NewZipf(rng, 1.1, 1000, 299999)
+			// zipfI := rand.NewZipf(rng, 1.1, 1000, 149999)
+			// zipfA := rand.NewZipf(rng, 1.1, 1000, 78660)
+
+			startDate := time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(2030, 12, 31, 0, 0, 0, 0, time.UTC)
 			totalDays := int(endDate.Sub(startDate).Hours() / 24)
-			zipfDate := rand.NewZipf(rng, 1.1, 1, uint64(totalDays-2))
+			// zipfDate := rand.NewZipf(rng, 1.1, 1, uint64(totalDays-2))
+			zipfDate := generator.NewZipfianWithRange(1, int64(totalDays-2), 0.99)
 
-			requestsWarmup = append(requestsWarmup, getZipfQueries(zipfU, zipfI, zipfA, zipfDate)...)
+			requestsWarmup = append(requestsWarmup, getZipfQueries(rng, zipfU, zipfI, zipfA, zipfDate)...)
 
 		}
 	}
 
 	requestsBench := []Query{}
-	for len(requestsBench) < 500000 {
+	for len(requestsBench) < 200000 {
 		if queryType == "default" {
 			requestsBench = append(requestsBench, getTestCases(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed, joinRange, rangeSize)...)
 		} else if queryType == "scaling" {
@@ -293,16 +299,16 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		} else if queryType == "zipf" {
 			source := rand.NewSource(selectionSeed)
 			rng := rand.New(source)
-			zipfU := rand.NewZipf(rng, 1.1, 1000, 299999)
-			zipfI := rand.NewZipf(rng, 1.1, 1000, 149999)
-			zipfA := rand.NewZipf(rng, 1.1, 1000, 78660)
+			zipfU := generator.NewZipfianWithRange(10000, 30000, 0.99)
+			zipfI := generator.NewZipfianWithRange(10000, 30000, 0.99)
+			zipfA := generator.NewZipfianWithRange(10000, 30000, 0.99)
 
-			startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-			endDate := time.Date(2060, 12, 31, 0, 0, 0, 0, time.UTC)
+			startDate := time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC)
+			endDate := time.Date(2030, 12, 31, 0, 0, 0, 0, time.UTC)
 			totalDays := int(endDate.Sub(startDate).Hours() / 24)
-			zipfDate := rand.NewZipf(rng, 1.1, 1, uint64(totalDays-2))
+			zipfDate := generator.NewZipfianWithRange(1, int64(totalDays-2), 0.99)
 
-			requestsBench = append(requestsBench, getZipfQueries(zipfU, zipfI, zipfA, zipfDate)...)
+			requestsBench = append(requestsBench, getZipfQueries(rng, zipfU, zipfI, zipfA, zipfDate)...)
 
 		}
 	}
@@ -313,16 +319,16 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		fmt.Println(strings.Repeat("-", 50))
 	}
 
-	fmt.Println("In-Flight Requests:", inFlight)
-	rateLimit := NewRateLimit(inFlight)
-	ops1, err1, _ := runBenchmark(resolverClient, &requestsWarmup, rateLimit, 10, true)
-	fmt.Printf("Warmup Done! %d %d\n", ops1, err1)
-	fmt.Println("-------")
-	fmt.Printf("Running Benchmark! %d seconds \n", timeDuration)
-	rateLimitNew := NewRateLimit(inFlight)
-	ops2, err2, lat2 := runBenchmark(resolverClient, &requestsBench, rateLimitNew, timeDuration, false)
+	// fmt.Println("In-Flight Requests:", inFlight)
+	// rateLimit := NewRateLimit(inFlight)
+	// ops1, err1, _ := runBenchmark(resolverClient, &requestsWarmup, rateLimit, 10, true)
+	// fmt.Printf("Warmup Done! %d %d\n", ops1, err1)
+	// fmt.Println("-------")
+	// fmt.Printf("Running Benchmark! %d seconds \n", timeDuration)
+	// rateLimitNew := NewRateLimit(inFlight)
+	// ops2, err2, lat2 := runBenchmark(resolverClient, &requestsBench, rateLimitNew, timeDuration, false)
 
-	fmt.Printf("Total Ops: %d\n", ops2)
-	fmt.Printf("Total Err: %d\n", err2)
-	fmt.Printf("Average Latency: %v ms\n", lat2.Milliseconds())
+	// fmt.Printf("Total Ops: %d\n", ops2)
+	// fmt.Printf("Total Err: %d\n", err2)
+	// fmt.Printf("Average Latency: %v ms\n", lat2.Milliseconds())
 }

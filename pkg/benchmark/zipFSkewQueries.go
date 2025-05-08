@@ -5,12 +5,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/pingcap/go-ycsb/pkg/generator"
 	"github.com/project/ObliSql/api/resolver"
 )
 
-func dateSkewHelper(zipfDate *rand.Zipf) (string, string) {
+func dateSkewHelper(r *rand.Rand, zipfDate *generator.Zipfian) (string, string) {
 	startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-	startOffset := int(zipfDate.Uint64())
+	startOffset := int(zipfDate.Next(r))
 	rangeLength := getRandomNumber(5)
 	start := startDate.AddDate(0, 0, startOffset)
 	end := start.AddDate(0, 0, rangeLength)
@@ -18,14 +19,14 @@ func dateSkewHelper(zipfDate *rand.Zipf) (string, string) {
 	return start.Format("2006-01-02"), end.Format("2006-01-02")
 }
 
-func rangeHelper(Zip_u_id *rand.Zipf) (string, string) {
-	startingPoint := Zip_u_id.Uint64()
-	endingPoint := startingPoint + uint64(getRandomNumber(5))
+func rangeHelper(r *rand.Rand, Zip_u_id *generator.Zipfian) (string, string) {
+	startingPoint := Zip_u_id.Next(r)
+	endingPoint := uint64(startingPoint) + uint64(getRandomNumber(5))
 
-	return strconv.FormatUint(startingPoint, 10), strconv.FormatUint(endingPoint, 10)
+	return strconv.FormatUint(uint64(startingPoint), 10), strconv.FormatUint(endingPoint, 10)
 }
 
-func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
+func getZipfQueries(r *rand.Rand, Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *generator.Zipfian) []Query {
 	testCases := []Query{
 		{
 
@@ -37,7 +38,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:  "review",
 				ColToGet:   []string{"rating"},
 				SearchCol:  []string{"u_id"},
-				SearchVal:  []string{strconv.FormatUint(Zip_u_id.Uint64(), 10)},
+				SearchVal:  []string{strconv.FormatUint(uint64(Zip_u_id.Next(r)), 10)},
 				SearchType: []string{"point"},
 			},
 		},
@@ -51,7 +52,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:  "review",
 				ColToGet:   []string{"*"},
 				SearchCol:  []string{"a_id", "i_id"},
-				SearchVal:  []string{strconv.FormatUint(Zip_a_id.Uint64(), 10), strconv.FormatUint(Zip_i_id.Uint64(), 10)},
+				SearchVal:  []string{strconv.FormatUint(uint64(Zip_a_id.Next(r)), 10), strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10)},
 				SearchType: []string{"point", "point"},
 			},
 		},
@@ -65,7 +66,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:  "review",
 				ColToGet:   []string{"rating", "creation_date"},
 				SearchCol:  []string{"i_id"},
-				SearchVal:  []string{strconv.FormatUint(Zip_i_id.Uint64(), 10)},
+				SearchVal:  []string{strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10)},
 				SearchType: []string{"point"},
 				OrderBy:    []string{"creation_date,ASC"},
 			},
@@ -80,7 +81,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:  "review",
 				ColToGet:   []string{"*"},
 				SearchCol:  []string{"i_id"},
-				SearchVal:  []string{strconv.FormatUint(Zip_i_id.Uint64(), 10)},
+				SearchVal:  []string{strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10)},
 				SearchType: []string{"point"},
 				OrderBy:    []string{"creation_date,DESC"},
 			},
@@ -94,7 +95,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:     "review",
 				ColToGet:      []string{"rating"},
 				SearchCol:     []string{"i_id"},
-				SearchVal:     []string{strconv.FormatUint(Zip_i_id.Uint64(), 10)},
+				SearchVal:     []string{strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10)},
 				SearchType:    []string{"point"},
 				AggregateType: []string{"avg"},
 			},
@@ -108,7 +109,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:     "review",
 				ColToGet:      []string{"rating"},
 				SearchCol:     []string{"i_id"},
-				SearchVal:     []string{strconv.FormatUint(Zip_i_id.Uint64(), 10)},
+				SearchVal:     []string{strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10)},
 				SearchType:    []string{"point"},
 				AggregateType: []string{"sum"},
 			},
@@ -122,7 +123,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:     "review",
 				ColToGet:      []string{"rating"},
 				SearchCol:     []string{"i_id"},
-				SearchVal:     []string{strconv.FormatUint(Zip_i_id.Uint64(), 10)},
+				SearchVal:     []string{strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10)},
 				SearchType:    []string{"point"},
 				AggregateType: []string{"count"},
 			},
@@ -139,7 +140,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				ColToGet:  []string{"rating", "rating"},
 				SearchCol: []string{"i_id", "i_id"},
 				SearchVal: func() []string {
-					val := strconv.FormatUint(Zip_i_id.Uint64(), 10)
+					val := strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10)
 					return []string{val, val}
 				}(),
 				SearchType:    []string{"point", "point"},
@@ -156,7 +157,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				ColToGet:  []string{"rating"},
 				SearchCol: []string{"u_id"}, //Change to fetch at most 10 rows 299995
 				SearchVal: func() []string {
-					start, end := rangeHelper(Zip_u_id)
+					start, end := rangeHelper(r, Zip_u_id)
 					return []string{start, end}
 				}(),
 				SearchType: []string{"range"},
@@ -172,7 +173,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				ColToGet:  []string{"rating"},
 				SearchCol: []string{"creation_date"},
 				SearchVal: func() []string {
-					start, end := dateSkewHelper(zipfDate)
+					start, end := dateSkewHelper(r, zipfDate)
 					return []string{start, end}
 				}(),
 				SearchType: []string{"range"},
@@ -188,7 +189,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:   "review,item", //Make it into a list
 				ColToGet:    []string{"review.rating", "item.title"},
 				SearchCol:   []string{"review.i_id"},
-				SearchVal:   []string{strconv.FormatUint(Zip_i_id.Uint64(), 10)}, //getRandomValue(i_id, rng) 55861
+				SearchVal:   []string{strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10)}, //getRandomValue(i_id, rng) 55861
 				SearchType:  []string{"point"},
 				JoinColumns: []string{"i_id", "i_id"},
 				OrderBy:     []string{"review.rating,DESC", "review.creation_date,DESC"},
@@ -203,7 +204,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:   "review,trust", //Make it into a list
 				ColToGet:    []string{"review.rating"},
 				SearchCol:   []string{"review.i_id", "trust.source_u_id"},
-				SearchVal:   []string{strconv.FormatUint(Zip_i_id.Uint64(), 10), strconv.FormatUint(Zip_u_id.Uint64(), 10)},
+				SearchVal:   []string{strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10), strconv.FormatUint(uint64(Zip_u_id.Next(r)), 10)},
 				SearchType:  []string{"point"},
 				JoinColumns: []string{"u_id", "target_u_id"},
 			},
@@ -217,7 +218,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:     "review,trust", //Make it into a list
 				ColToGet:      []string{"review.rating"},
 				SearchCol:     []string{"review.i_id", "trust.source_u_id"},
-				SearchVal:     []string{strconv.FormatUint(Zip_i_id.Uint64(), 10), strconv.FormatUint(Zip_u_id.Uint64(), 10)},
+				SearchVal:     []string{strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10), strconv.FormatUint(uint64(Zip_u_id.Next(r)), 10)},
 				SearchType:    []string{"point"},
 				JoinColumns:   []string{"u_id", "target_u_id"},
 				AggregateType: []string{"avg"},
@@ -232,7 +233,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:  "review",
 				ColToGet:   []string{"title"},
 				SearchCol:  []string{"i_id"},
-				SearchVal:  []string{strconv.FormatUint(Zip_i_id.Uint64(), 10)},
+				SearchVal:  []string{strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10)},
 				SearchType: []string{"point"},
 				UpdateVal:  []string{"This is the new title"},
 			},
@@ -246,7 +247,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:  "review",
 				ColToGet:   []string{"rating"},
 				SearchCol:  []string{"i_id", "u_id"},
-				SearchVal:  []string{strconv.FormatUint(Zip_i_id.Uint64(), 10), strconv.FormatUint(Zip_u_id.Uint64(), 10)},
+				SearchVal:  []string{strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10), strconv.FormatUint(uint64(Zip_u_id.Next(r)), 10)},
 				SearchType: []string{"point", "point"},
 				UpdateVal:  []string{"6"}, //Adding a new Rating just to make sure it isn't something from the DB
 			},
@@ -260,7 +261,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:  "trust",
 				ColToGet:   []string{"trust"},
 				SearchCol:  []string{"source_u_id", "target_u_id"},
-				SearchVal:  []string{strconv.FormatUint(Zip_u_id.Uint64(), 10), strconv.FormatUint(Zip_u_id.Uint64(), 10)}, //using u_id since source/trust u_id reference user IDS.
+				SearchVal:  []string{strconv.FormatUint(uint64(Zip_u_id.Next(r)), 10), strconv.FormatUint(uint64(Zip_u_id.Next(r)), 10)}, //using u_id since source/trust u_id reference user IDS.
 				SearchType: []string{"point", "point"},
 				UpdateVal:  []string{"10"},
 			},
@@ -274,7 +275,7 @@ func getZipfQueries(Zip_u_id, Zip_i_id, Zip_a_id, zipfDate *rand.Zipf) []Query {
 				TableName:  "item",
 				ColToGet:   []string{"description"},
 				SearchCol:  []string{"i_id"},
-				SearchVal:  []string{strconv.FormatUint(Zip_i_id.Uint64(), 10)}, //using u_id since source/trust u_id reference user IDS.
+				SearchVal:  []string{strconv.FormatUint(uint64(Zip_i_id.Next(r)), 10)}, //using u_id since source/trust u_id reference user IDS.
 				SearchType: []string{"point"},
 				UpdateVal:  []string{"new-title"},
 			},

@@ -68,8 +68,11 @@ func AnalyzeSearchColDistribution(queries []Query) map[string]*SearchColDistribu
 	return distributions
 }
 
-// PrintDistributionStats prints detailed statistics about the distributions
+// PrintDistributionStats prints detailed statistics about the distributions with visualization
 func PrintDistributionStats(distributions map[string]*SearchColDistribution) {
+	// Define how many items to show by default
+	defaultTopItems := 20
+
 	for colName, dist := range distributions {
 		fmt.Printf("\n=== %s Distribution ===\n", colName)
 		fmt.Printf("Total occurrences: %d\n", dist.Total)
@@ -88,15 +91,58 @@ func PrintDistributionStats(distributions map[string]*SearchColDistribution) {
 			return pairs[i].Count > pairs[j].Count
 		})
 
-		// Print top values
-		fmt.Println("Top values:")
-		limit := 10
-		if len(pairs) < limit {
-			limit = len(pairs)
+		// Find the highest frequency for scaling the visualization
+		maxFreq := 0
+		if len(pairs) > 0 {
+			maxFreq = pairs[0].Count
 		}
-		for i := 0; i < limit; i++ {
-			fmt.Printf("  %s: %d (%.2f%%)\n", pairs[i].Value, pairs[i].Count,
-				float64(pairs[i].Count)/float64(dist.Total)*100)
+
+		// Display header for the table
+		fmt.Println("\nRank  Value                 Count    Percentage  Distribution")
+		fmt.Println("-------------------------------------------------------------")
+
+		// Determine number of items to show
+		itemsToShow := defaultTopItems
+		if len(pairs) < itemsToShow {
+			itemsToShow = len(pairs)
+		}
+
+		// Display items with visualization
+		maxBars := 50 // maximum number of bars to display
+		for i := 0; i < itemsToShow; i++ {
+			percentage := float64(pairs[i].Count) / float64(dist.Total) * 100
+			bars := generateBars(pairs[i].Count, maxFreq, maxBars)
+
+			// Format the value column with appropriate padding based on content length
+			valueStr := fmt.Sprintf("%-20s", pairs[i].Value)
+			if len(pairs[i].Value) > 20 {
+				valueStr = pairs[i].Value[:17] + "..."
+			}
+
+			fmt.Printf("%-5d %-20s %-8d (%5.2f%%) %s\n",
+				i+1, valueStr, pairs[i].Count, percentage, bars)
+		}
+
+		// If there are too many unique values, summarize the rest
+		if len(pairs) > itemsToShow {
+			remaining := len(pairs) - itemsToShow
+			remainingCount := 0
+			for i := itemsToShow; i < len(pairs); i++ {
+				remainingCount += pairs[i].Count
+			}
+			remainingPercentage := float64(remainingCount) / float64(dist.Total) * 100
+			fmt.Printf("... %d more unique values with combined count %d (%.2f%%)\n",
+				remaining, remainingCount, remainingPercentage)
 		}
 	}
+}
+
+// generateBars creates a text-based bar chart
+func generateBars(count, maxCount, maxBars int) string {
+	if maxCount == 0 {
+		return ""
+	}
+
+	numBars := int(float64(count) * float64(maxBars) / float64(maxCount))
+	return strings.Repeat("█", numBars)
 }

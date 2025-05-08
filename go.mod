@@ -20,8 +20,13 @@ require (
 
 require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
+	github.com/magiconair/properties v1.8.0 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
+	github.com/olekukonko/tablewriter v0.0.5 // indirect
+	github.com/pingcap/errors v0.11.5-0.20211224045212-9687c2b0f87c // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
 )
 
@@ -36,6 +41,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/pingcap/go-ycsb v1.0.1
 	github.com/redis/go-redis/v9 v9.6.1
 	go.opentelemetry.io/otel/metric v1.30.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
