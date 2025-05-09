@@ -3,7 +3,6 @@ package oramexecutor
 import (
 	"errors"
 	"fmt"
-	"sort"
 )
 
 //  Core ORAM functions
@@ -64,7 +63,7 @@ func (o *ORAM) canInclude(entryLeaf, leaf, level int) bool {
 }
 
 // ReadPath reads the paths from the root to the given leaves and optionally populates the stash.
-func (o *ORAM) ReadPaths(leafs []int) {
+func (o *ORAM) ReadPaths(leafs []int) map[int]struct{} {
 
 	// Calculate the maximum valid leaf value
 	maxLeaf := (1 << o.LogCapacity) - 1
@@ -100,132 +99,81 @@ func (o *ORAM) ReadPaths(leafs []int) {
 		}
 	}
 
+	return uniqueBuckets
+
 }
 
-func (o *ORAM) WritePath(bucketInfo []int, requests *[]BucketRequest) {
+func (o *ORAM) WritePaths(oldLeaves map[string]int, bucketIndices map[int]struct{}) {
+	newBuckets := make(map[int]Bucket)
 
-	buckedId := bucketInfo[0]
-	leaf := bucketInfo[1]
-	level := bucketInfo[2]
-
-	// Step 1: Get all blocks from stash
-	currentStash := make(map[string]Block)
-	for blockId, block := range o.StashMap {
-		currentStash[blockId] = block
+	// Initialize all buckets we need to write
+	for idx := range bucketIndices {
+		newBuckets[idx] = Bucket{
+			Blocks:         make([]Block, 0, o.Z),
+			RealBlockCount: 0,
+		}
 	}
 
-	toDelete := make(map[string]struct{}) // track blocks that need to be deleted from stash
+	toDelete := make([]string, 0)
 
-	toInsert := make(map[string]Block) // blocks to be inserted in the bucket (up to Z)
+	// Iterate through stashmap for eviction
+	for key, block := range o.StashMap {
+		newLeafID := o.keyMap[key]
+		oldLeafID, hasOldPath := oldLeaves[key]
 
-	toDeleteLocal := make([]string, 0) // indices/blockIds/keys of blocks in currentStash to delete
+		// Iterate through each level (leaf to root)
+		for level := o.LogCapacity; level >= 0; level-- {
+			bucketIDNew := o.bucketForLevelLeaf(level, newLeafID)
 
-	for key, currentBlock := range currentStash {
-		currentBlockLeaf := o.keyMap[currentBlock.Key]
-		if o.canInclude(currentBlockLeaf, leaf, level) {
-			toInsert[currentBlock.Key] = currentBlock
-			toDelete[currentBlock.Key] = struct{}{}
-			toDeleteLocal = append(toDeleteLocal, key) // add the key for block we want to delete
-			if len(toInsert) == o.Z {
-				break
+			// If the block has an old path, check if it intersects with the new path
+			if hasOldPath {
+				bucketIDOld := o.bucketForLevelLeaf(level, oldLeafID)
+				if bucketIDOld != bucketIDNew {
+					continue // Skip if paths don't intersect at this level - need to check intersection further up
+				}
+			}
+
+			// Check if this bucket is in the set we're writing to - it SHOULD be by default, but for sanity
+			if _, exists := bucketIndices[bucketIDNew]; !exists {
+				continue
+			}
+
+			// If bucket not full, place block
+			if newBuckets[bucketIDNew].RealBlockCount < o.Z {
+				newBucket := newBuckets[bucketIDNew]
+				newBucket.Blocks = append(newBucket.Blocks, block)
+				newBucket.RealBlockCount++
+				newBuckets[bucketIDNew] = newBucket
+				toDelete = append(toDelete, key)
+				break // Block placed - move to next block
 			}
 		}
 	}
 
-	// Delete inserted blocks from currentStash
-	for _, key := range toDeleteLocal {
-		delete(currentStash, key)
-	}
-
-	// Prepare the bucket for writing
-
-	bkt := Bucket{
-		Blocks: make([]Block, o.Z),
-	}
-
-	i := 0
-	for _, block := range toInsert {
-		bkt.Blocks[i] = block
-		i++
-		if i >= o.Z {
-			break
-		}
-	}
-
-	// If there are fewer blocks than o.Z, fill the remaining slots with dummy blocks
-	for i < o.Z {
-		bkt.Blocks[i] = Block{Key: "-1", Value: ""}
-		i++
-	}
-
-	*requests = append(*requests, BucketRequest{
-		BucketId: buckedId,
-		Bucket:   bkt,
-	})
-
-	// Update the stash map by removing the newly inserted blocks
-	for key := range toDelete {
+	// Delete placed blocks from stash
+	for _, key := range toDelete {
 		delete(o.StashMap, key)
 	}
 
-}
-
-func (o *ORAM) WritePaths(previousPositionLeaves []int) {
-
+	// Pad buckets with dummy blocks and prepare Redis requests
 	requests := make([]BucketRequest, 0)
-	bucketsToFillMap := make(map[int][]int) // Map to store bucketId and its associated [leaf, level]
-
-	for _, leaf := range previousPositionLeaves {
-		for level := o.LogCapacity; level >= 0; level-- {
-			bucketId := o.bucketForLevelLeaf(level, leaf)
-			bucketsToFillMap[bucketId] = []int{leaf, level} // Store leaf and level for each bucketId
+	for idx := range bucketIndices {
+		bucket := newBuckets[idx]
+		for len(bucket.Blocks) < o.Z {
+			bucket.Blocks = append(bucket.Blocks, Block{Key: "-1", Value: ""})
 		}
+		requests = append(requests, BucketRequest{
+			BucketId: idx,
+			Bucket:   bucket,
+		})
 	}
 
-	// Extract keys from the map
-	var bucketIds []int
-	for bucketId := range bucketsToFillMap {
-		bucketIds = append(bucketIds, bucketId)
-	}
-
-	// Sort bucketIds in descending order
-	sort.Slice(bucketIds, func(i, j int) bool {
-		return bucketIds[i] > bucketIds[j]
-	})
-
-	// Create a nested list [bucketId:[leaf, level]]
-	var nestedList [][]int
-	for _, bucketId := range bucketIds {
-		// Access leaf and level for the current bucketId
-		leafLevel := bucketsToFillMap[bucketId]
-		nestedList = append(nestedList, []int{bucketId, leafLevel[0], leafLevel[1]})
-	}
-
-	// Now we have all the bucketIDs that we need to fill
-
-	// Iterate through the nested list
-	for _, entry := range nestedList {
-		o.WritePath(entry, &requests)
-	}
-
-	// Set the requests in Redis
+	// Write to Redis
 	if err := o.RedisClient.WriteBucketsToDb(requests); err != nil {
-		fmt.Println("Error writing buckets : ", err)
+		fmt.Println("Error writing buckets:", err)
 	}
-
 }
 
-// ORAM batching mechanism
-/*
-	write path 50 previous position leafs at once to redis - MGET vs pipeline - use MGET 180X faster than GET, pipeline is 12x faster than GET. pipeline allows batching, non blocking for other clients
-	pipeline also allows different types of commands.
-
-	for each batch, as we writepath, keep a track of all buckets already touched/altered
-	if a bucket is already changed, we dont' write that bucket or any of the buckets above it
-	becuase all buckets above have already been considered for all elements of the stash
-	no point in redoing, this is an optmization. also, the other path may write -1s into
-	already filled buckets
-*/
 func (o *ORAM) Batching(requests []Request, batchSize int) ([]string, error) {
 
 	if len(requests) > batchSize {
@@ -244,7 +192,10 @@ func (o *ORAM) Batching(requests []Request, batchSize int) ([]string, error) {
 	// - fake leaves for keys already seen in batch
 	var previousPositionLeaves []int
 
+	oldLeaves := make(map[string]int)
+
 	for _, req := range requests {
+
 		_, keyReadBefore := fakeReadMap[req.Key]
 		var previousPositionLeaf = -1
 
@@ -269,6 +220,8 @@ func (o *ORAM) Batching(requests []Request, batchSize int) ([]string, error) {
 			previousPositionLeaf = GetRandomInt(1 << o.LogCapacity)
 		}
 
+		oldLeaves[req.Key] = previousPositionLeaf // keep track of old leaf for each key
+
 		// ensure there are no duplicates in previousPositionLeaves - otherwise writepaths may overwrite content
 		if _, alreadyExists := previousPositionLeavesMap[previousPositionLeaf]; !alreadyExists {
 			previousPositionLeavesMap[previousPositionLeaf] = struct{}{}
@@ -276,12 +229,18 @@ func (o *ORAM) Batching(requests []Request, batchSize int) ([]string, error) {
 		}
 
 		// randomly remap key
-		o.keyMap[req.Key] = GetRandomInt(1 << o.LogCapacity)
+		o.keyMap[req.Key] = GetRandomInt(1 << o.LogCapacity) // keep track of new leaf for each key
 	}
 
 	// perform read path, go through all paths at once and find non overlapping buckets, fetch all from redis at once - read path use redis MGET
 	// adding all blocks to stash
-	o.ReadPaths(previousPositionLeaves)
+	var bucketIndices map[int]struct{} = o.ReadPaths(previousPositionLeaves)
+
+	/*
+		Optimization v1
+		previousPositionLeaves: all leaves for requested keys (these could be real or fake, but they were requested)
+		newLeaves: for all requested keys, o.Keymap now has NEW leaf ids
+	*/
 
 	// Retrieve values from stash map for all keys in requests and load them into an array
 	values := make([]string, len(requests))
@@ -310,7 +269,7 @@ func (o *ORAM) Batching(requests []Request, batchSize int) ([]string, error) {
 	// no point in redoing, this is an optmization. also, the other path may write -1s into
 	// already filled buckets
 
-	o.WritePaths(previousPositionLeaves)
+	o.WritePaths(oldLeaves, bucketIndices)
 
 	// return the results to the batch in an array
 	return values, nil
