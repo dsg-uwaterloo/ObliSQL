@@ -245,7 +245,7 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		log.Fatal(err)
 	}
 	selectionSeed := int64(13091999) //Random Seed
-	// currSeed := time.Now().UnixNano()
+	currSeed := time.Now().UnixNano()
 	// fmt.Println(currSeed)
 
 	requestsWarmup := []Query{}
@@ -255,6 +255,9 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		} else if queryType == "scaling" {
 			requestsWarmup = append(requestsWarmup, getTestCasesScaling(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
+		} else if queryType == "scaling-limited" {
+			requestsWarmup = append(requestsWarmup, getTestCasesScalingLimited(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+
 		} else if queryType == "epinions" {
 			requestsWarmup = append(requestsWarmup, getTestCasesEpinion(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
@@ -262,7 +265,7 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 			requestsWarmup = append(requestsWarmup, getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
 		} else if queryType == "zipf" {
-			source := rand.NewSource(selectionSeed)
+			source := rand.NewSource(currSeed)
 			rng := rand.New(source)
 
 			zipfU := generator.NewZipfianWithRange(10000, 30000, 0.99)
@@ -290,6 +293,9 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		} else if queryType == "scaling" {
 			requestsBench = append(requestsBench, getTestCasesScaling(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
+		} else if queryType == "scaling-limited" {
+			requestsBench = append(requestsBench, getTestCasesScalingLimited(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+
 		} else if queryType == "epinions" {
 			requestsBench = append(requestsBench, getTestCasesEpinion(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
@@ -297,7 +303,7 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 			requestsBench = append(requestsBench, getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
 		} else if queryType == "zipf" {
-			source := rand.NewSource(selectionSeed)
+			source := rand.NewSource(currSeed)
 			rng := rand.New(source)
 			zipfU := generator.NewZipfianWithRange(10000, 30000, 0.99)
 			zipfI := generator.NewZipfianWithRange(10000, 30000, 0.99)
@@ -319,16 +325,16 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		fmt.Println(strings.Repeat("-", 50))
 	}
 
-	// fmt.Println("In-Flight Requests:", inFlight)
-	// rateLimit := NewRateLimit(inFlight)
-	// ops1, err1, _ := runBenchmark(resolverClient, &requestsWarmup, rateLimit, 10, true)
-	// fmt.Printf("Warmup Done! %d %d\n", ops1, err1)
-	// fmt.Println("-------")
-	// fmt.Printf("Running Benchmark! %d seconds \n", timeDuration)
-	// rateLimitNew := NewRateLimit(inFlight)
-	// ops2, err2, lat2 := runBenchmark(resolverClient, &requestsBench, rateLimitNew, timeDuration, false)
+	fmt.Println("In-Flight Requests:", inFlight)
+	rateLimit := NewRateLimit(inFlight)
+	ops1, err1, _ := runBenchmark(resolverClient, &requestsWarmup, rateLimit, 10, true)
+	fmt.Printf("Warmup Done! %d %d\n", ops1, err1)
+	fmt.Println("-------")
+	fmt.Printf("Running Benchmark! %d seconds \n", timeDuration)
+	rateLimitNew := NewRateLimit(inFlight)
+	ops2, err2, lat2 := runBenchmark(resolverClient, &requestsBench, rateLimitNew, timeDuration, false)
 
-	// fmt.Printf("Total Ops: %d\n", ops2)
-	// fmt.Printf("Total Err: %d\n", err2)
-	// fmt.Printf("Average Latency: %v ms\n", lat2.Milliseconds())
+	fmt.Printf("Total Ops: %d\n", ops2)
+	fmt.Printf("Total Err: %d\n", err2)
+	fmt.Printf("Average Latency: %v ms\n", lat2.Milliseconds())
 }
