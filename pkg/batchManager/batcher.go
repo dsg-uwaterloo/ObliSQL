@@ -269,6 +269,7 @@ func (lb *myBatcher) centralCoordinator() {
 		// Collect batches
 		allZero := true
 		batches := make(map[int][]*KVPair)
+		fakeCount := 0
 		for i := 0; i < lb.executorNumber; i++ {
 			n := len(lb.executorChannels[i])
 			if n != 0 {
@@ -287,7 +288,7 @@ func (lb *myBatcher) centralCoordinator() {
 			if !lb.fakeRequestsOff {
 				// log.Info().Msgf("Adding Fake Requests", len(batch))
 				for len(batch) < lb.R {
-					lb.TotalFakeAdded.Add(1)
+					fakeCount += 1
 					temp := &KVPair{Key: "Fake", Value: "", channelId: "noChannel"}
 					batch = append(batch, temp)
 				}
@@ -309,6 +310,7 @@ func (lb *myBatcher) centralCoordinator() {
 				}
 			}
 			lb.TotalKeysSeen.Add(int64(len(batch)))
+			lb.TotalFakeAdded.Add(int64(fakeCount))
 			go func(executorID int, batch []*KVPair) {
 				lb.executeBatch(executorID, batch)
 			}(i, batch)
