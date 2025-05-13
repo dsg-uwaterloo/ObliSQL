@@ -343,16 +343,16 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		fmt.Println(strings.Repeat("-", 50))
 	}
 
-	// fmt.Println("In-Flight Requests:", inFlight)
-	// rateLimit := NewRateLimit(inFlight)
-	// ops1, err1, _ := runBenchmark(resolverClient, &requestsWarmup, rateLimit, 10, true)
-	// fmt.Printf("Warmup Done! %d %d\n", ops1, err1)
-	// fmt.Println("-------")
-	// fmt.Printf("Running Benchmark! %d seconds \n", timeDuration)
-	// rateLimitNew := NewRateLimit(inFlight)
-	// ops2, err2, lat2 := runBenchmark(resolverClient, &requestsBench, rateLimitNew, timeDuration, false)
+	fmt.Println("In-Flight Requests:", inFlight)
+	rateLimit := NewRateLimit(inFlight)
+	ops1, err1, _ := runBenchmark(resolverClient, &requestsWarmup, rateLimit, 10, true)
+	fmt.Printf("Warmup Done! %d %d\n", ops1, err1)
+	fmt.Println("-------")
+	fmt.Printf("Running Benchmark! %d seconds \n", timeDuration)
+	rateLimitNew := NewRateLimit(inFlight)
+	ops2, err2, lat2 := runBenchmark(resolverClient, &requestsBench, rateLimitNew, timeDuration, false)
 
-	// fmt.Printf("Total Ops: %d\n", ops2)
-	// fmt.Printf("Total Err: %d\n", err2)
-	// fmt.Printf("Average Latency: %v ms\n", lat2.Milliseconds())
+	fmt.Printf("Total Ops: %d\n", ops2)
+	fmt.Printf("Total Err: %d\n", err2)
+	fmt.Printf("Average Latency: %v ms\n", lat2.Milliseconds())
 }
