@@ -142,7 +142,7 @@ func getTestCasesScalingLimited(u_id, i_id, a_id, pageRank_list *[]string, pair_
 				ColToGet:  []string{"rating"},
 				SearchCol: []string{"u_id"}, //Change to fetch at most 10 rows 299995
 				SearchVal: func() []string {
-					start, end := getRandomRangeScaling(10000, 299995, getRandomNumber(5))
+					start, end := getRandomRangeScaling(10000, 30000, getRandomNumber(5))
 					return []string{start, end}
 				}(),
 				SearchType: []string{"range"},
@@ -189,7 +189,7 @@ func getTestCasesScalingLimited(u_id, i_id, a_id, pageRank_list *[]string, pair_
 				TableName:   "review,trust", //Make it into a list
 				ColToGet:    []string{"review.rating"},
 				SearchCol:   []string{"review.i_id", "trust.source_u_id"},
-				SearchVal:   []string{getRandomValueMinMax(10000, 30000), getRandomValueMinMax(10000, 299999)},
+				SearchVal:   []string{getRandomValueMinMax(10000, 30000), getRandomValueMinMax(10000, 30000)},
 				SearchType:  []string{"point"},
 				JoinColumns: []string{"u_id", "target_u_id"},
 			},
@@ -203,7 +203,7 @@ func getTestCasesScalingLimited(u_id, i_id, a_id, pageRank_list *[]string, pair_
 				TableName:     "review,trust", //Make it into a list
 				ColToGet:      []string{"review.rating"},
 				SearchCol:     []string{"review.i_id", "trust.source_u_id"},
-				SearchVal:     []string{getRandomValueMinMax(10000, 30000), getRandomValueMinMax(10000, 299999)},
+				SearchVal:     []string{getRandomValueMinMax(10000, 30000), getRandomValueMinMax(10000, 30000)},
 				SearchType:    []string{"point"},
 				JoinColumns:   []string{"u_id", "target_u_id"},
 				AggregateType: []string{"avg"},
