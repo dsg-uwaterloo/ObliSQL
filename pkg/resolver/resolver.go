@@ -46,6 +46,12 @@ func (c *myResolver) ExecuteQuery(ctx context.Context, q *resolver.ParsedQuery) 
 		if err != nil {
 			log.Info().Msgf("Update failed because: %s", err)
 		}
+	case "bdb3":
+		resp, err = c.doBDB3Join(q, requestID)
+		if err != nil {
+			log.Info().Msgf("BDB3 failed because: %s", err)
+		}
+
 	default:
 		return nil, fmt.Errorf("unsupported query type: %s", q.QueryType)
 	}
@@ -254,6 +260,7 @@ func (r *myResolver) readJoinFilters(filePath string, joinName string) {
 	if err != nil {
 		log.Fatal().Msgf("Error parsing JSON: %v", err)
 	}
+
 	for _, pair := range pairs {
 		if len(pair) == 2 {
 			reviewPK := pair[0]
@@ -374,8 +381,9 @@ func NewResolver(ctx context.Context, lbAddr []string, lbPort []string, traceLoc
 	// service.readJoinMap(joinMapLoc)
 	// service.InitDB(ctx, traceLocation) //Initialize the DB
 
-	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_review_trust.json", "review,trust") //PK,FK
-	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_item_review.json", "review,item")   //PK,FK
+	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_review_trust.json", "review,trust")           //PK,FK
+	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_item_review.json", "review,item")             //PK,FK
+	service.readJoinFilters("../../metaData/JoinMaps/pairList/pairs_pageURL_destURL.json", "rankings,uservisits") //PK,FK
 	// service.readJSONToMap("../../metaData/partitionMap/max_chunk_sizes.json")
 
 	if service.UseBloom {

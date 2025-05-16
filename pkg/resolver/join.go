@@ -386,7 +386,7 @@ func (c *myResolver) indexFilterAndJoin(tableName string, searchMap *map[string]
 		if contains(splitValues, "-1") {
 			return map[string][]string{}, joinCheck, foundPairs, pairMapping // Empty Response back, we can return
 		}
-		tableNameKeyMap[tableNameInner] = splitValues
+		tableNameKeyMap[tableNameInner] = append(tableNameKeyMap[tableNameInner], splitValues...)
 	}
 	span.AddEvent("Parsed Index")
 
