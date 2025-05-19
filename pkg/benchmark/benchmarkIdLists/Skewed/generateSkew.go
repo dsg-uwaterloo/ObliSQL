@@ -37,5 +37,5 @@ func main() {
 	// generateSkewedIdList(0.99) //High Skew
 	// generateSkewedIdList(0.55) //Medium Skew
 	// generateSkewedIdList(0.11) //Low Skew
-	generateSkewedIdList(0.00)
+	generateSkewedIdList(0.01)
 }

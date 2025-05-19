@@ -9,8 +9,8 @@ import (
 )
 
 func dateSkewHelper(startOffSetValue int) (string, string) {
-	startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
-	startOffset := startOffSetValue
+	startDate := time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC)
+	startOffset := startOffSetValue - 10000
 	rangeLength := getRandomNumber(5)
 	start := startDate.AddDate(0, 0, startOffset)
 	end := start.AddDate(0, 0, rangeLength)

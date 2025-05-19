@@ -224,6 +224,11 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		highSkewFile = "../../pkg/benchmark/benchmarkIdLists/Skewed/skewed_ids_0.99.csv"
 	}
 
+	lowSkewFile := os.Getenv("lowSkewFile")
+	if lowSkewFile == "" {
+		lowSkewFile = "../../pkg/benchmark/benchmarkIdLists/Skewed/skewed_ids_0.csv"
+	}
+
 	item_id_list, err := ReadCSVColumn(itemIDFile, 0, true)
 	if err != nil {
 		log.Fatal(err)
@@ -251,13 +256,24 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 
 	var highSkew_list []string
 
-	if queryType == "zipf" {
+	if queryType == "zipf9" {
 		var err error
 		highSkew_list, err = ReadCSVColumn(highSkewFile, 0, true)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
+
+	var lowSkew_list []string
+
+	if queryType == "zipf0" {
+		var err error
+		lowSkew_list, err = ReadCSVColumn(lowSkewFile, 0, true)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	selectionSeed := int64(13091999) //Random Seed
 	// currSeed := time.Now().UnixNano()
 	// fmt.Println(currSeed)
@@ -278,32 +294,20 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		} else if queryType == "bdb" {
 			requestsWarmup = append(requestsWarmup, getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
-		} else if queryType == "zipf" {
-			// source := rand.NewSource(currSeed)
-			// rng := rand.New(source)
-
-			// zipfU := generator.NewZipfianWithRange(10000, 30000, 0.99)
-			// zipfI := generator.NewZipfianWithRange(10000, 30000, 0.99)
-			// zipfA := generator.NewZipfianWithRange(10000, 30000, 0.99)
-			// zipfU := rand.NewZipf(rng, 1.1, 1000, 299999)
-			// zipfI := rand.NewZipf(rng, 1.1, 1000, 149999)
-			// zipfA := rand.NewZipf(rng, 1.1, 1000, 78660)
-
-			// startDate := time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC)
-			// endDate := time.Date(2030, 12, 31, 0, 0, 0, 0, time.UTC)
-			// totalDays := int(endDate.Sub(startDate).Hours() / 24)
-			// // zipfDate := rand.NewZipf(rng, 1.1, 1, uint64(totalDays-2))
-			// zipfDate := generator.NewZipfianWithRange(1, int64(totalDays-2), 0.99)
+		} else if queryType == "zipf9" {
 
 			r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 			requestsWarmup = append(requestsWarmup, getZipfQueries(r, highSkew_list)...)
 
+		} else if queryType == "zipf0" {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			requestsWarmup = append(requestsWarmup, getZipfQueries(r, lowSkew_list)...)
 		}
 	}
 
 	requestsBench := []Query{}
-	for len(requestsBench) < 200000 {
+	for len(requestsBench) < 500000 {
 		if queryType == "default" {
 			requestsBench = append(requestsBench, getTestCases(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed, joinRange, rangeSize)...)
 		} else if queryType == "scaling" {
@@ -318,30 +322,24 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		} else if queryType == "bdb" {
 			requestsBench = append(requestsBench, getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
-		} else if queryType == "zipf" {
-			// source := rand.NewSource(currSeed)
-			// rng := rand.New(source)
-			// zipfU := generator.NewZipfianWithRange(10000, 30000, 0.99)
-			// zipfI := generator.NewZipfianWithRange(10000, 30000, 0.99)
-			// zipfA := generator.NewZipfianWithRange(10000, 30000, 0.99)
-
-			// startDate := time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC)
-			// endDate := time.Date(2030, 12, 31, 0, 0, 0, 0, time.UTC)
-			// totalDays := int(endDate.Sub(startDate).Hours() / 24)
-			// zipfDate := generator.NewZipfianWithRange(1, int64(totalDays-2), 0.99)
+		} else if queryType == "zipf9" {
 
 			r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 			requestsBench = append(requestsBench, getZipfQueries(r, highSkew_list)...)
 
+		} else if queryType == "zipf0" {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+			requestsBench = append(requestsBench, getZipfQueries(r, lowSkew_list)...)
 		}
 	}
 
-	if queryType == "zipf" {
-		analysis := AnalyzeSearchColDistribution(requestsBench)
-		PrintDistributionStats(analysis)
-		fmt.Println(strings.Repeat("-", 50))
-	}
+	// if queryType == "zipf" {
+	// 	analysis := AnalyzeSearchColDistribution(requestsBench)
+	// 	PrintDistributionStats(analysis)
+	// 	fmt.Println(strings.Repeat("-", 50))
+	// }
 
 	fmt.Println("In-Flight Requests:", inFlight)
 	rateLimit := NewRateLimit(inFlight)
