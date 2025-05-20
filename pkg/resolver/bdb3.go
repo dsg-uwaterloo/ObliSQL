@@ -12,6 +12,56 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// AvgMetrics holds the two averages for a given IP.
+type AvgMetrics struct {
+	PageRank  float64
+	AdRevenue float64
+}
+
+func ComputeAverages(keys, vals []string) map[string]AvgMetrics {
+	// intermediate sums and counts
+	type accum struct {
+		sumRank    float64
+		sumRevenue float64
+		count      int
+	}
+	statsMap := make(map[string]*accum, len(vals)/3)
+
+	for i := 0; i+2 < len(vals); i += 3 {
+		pr, err := strconv.ParseFloat(vals[i], 64)
+		if err != nil {
+			continue
+		}
+		ip := vals[i+1]
+		ar, err := strconv.ParseFloat(vals[i+2], 64)
+		if err != nil {
+			continue
+		}
+
+		a, ok := statsMap[ip]
+		if !ok {
+			a = &accum{}
+			statsMap[ip] = a
+		}
+		a.sumRank += pr
+		a.sumRevenue += ar
+		a.count++
+	}
+
+	// build final averages map
+	result := make(map[string]AvgMetrics, len(statsMap))
+	for ip, a := range statsMap {
+		if a.count == 0 {
+			continue
+		}
+		result[ip] = AvgMetrics{
+			PageRank:  a.sumRank / float64(a.count),
+			AdRevenue: a.sumRevenue / float64(a.count),
+		}
+	}
+	return result
+}
+
 func generateTuples(values []string, max int) []string {
 	var tuples []string
 	for _, group := range values {
@@ -169,9 +219,54 @@ func (c *myResolver) doBDB3Join(q *resolver.ParsedQuery, localRequestID int64) (
 			foundPairs2 = append(foundPairs2, pair)
 		}
 	}
+	resultKeys := []string{}
+	resultValues := []string{}
+
+	for _, pair := range foundPairs2 {
+		parts := strings.Split(pair, "/")
+		if len(parts) != 2 {
+			log.Warn().Msgf("Invalid pair format: %s", pair)
+			continue
+		}
+		//parts[0] --> rankings
+		//parts[1] --> uservisits
+		pageRank := fmt.Sprintf("%s/%s/%s", "rankings", "pageRank", parts[0])
+		sourceIP := fmt.Sprintf("%s/%s/%s", "uservisits", "sourceIP", parts[1])
+		adRevenue := fmt.Sprintf("%s/%s/%s", "uservisits", "adRevenue", parts[1])
+		resultKeys = append(resultKeys, pageRank)
+		resultKeys = append(resultKeys, sourceIP)
+		resultKeys = append(resultKeys, adRevenue)
+		resultValues = append(resultValues, "")
+		resultValues = append(resultValues, "")
+		resultValues = append(resultValues, "")
+	}
+
+	fetchKeys := loadbalancer.LoadBalanceRequest{
+		Keys:      resultKeys,
+		Values:    resultValues,
+		RequestId: localRequestID,
+	}
+
+	valueResp, err := conn.AddKeys(ctx, &fetchKeys)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch pageURL value: %w", err)
+	}
+
+	averages := ComputeAverages(valueResp.Keys, valueResp.Values)
+
+	returnKeys := []string{}
+	returnValues := []string{}
+
+	for ip, metrics := range averages {
+		returnKeys = append(returnKeys, fmt.Sprintf("sourceIP/%s", ip))
+		returnValues = append(returnValues, fmt.Sprintf("avgPageRank=%f || avgAdRevenue=%f", metrics.PageRank, metrics.AdRevenue))
+
+	}
+
+	fmt.Println(len(returnKeys))
 
 	return &queryResponse{
-		Keys:   []string{},
-		Values: []string{},
+		Keys:   returnKeys,
+		Values: returnValues,
 	}, nil
 }
