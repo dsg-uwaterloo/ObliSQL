@@ -229,6 +229,22 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		lowSkewFile = "../../pkg/benchmark/benchmarkIdLists/Skewed/skewed_ids_0.csv"
 	}
 
+	// New environment variables for the additional zipf distributions
+	zipf25File := os.Getenv("zipf25File")
+	if zipf25File == "" {
+		zipf25File = "../../pkg/benchmark/benchmarkIdLists/Skewed/skewed_ids_0.25.csv"
+	}
+
+	zipf50File := os.Getenv("zipf50File")
+	if zipf50File == "" {
+		zipf50File = "../../pkg/benchmark/benchmarkIdLists/Skewed/skewed_ids_0.5.csv"
+	}
+
+	zipf75File := os.Getenv("zipf75File")
+	if zipf75File == "" {
+		zipf75File = "../../pkg/benchmark/benchmarkIdLists/Skewed/skewed_ids_0.75.csv"
+	}
+
 	item_id_list, err := ReadCSVColumn(itemIDFile, 0, true)
 	if err != nil {
 		log.Fatal(err)
@@ -255,6 +271,10 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 	}
 
 	var highSkew_list []string
+	var lowSkew_list []string
+	var zipf25_list []string
+	var zipf50_list []string
+	var zipf75_list []string
 
 	if queryType == "zipf9" {
 		var err error
@@ -264,11 +284,34 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		}
 	}
 
-	var lowSkew_list []string
-
 	if queryType == "zipf0" {
 		var err error
 		lowSkew_list, err = ReadCSVColumn(lowSkewFile, 0, true)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	// Load the new zipf distributions when needed
+	if queryType == "zipf025" {
+		var err error
+		zipf25_list, err = ReadCSVColumn(zipf25File, 0, true)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if queryType == "zipf05" {
+		var err error
+		zipf50_list, err = ReadCSVColumn(zipf50File, 0, true)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if queryType == "zipf075" {
+		var err error
+		zipf75_list, err = ReadCSVColumn(zipf75File, 0, true)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -295,14 +338,24 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 			requestsWarmup = append(requestsWarmup, getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
 		} else if queryType == "zipf9" {
-
 			r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
 			requestsWarmup = append(requestsWarmup, getZipfQueries(r, highSkew_list)...)
 
 		} else if queryType == "zipf0" {
 			r := rand.New(rand.NewSource(time.Now().UnixNano()))
 			requestsWarmup = append(requestsWarmup, getZipfQueries(r, lowSkew_list)...)
+
+		} else if queryType == "zipf025" {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			requestsWarmup = append(requestsWarmup, getZipfQueries(r, zipf25_list)...)
+
+		} else if queryType == "zipf05" {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			requestsWarmup = append(requestsWarmup, getZipfQueries(r, zipf50_list)...)
+
+		} else if queryType == "zipf075" {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			requestsWarmup = append(requestsWarmup, getZipfQueries(r, zipf75_list)...)
 		}
 	}
 
@@ -323,15 +376,24 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 			requestsBench = append(requestsBench, getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
 		} else if queryType == "zipf9" {
-
 			r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
 			requestsBench = append(requestsBench, getZipfQueries(r, highSkew_list)...)
 
 		} else if queryType == "zipf0" {
 			r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
 			requestsBench = append(requestsBench, getZipfQueries(r, lowSkew_list)...)
+
+		} else if queryType == "zipf025" {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			requestsBench = append(requestsBench, getZipfQueries(r, zipf25_list)...)
+
+		} else if queryType == "zipf05" {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			requestsBench = append(requestsBench, getZipfQueries(r, zipf50_list)...)
+
+		} else if queryType == "zipf075" {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			requestsBench = append(requestsBench, getZipfQueries(r, zipf75_list)...)
 		}
 	}
 
