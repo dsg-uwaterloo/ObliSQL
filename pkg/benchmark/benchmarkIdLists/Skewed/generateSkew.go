@@ -35,7 +35,9 @@ func generateSkewedIdList(zipfFactor float64) {
 
 func main() {
 	// generateSkewedIdList(0.99) //High Skew
-	// generateSkewedIdList(0.55) //Medium Skew
-	// generateSkewedIdList(0.11) //Low Skew
-	generateSkewedIdList(0.01)
+	generateSkewedIdList(0.75)
+	generateSkewedIdList(0.50)
+	generateSkewedIdList(0.25)
+
+	// generateSkewedIdList(0.00) // Uniform
 }

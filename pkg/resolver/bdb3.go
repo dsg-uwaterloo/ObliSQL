@@ -129,18 +129,20 @@ func (c *myResolver) doBDB3Join(q *resolver.ParsedQuery, localRequestID int64) (
 		return nil, fmt.Errorf("failed to fetch index value: %w", err)
 	}
 
-	// Step 3: Go over all possible Keys
-	totalRankingIds := c.metaData["rankings"].PkEnd
 	joinFilter := c.Filters[q.TableName]
-	crossProduct := generateTuples(resp.Values, totalRankingIds)
-	foundPairs := []string{}
-	for _, pair := range crossProduct {
-		pairBytes := []byte(pair) // Concatenate the strings and convert to []byte
-		found := joinFilter.Has(xxhash.Sum64(pairBytes))
-		if found {
-			foundPairs = append(foundPairs, pair) // Concatenate with a delimiter for string representation
-		}
-	}
+
+	// // Step 3: Go over all possible Keys
+	// totalRankingIds := c.metaData["rankings"].PkEnd
+	// joinFilter := c.Filters[q.TableName]
+	// crossProduct := generateTuples(resp.Values, totalRankingIds)
+	// foundPairs := []string{}
+	// for _, pair := range crossProduct {
+	// 	pairBytes := []byte(pair) // Concatenate the strings and convert to []byte
+	// 	found := joinFilter.Has(xxhash.Sum64(pairBytes))
+	// 	if found {
+	// 		foundPairs = append(foundPairs, pair) // Concatenate with a delimiter for string representation
+	// 	}
+	// }
 
 	// Step 3(2): Fetch DestURLs using the PKs u got. Then Fetch Pks from Rankings for those pageUrls and then make a join.
 
@@ -263,7 +265,7 @@ func (c *myResolver) doBDB3Join(q *resolver.ParsedQuery, localRequestID int64) (
 
 	}
 
-	fmt.Println(len(returnKeys))
+	// fmt.Println(len(resultKeys))
 
 	return &queryResponse{
 		Keys:   returnKeys,
