@@ -9,8 +9,34 @@ import (
 func getTestCasesBDB(u_id, i_id, a_id, pageRank_list *[]string, pair_list *[][]string, seedVal int64) []Query {
 	source := rand.NewSource(seedVal) // Fixed seed value
 	rng := rand.New(source)
-	testCases := []Query{
 
+	// Generate a random number to decide the query type
+	isJoinQuery := rng.Float64() < 0.05 // 5% probability for BDB3-Join
+	endingPoints := []string{"1980-01-02", "1980-01-03", "1980-01-04", "1980-01-05"}
+
+	if isJoinQuery {
+		return []Query{
+			{
+				name: "BDB3-Join",
+				requestQuery: &resolver.ParsedQuery{
+					ClientId:  "1",
+					QueryType: "bdb3",
+					TableName: "rankings,uservisits",
+					ColToGet:  []string{"uservisits.sourceIP", "uservisits.adRevenue", "rankings.pageRank"},
+					SearchCol: []string{"uservisits.visitDate"},
+					SearchVal: func() []string {
+						start, end := "1980-01-01", endingPoints[rng.Intn(len(endingPoints))]
+						return []string{start, end}
+					}(),
+					SearchType:  []string{"range"},
+					JoinColumns: []string{"pageURL", "destURL"},
+				},
+			},
+		}
+	}
+
+	// Return other queries if not BDB3-Join
+	testCases := []Query{
 		{
 			name: "BDB1-Select",
 			requestQuery: &resolver.ParsedQuery{
@@ -36,22 +62,6 @@ func getTestCasesBDB(u_id, i_id, a_id, pageRank_list *[]string, pair_list *[][]s
 					return []string{start, end}
 				}(),
 				SearchType: []string{"range"},
-			},
-		},
-		{
-			name: "BDB3-Join",
-			requestQuery: &resolver.ParsedQuery{
-				ClientId:  "1",
-				QueryType: "bdb3",
-				TableName: "rankings,uservisits",
-				ColToGet:  []string{"uservisits.sourceIP", "uservisits.adRevenue", "rankings.pageRank"},
-				SearchCol: []string{"uservisits.visitDate"},
-				SearchVal: func() []string {
-					start, end := "1980-01-01", "1980-01-01"
-					return []string{start, end}
-				}(),
-				SearchType:  []string{"range"},
-				JoinColumns: []string{"pageURL", "destURL"},
 			},
 		},
 	}
