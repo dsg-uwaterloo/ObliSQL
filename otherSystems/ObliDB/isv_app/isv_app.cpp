@@ -34,7 +34,10 @@
 
 
 
+#include <cstring>
 #include <stdio.h>
+#include <chrono>
+#include <thread>
 #include <stdlib.h>
 #include <limits.h>
 #include <unistd.h>
@@ -288,6 +291,189 @@ void ocall_read_file(void *dest, int dsize){
 
 }
 
+int getRandomNumberInRange(int x, int y) {
+	if (x >= y) {
+		return x;
+	}
+	return rand() % (y - x) + x;
+}
+
+int pickRandomNumberFromList()
+{
+    // Put your numbers in a static array
+    static const int numbers[] = {
+        80818, 11289, 8097, 6660, 5738, 4960, 4668, 4333, 3996, 3826, 3632, 3435, 3411, 3136,
+        3036, 2963, 2840, 2850, 2705, 2468, 2537, 2475, 2411, 2388, 2453, 2307, 2255, 2345, 2191,
+        2152, 2123, 2036, 2046, 1971, 1969, 1908, 1944, 1888, 1789, 1825, 1822, 1768, 1787, 1742,
+        1684, 1733, 1740, 1673, 1622, 1647, 1587, 1630, 1579, 1569, 1566, 1496, 1539, 1487, 1451,
+        1508, 1432, 1454, 1419, 1448, 1419, 1427, 1374, 1323, 1360, 1383, 1354, 1431, 1292, 1344,
+        1339, 1283, 1262, 1276, 1329, 1315, 1274, 1271, 1193, 1258, 1257, 1245, 1229, 1239, 1207,
+        1179, 1221, 1182, 1199, 1122, 1160, 1140, 1126, 1187, 1156, 1128, 1172, 1063, 1096, 1118,
+        1116, 1116, 1146, 1171, 1106, 1086, 1075, 1121, 1088, 1082, 1096, 1083, 1062, 1122, 1036,
+        1046, 1051, 1078, 1004, 1018, 1041, 1035, 1034, 1072, 1010, 1075, 1012, 1023, 1031, 1027,
+        1017
+    };
+
+    // Compute the array's size
+    static const size_t sizeOfList = sizeof(numbers) / sizeof(numbers[0]);
+
+    // Seed rand() once (the first time this function is called)
+    static bool seeded = false;
+    if (!seeded) {
+        srand(static_cast<unsigned int>(time(nullptr)));
+        seeded = true;
+    }
+
+    // Generate a random index using rand()
+    int randomIndex = rand() % sizeOfList;
+    
+    // Return the corresponding number
+    return numbers[randomIndex];
+}
+
+#include <vector>
+#include <string>
+#include <random>
+#include <utility>
+
+std::pair<int, int> getRandomRangeFromList(const std::vector<std::string>& list, int k) {
+	if (k <= 0 || list.size() < k) {
+		return {0, 0};
+	}
+
+	std::random_device rd;
+	std::mt19937 rng(rd());
+
+	// Calculate the maximum starting index for a valid range of size k
+	int maxStart = list.size() - k;
+
+	// Generate a random starting index
+	std::uniform_int_distribution<int> dist(0, maxStart);
+	int randomStart = dist(rng);
+
+	// Get the start element as a string and convert to an integer
+	int start = std::stoi(list[randomStart]);
+
+	// Calculate the end of the range
+	int end = start + k;
+
+	return {start, end};
+}
+
+void client_server_benchmark(sgx_enclave_id_t enclave_id, Condition cond1, Condition cond2,Condition joinCond, Condition noCond, std::vector<std::string> list2, int status, int K) {
+    using namespace std::chrono;
+    double totalElapsedTime = 0.0;
+	double pointComputation = 0.0;
+	double rangeComputation = 0.0;
+	double joinComputation = 0.0;
+
+	int joinArray[] = {19800102, 19800103, 19800104, 19800105, 19800106};
+
+    // Reset counter at the beginning of each benchmark run
+    int queryCallCounter = 0;
+
+    //Cond1 --> Point Query
+    //Cond2 --> Range Query
+
+    for (int i = 0; i < K; i++) {
+        queryCallCounter++;
+        
+        int queryType;
+        // Every 20th call is a join query (5%)
+        if (queryCallCounter % 20 == 0) {
+            queryType = 3; // Join query
+        } else {
+            // For non-join queries, randomly choose between point (1) and range (2)
+            queryType = (rand() % 2) + 1; // Either 1 or 2
+        }
+
+        if (queryType == 1) {
+            //Do a Point Query
+            int randNum = pickRandomNumberFromList(); //Pick a Random Number 
+            memcpy(cond1.values[0], &randNum, 4); //Replace it in Cond
+            auto start = high_resolution_clock::now();
+            std::this_thread::sleep_for(milliseconds(5)); // Simulate 5ms latency to client
+			auto startCompute = high_resolution_clock::now();
+            indexSelect(enclave_id, &status, "rankings", -1, cond1, -1, -1, 2, 1000, INT_MAX, 0); //Small
+            auto endCompute = high_resolution_clock::now();
+			std::this_thread::sleep_for(milliseconds(5)); // Simulate 5ms latency from server to client
+            auto end = high_resolution_clock::now();
+            double elapsed = duration<double>(end - start).count();
+			double elapsedCompute = duration<double>(endCompute-startCompute).count();
+            totalElapsedTime += elapsed;
+			pointComputation+=elapsedCompute;
+            deleteTable(enclave_id, (int*)&status, "ReturnTable");
+
+        } else if (queryType == 2) {
+            // Do a Range Query	
+            std::pair<int, int> randomRange = getRandomRangeFromList(list2, 5);
+            memcpy(cond2.values[0], &randomRange.first, sizeof(int));
+            memcpy(cond2.nextCondition->values[0], &randomRange.second, sizeof(int));
+            auto start = high_resolution_clock::now();
+            std::this_thread::sleep_for(milliseconds(5)); // Simulate 5ms latency to client
+			auto startCompute = high_resolution_clock::now();
+            indexSelect(enclave_id, (int*)&status, "rankings", -1, cond2, -1, -1, -1, randomRange.first, randomRange.second, 0); // Following Workloads Code
+            auto endCompute = high_resolution_clock::now();
+			std::this_thread::sleep_for(milliseconds(5)); // Simulate 5ms latency from server to client
+            auto end = high_resolution_clock::now();
+            double elapsed = duration<double>(end - start).count();
+			double elapsedCompute = duration<double>(endCompute-startCompute).count();
+            totalElapsedTime += elapsed;
+			rangeComputation +=elapsedCompute;
+            deleteTable(enclave_id, (int*)&status, "ReturnTable");
+
+        } else if (queryType == 3) {
+			
+			int randomIndex = rand() % (sizeof(joinArray) / sizeof(joinArray[0]));
+			int randomValue = joinArray[randomIndex];
+			memcpy(joinCond.nextCondition->values[0], &randomValue, sizeof(int));
+			// printf("Start: %d, End: %d\n", *(int*)joinCond.values[0], *(int*)joinCond.nextCondition->values[0]);
+            // Do a Join
+            auto start = high_resolution_clock::now();
+
+            std::this_thread::sleep_for(milliseconds(5)); // Simulate 5ms latency to client
+
+			auto startCompute = high_resolution_clock::now();
+            selectRows(enclave_id, (int*)&status, "uservisits", -1, joinCond, -1, -1, 2, 0);
+            //indexSelect(enclave_id, (int*)&status, "uservisits", -1, cond1, -1, -1, 2, l, h);
+            renameTable(enclave_id, (int*)&status, "ReturnTable", "uvJ");
+            //printTable(enclave_id, (int*)&status, "uvJ");
+            joinTables(enclave_id, (int*)&status, "uvJ", "rankings", 2, 1, -1, -1);
+            //int joinTables(char* tableName1, char* tableName2, int joinCol1, int joinCol2, int startKey, int endKey) {//put the smaller table first for
+            renameTable(enclave_id, (int*)&status, "JoinReturn", "jr");
+            //printTable(enclave_id, (int*)&status, "jr");
+            selectRows(enclave_id, (int*)&status, "jr", 10, noCond, 4, 1, 4, 0);
+            renameTable(enclave_id, (int*)&status, "ReturnTable", "last");
+            //printTable(enclave_id, (int*)&status, "last");
+            selectRows(enclave_id, (int*)&status, "last", 2, noCond, 3, -1, -1, 0);
+            //select from index
+			auto endCompute = high_resolution_clock::now();
+            std::this_thread::sleep_for(milliseconds(5)); // Simulate 5ms latency from server to client
+
+            auto end = high_resolution_clock::now();
+            double elapsed = duration<double>(end - start).count();
+			double elapsedCompute = duration<double>(endCompute-startCompute).count();
+            totalElapsedTime += elapsed;
+			joinComputation+=elapsedCompute;
+            deleteTable(enclave_id, (int*)&status, "ReturnTable");
+        }
+    }
+    
+    printf("Average running time for %d iterations: %.5f seconds\n", K, totalElapsedTime / K);
+    printf("Throughput: %.2f requests/second\n", K / totalElapsedTime);
+
+	printf("\n \n");
+	printf("Point Computation Time: %.5f seconds\n", pointComputation / K);
+	printf("Range Computation Time: %.5f seconds\n", rangeComputation / K);
+	printf("Join Computation Time: %.5f seconds\n", joinComputation / K);
+		
+	printf("\n \n");
+    // Print query distribution for verification
+    int joinQueries = K / 20 + (K % 20 == 0 ? 0 : 0); // Exact count of join queries
+    printf("Join Query Fraction: %d join queries (%.1f%%), %d non-join queries (%.1f%%)\n", 
+           joinQueries, (100.0 * joinQueries) / K, 
+           K - joinQueries, (100.0 * (K - joinQueries)) / K);
+}
 void BDB1Index(sgx_enclave_id_t enclave_id, int status){
 	//block size needs to be 512
 
@@ -309,14 +495,6 @@ void BDB1Index(sgx_enclave_id_t enclave_id, int status){
 	rankingsSchema.fieldSizes[3] = 4;
 	rankingsSchema.fieldTypes[3] = INTEGER;
 
-	Condition cond;
-	int val = 1000;
-	cond.numClauses = 1;
-	cond.fieldNums[0] = 2;
-	cond.conditionType[0] = 1;
-	cond.values[0] = (uint8_t*)malloc(4);
-	memcpy(cond.values[0], &val, 4);
-	cond.nextCondition = NULL;
 
 	char* tableName = "rankings";
 	createTable(enclave_id, (int*)&status, &rankingsSchema, tableName, strlen(tableName), TYPE_TREE_ORAM, 360010, &structureIdIndex);//TODO temp really 360010
@@ -363,31 +541,176 @@ void BDB1Index(sgx_enclave_id_t enclave_id, int status){
 	double elapsedTime;
 	//printTable(enclave_id, (int*)&status, "rankings");
 
-	startTime = clock();
-	indexSelect(enclave_id, (int*)&status, "rankings", -1, cond, -1, -1, 2, 1000, INT_MAX, 0);
-	//char* tableName, int colChoice, Condition c, int aggregate, int groupCol, int algChoice, int key_start, int key_end
-	endTime = clock();
-	elapsedTime = (double)(endTime - startTime)/(CLOCKS_PER_SEC);
-	printf("BDB1 running time (small): %.5f\n", elapsedTime);
-	//printTable(enclave_id, (int*)&status, "ReturnTable");
-    deleteTable(enclave_id, (int*)&status, "ReturnTable");
-	startTime = clock();
-	indexSelect(enclave_id, (int*)&status, "rankings", -1, cond, -1, -1, 3, 1000, INT_MAX, 0);
-	//char* tableName, int colChoice, Condition c, int aggregate, int groupCol, int algChoice, int key_start, int key_end
-	endTime = clock();
-	elapsedTime = (double)(endTime - startTime)/(CLOCKS_PER_SEC);
-	printf("BDB1 running time (hash): %.5f\n", elapsedTime);
-	printTable(enclave_id, (int*)&status, "ReturnTable");
-    deleteTable(enclave_id, (int*)&status, "ReturnTable");
-	startTime = clock();
-	indexSelect(enclave_id, (int*)&status, "rankings", -1, cond, -1, -1, 5, 1000, INT_MAX, 0);
-	//char* tableName, int colChoice, Condition c, int aggregate, int groupCol, int algChoice, int key_start, int key_end
-	endTime = clock();
-	elapsedTime = (double)(endTime - startTime)/(CLOCKS_PER_SEC);
-	printf("BDB1 running time (baseline): %.5f\n", elapsedTime);
-	printTable(enclave_id, (int*)&status, "ReturnTable");
-    deleteTable(enclave_id, (int*)&status, "ReturnTable");
+	//Point Query
+	Condition cond;
+	int val = 1000;
+	cond.numClauses = 1;
+	cond.fieldNums[0] = 2;
+	cond.conditionType[0] = 0;
+	cond.values[0] = (uint8_t*)malloc(4);
+	memcpy(cond.values[0], &val, 4);
+	cond.nextCondition = NULL;
 
+	//Range Query
+
+	Condition condition1, condition2, noCondition, neverCondition;
+    char a = 'a', b = 'b', c='c';
+	std::vector<std::string> list2;
+	std::ifstream filePageRank("pageRank.csv");
+	std::string line2;
+	while (std::getline(filePageRank, line2)) {
+		list2.push_back(line2);
+	}
+
+	
+	int low = 1, high = 100;
+
+    condition1.numClauses = 1;
+    condition1.fieldNums[0] = 1;
+    condition1.conditionType[0] = 1; //1 --> Greater than low
+    condition1.values[0] = (uint8_t*)&low;
+    condition1.nextCondition = &condition2;
+    condition2.numClauses = 1;
+    condition2.fieldNums[0] = 1;
+    condition2.conditionType[0] = -1; //-1 --? Less than High
+    condition2.values[0] = (uint8_t*)&high;
+    condition2.nextCondition = NULL;
+    noCondition.numClauses = 0;
+    noCondition.nextCondition = NULL;
+
+    neverCondition.numClauses = 1;
+    neverCondition.fieldNums[0] = 1;
+    neverCondition.conditionType[0] = -1;
+    neverCondition.values[0] = (uint8_t*)&low;
+    neverCondition.nextCondition = NULL;
+
+
+	Schema userdataSchema;
+	int structureId1 = -1;
+	int structureId2 = -1;
+	userdataSchema.numFields = 10;
+	userdataSchema.fieldOffsets[0] = 0;
+	userdataSchema.fieldSizes[0] = 1;
+	userdataSchema.fieldTypes[0] = CHAR;
+	userdataSchema.fieldOffsets[1] = 1;
+	userdataSchema.fieldSizes[1] = 255;
+	userdataSchema.fieldTypes[1] = TINYTEXT;
+	userdataSchema.fieldOffsets[2] = 256;
+	userdataSchema.fieldSizes[2] = 255;
+	userdataSchema.fieldTypes[2] = TINYTEXT;
+	userdataSchema.fieldOffsets[3] = 511;
+	userdataSchema.fieldSizes[3] = 4;
+	userdataSchema.fieldTypes[3] = INTEGER;
+	userdataSchema.fieldOffsets[4] = 515;
+	userdataSchema.fieldSizes[4] = 4;
+	userdataSchema.fieldTypes[4] = INTEGER;
+	userdataSchema.fieldOffsets[5] = 519;
+	userdataSchema.fieldSizes[5] = 255;
+	userdataSchema.fieldTypes[5] = TINYTEXT;
+	userdataSchema.fieldOffsets[6] = 774;
+	userdataSchema.fieldSizes[6] = 255;
+	userdataSchema.fieldTypes[6] = TINYTEXT;
+	userdataSchema.fieldOffsets[7] = 1029;
+	userdataSchema.fieldSizes[7] = 255;
+	userdataSchema.fieldTypes[7] = TINYTEXT;
+	userdataSchema.fieldOffsets[8] = 1284;
+	userdataSchema.fieldSizes[8] = 255;
+	userdataSchema.fieldTypes[8] = TINYTEXT;
+	userdataSchema.fieldOffsets[9] = 1539;
+	userdataSchema.fieldSizes[9] = 4;
+	userdataSchema.fieldTypes[9] = INTEGER;
+
+	Condition condJoin;
+	condJoin.numClauses = 0;
+	condJoin.nextCondition = NULL;
+
+	char* tableName2 = "uservisits";
+	createTable(enclave_id, (int*)&status, &userdataSchema, tableName2, strlen(tableName2), TYPE_LINEAR_SCAN, 350010, &structureId2); //TODO temp really 350010
+
+	std::ifstream file2("uservisits.csv");
+
+	//file.getline(line, BLOCK_DATA_SIZE);//burn first line
+	row[0] = 'a';
+	for(int i = 0; i < 350000; i++){//TODO temp really 350000
+	//for(int i = 0; i < 1000; i++){
+		memset(row, 'a', BLOCK_DATA_SIZE);
+		file2.getline(line, BLOCK_DATA_SIZE);//get the field
+
+		std::istringstream ss(line);
+		for(int j = 0; j < 9; j++){
+			if(!ss.getline(data, BLOCK_DATA_SIZE, ',')){
+				break;
+			}
+			//printf("data: %s\n", data);
+			if(j == 2 || j == 3 || j == 8){//integer
+				int d = 0;
+				if(j==3) d = atof(data)*100;
+				else d = atoi(data);
+				//printf("data: %s\n", data);
+				//printf("d %d ", d);
+				memcpy(&row[userdataSchema.fieldOffsets[j+1]], &d, 4);
+			}
+			else{//tinytext
+				strncpy((char*)&row[userdataSchema.fieldOffsets[j+1]], data, strlen(data)+1);
+			}
+		}
+		//manually insert into the linear scan structure for speed purposes
+		opOneLinearScanBlock(enclave_id, (int*)&status, structureId2, i, (Linear_Scan_Block*)row, 1);
+		incrementNumRows(enclave_id, (int*)&status, structureId2);
+	}
+
+	printf("created uservisits table\n");
+
+	Condition JoinQuery, condJoin2; 
+	int l = 19800100, h = 19800105; //19800105
+	JoinQuery.numClauses = 1;
+	JoinQuery.fieldNums[0] = 3;
+	JoinQuery.conditionType[0] = 1; //>1980-01-00 => >=1980-01-01
+	JoinQuery.values[0] = (uint8_t*)malloc(4);
+	memcpy(JoinQuery.values[0], &l, 4);
+	JoinQuery.nextCondition = &condJoin2;
+	condJoin2.numClauses = 1;
+	condJoin2.fieldNums[0] = 3;
+	condJoin2.conditionType[0] = 2; //<1980-01-05 => <=1980-01-04
+	condJoin2.values[0] = (uint8_t*)malloc(4);
+	memcpy(condJoin2.values[0], &h, 4);
+	condJoin2.nextCondition = NULL;
+	Condition noCond;
+	noCond.numClauses = 0;
+	noCond.nextCondition = NULL;
+
+
+
+
+	client_server_benchmark(enclave_id,cond, condition1,JoinQuery,noCond,list2,status, 10000);
+
+	// elapsedTime = (double)(endTime - startTime)/(CLOCKS_PER_SEC);
+	// printf("BDB1 running time (small): %.5f\n", elapsedTime);
+	//printTable(enclave_id, (int*)&status, "ReturnTable");
+
+
+	// startTime = clock();
+	// indexSelect(enclave_id, (int*)&status, "rankings", -1, cond, -1, -1, 3, 1000, INT_MAX, 0);
+	// //char* tableName, int colChoice, Condition c, int aggregate, int groupCol, int algChoice, int key_start, int key_end
+	// endTime = clock();
+	// elapsedTime = (double)(endTime - startTime)/(CLOCKS_PER_SEC);
+	// printf("BDB1 running time (hash): %.5f\n", elapsedTime);
+
+
+
+	// printTable(enclave_id, (int*)&status, "ReturnTable");
+    // deleteTable(enclave_id, (int*)&status, "ReturnTable");
+	// startTime = clock();
+	// indexSelect(enclave_id, (int*)&status, "rankings", -1, cond, -1, -1, 5, 1000, INT_MAX, 0);
+	// //char* tableName, int colChoice, Condition c, int aggregate, int groupCol, int algChoice, int key_start, int key_end
+	// endTime = clock();
+	// elapsedTime = (double)(endTime - startTime)/(CLOCKS_PER_SEC);
+	
+	// printf("BDB1 running time (baseline): %.5f\n", elapsedTime);
+	// printTable(enclave_id, (int*)&status, "ReturnTable");
+    // deleteTable(enclave_id, (int*)&status, "ReturnTable");
+	
+ 	deleteTable(enclave_id, (int*)&status, "uservisits");
     deleteTable(enclave_id, (int*)&status, "rankings");
 }
 
@@ -572,17 +895,19 @@ void BDB2(sgx_enclave_id_t enclave_id, int status, int baseline){
 	time_t startTime, endTime;
 	double elapsedTime;
 	//printTable(enclave_id, (int*)&status, "uservisits");
-	startTime = clock();
-	if(baseline == 1)
-		selectRows(enclave_id, (int*)&status, "uservisits", 4, cond, 1, 1, -2, 2);
-	else
-		highCardLinGroupBy(enclave_id, (int*)&status, "uservisits", 4, cond, 1, 1, -2, 0);
+	// client_server_benchmark(enclave_id,cond, status, 10000);
+	
+	// startTime = clock();
+	// if(baseline == 1)
+	// 	selectRows(enclave_id, (int*)&status, "uservisits", 4, cond, 1, 1, -2, 2);
+	// else
+	// 	highCardLinGroupBy(enclave_id, (int*)&status, "uservisits", 4, cond, 1, 1, -2, 0);
 	//char* tableName, int colChoice, Condition c, int aggregate, int groupCol, int algChoice
-	endTime = clock();
-	elapsedTime = (double)(endTime - startTime)/(CLOCKS_PER_SEC);
+	// endTime = clock();
+	// elapsedTime = (double)(endTime - startTime)/(CLOCKS_PER_SEC);
 	//printf("BDB2 running time: %.5f\n", elapsedTime);
 	printTable(enclave_id, (int*)&status, "ReturnTable");
-	printf("BDB2 running time: %.5f\n", elapsedTime);
+	// printf("BDB2 running time: %.5f\n", elapsedTime);
 
     deleteTable(enclave_id, (int*)&status, "ReturnTable");
 
@@ -670,17 +995,18 @@ void BDB2Index(sgx_enclave_id_t enclave_id, int status, int baseline){
 	}
 
 	printf("created BDB2 table\n");
-	time_t startTime, endTime;
-	double elapsedTime;
+	// client_server_benchmark(enclave_id,cond, status, 10000);
+	// time_t startTime, endTime;
+	// double elapsedTime;
 	//printTable(enclave_id, (int*)&status, "uservisits");
-	startTime = clock();
-	highCardLinGroupBy(enclave_id, (int*)&status, "uservisits", 4, cond, 1, 1, -2, 0);
+	// startTime = clock();
+	// highCardLinGroupBy(enclave_id, (int*)&status, "uservisits", 4, cond, 1, 1, -2, 0);
 	//char* tableName, int colChoice, Condition c, int aggregate, int groupCol, int algChoice
-	endTime = clock();
-	elapsedTime = (double)(endTime - startTime)/(CLOCKS_PER_SEC);
+	// endTime = clock();
+	// elapsedTime = (double)(endTime - startTime)/(CLOCKS_PER_SEC);
 	//printf("BDB2 running time: %.5f\n", elapsedTime);
-	printf("BDB2 running time: %.5f\n", elapsedTime);
-	printTable(enclave_id, (int*)&status, "ReturnTable");
+	// printf("BDB2 running time: %.5f\n", elapsedTime);
+	// printTable(enclave_id, (int*)&status, "ReturnTable");
 
     deleteTable(enclave_id, (int*)&status, "ReturnTable");
 
@@ -822,7 +1148,7 @@ void BDB3(sgx_enclave_id_t enclave_id, int status, int baseline){
 	double elapsedTime;
 
 	Condition cond1, cond2;
-	int l = 19800100, h = 19800402;
+	int l = 19800100, h = 19800105; //19800105
 	cond1.numClauses = 1;
 	cond1.fieldNums[0] = 3;
 	cond1.conditionType[0] = 1;
@@ -839,7 +1165,7 @@ void BDB3(sgx_enclave_id_t enclave_id, int status, int baseline){
 	noCond.numClauses = 0;
 	noCond.nextCondition = NULL;
 
-	startTime = clock();
+	// startTime = clock();
 	if(baseline == 1){
 		selectRows(enclave_id, (int*)&status, "uservisits", -1, cond1, -1, -1, 5, 0);
 		renameTable(enclave_id, (int*)&status, "ReturnTable", "uvJ");
@@ -854,6 +1180,38 @@ void BDB3(sgx_enclave_id_t enclave_id, int status, int baseline){
 		selectRows(enclave_id, (int*)&status, "last", 2, noCond, 3, -1, 0, 0);
 	}
 	else{
+		// selectRows(enclave_id, (int*)&status, "uservisits", -1, cond1, -1, -1, 2, 0);
+		// //indexSelect(enclave_id, (int*)&status, "uservisits", -1, cond1, -1, -1, 2, l, h);
+		// renameTable(enclave_id, (int*)&status, "ReturnTable", "uvJ");
+		// //printTable(enclave_id, (int*)&status, "uvJ");
+		// joinTables(enclave_id, (int*)&status, "uvJ", "rankings",  2, 1, -1, -1);
+		// //int joinTables(char* tableName1, char* tableName2, int joinCol1, int joinCol2, int startKey, int endKey) {//put the smaller table first for
+		// renameTable(enclave_id, (int*)&status, "JoinReturn", "jr");
+		// //printTable(enclave_id, (int*)&status, "jr");
+		// selectRows(enclave_id, (int*)&status, "jr", 10, noCond, 4, 1, 4, 0);
+		// renameTable(enclave_id, (int*)&status, "ReturnTable", "last");
+		// //printTable(enclave_id, (int*)&status, "last");
+		// selectRows(enclave_id, (int*)&status, "last", 2, noCond, 3, -1, -1, 0);
+		// //select from index
+		//join
+		//fancy group by
+		//select max
+		//char* tableName, int colChoice, Condition c, int aggregate, int groupCol, int algChoice
+	}
+	// endTime = clock();
+	// elapsedTime = (double)(endTime - startTime)/(CLOCKS_PER_SEC);
+	// printf("BDB3 running time: %.5f\n", elapsedTime);
+	//printTable(enclave_id, (int*)&status, "ReturnTable");
+	double totalElapsedTime = 0.0;
+	double totalComputeTime = 0.0;
+	int K = 10000;
+	printf("Benchmarking with K = %d iterations\n", K);
+	using namespace std::chrono;
+    for (int i = 0; i < K; i++) {
+        auto start = high_resolution_clock::now();
+
+        std::this_thread::sleep_for(milliseconds(5)); // Simulate 5ms latency to client
+
 		selectRows(enclave_id, (int*)&status, "uservisits", -1, cond1, -1, -1, 2, 0);
 		//indexSelect(enclave_id, (int*)&status, "uservisits", -1, cond1, -1, -1, 2, l, h);
 		renameTable(enclave_id, (int*)&status, "ReturnTable", "uvJ");
@@ -867,15 +1225,19 @@ void BDB3(sgx_enclave_id_t enclave_id, int status, int baseline){
 		//printTable(enclave_id, (int*)&status, "last");
 		selectRows(enclave_id, (int*)&status, "last", 2, noCond, 3, -1, -1, 0);
 		//select from index
-		//join
-		//fancy group by
-		//select max
-		//char* tableName, int colChoice, Condition c, int aggregate, int groupCol, int algChoice
-	}
-	endTime = clock();
-	elapsedTime = (double)(endTime - startTime)/(CLOCKS_PER_SEC);
-	printf("BDB3 running time: %.5f\n", elapsedTime);
-	//printTable(enclave_id, (int*)&status, "ReturnTable");
+
+		
+        std::this_thread::sleep_for(milliseconds(5)); // Simulate 5ms latency from server to client
+
+        auto end = high_resolution_clock::now();
+        double elapsed = duration<double>(end - start).count();
+        totalElapsedTime += elapsed;
+		deleteTable(enclave_id, (int*)&status, "ReturnTable");
+    }
+ 	printf("Average running time for %d iterations: %.5f seconds\n", K, totalElapsedTime / K);
+    printf("Throughput: %.2f requests/second\n", K / totalElapsedTime);
+
+
     deleteTable(enclave_id, (int*)&status, "ReturnTable");
 
     deleteTable(enclave_id, (int*)&status, "uservisits");
@@ -3567,16 +3929,16 @@ int main(int argc, char* argv[])
         //nasdaqTables(enclave_id, status); //2048	
         //complaintTables(enclave_id, status); //4096	
         //flightTables(enclave_id, status); //512 (could be less, but we require 512 minimum)	
-        //BDB1Index(enclave_id, status);//512		
+        BDB1Index(enclave_id, status);//512		
         //BDB1Linear(enclave_id, status);//512		
         //BDB2(enclave_id, status, 0);//2048		
-        //BDB2Index(enclave_id, status, 0);//2048	
-        //BDB3(enclave_id, status, 0);//2048		
+        // BDB2Index(enclave_id, status, 0);//2048	
+        // BDB3(enclave_id, status, 0);//2048		
         //BDB2(enclave_id, status, 1);//2048 (baseline)	
         //BDB3(enclave_id, status, 1);//2048 (baseline)	
         //basicTests(enclave_id, status);//512		
 	//fabTests(enclave_id, status);//512		
-        joinTests(enclave_id, status);//512		
+        // joinTests(enclave_id, status);//512		
         //workloadTests(enclave_id, status);//512	
         //insdelScaling(enclave_id, status);//512	
 
