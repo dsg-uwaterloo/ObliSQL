@@ -1,0 +1,3 @@
+[submodule "ObliDB"]
+	path = ObliDB
+	url = https://github.com/SabaEskandarian/ObliDB/
