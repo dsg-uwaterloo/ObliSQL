@@ -320,6 +320,8 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 	selectionSeed := int64(13091999) //Random Seed
 	// currSeed := time.Now().UnixNano()
 	// fmt.Println(currSeed)
+	joinNumb := 0
+	nonJoinNumb := 0
 
 	requestsWarmup := []Query{}
 	for len(requestsWarmup) < 50000 {
@@ -335,7 +337,13 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 			requestsWarmup = append(requestsWarmup, getTestCasesEpinion(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
 		} else if queryType == "bdb" {
-			requestsWarmup = append(requestsWarmup, getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+			query := getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)
+			if query.name == "BDB3-Join" {
+				joinNumb += 1
+			} else {
+				nonJoinNumb += 1
+			}
+			requestsWarmup = append(requestsWarmup, query)
 
 		} else if queryType == "zipf9" {
 			r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -359,6 +367,18 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 		}
 	}
 
+	if queryType == "bdb" {
+		ResetBDBCallCounter()
+		fmt.Println("--------Warmup--------")
+		fmt.Printf("JoinNumber %d\n", joinNumb)
+		fmt.Printf("NonJoinNumber %d\n", nonJoinNumb)
+		fmt.Println("---------------------------")
+		fmt.Println()
+
+	}
+	joinNumb = 0
+	nonJoinNumb = 0
+
 	requestsBench := []Query{}
 	for len(requestsBench) < 500000 {
 		if queryType == "default" {
@@ -373,7 +393,13 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 			requestsBench = append(requestsBench, getTestCasesEpinion(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
 
 		} else if queryType == "bdb" {
-			requestsBench = append(requestsBench, getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)...)
+			query := getTestCasesBDB(&user_id_list, &item_id_list, &a_id_list, &pageRank_list, &pair_date_list, selectionSeed)
+			if query.name == "BDB3-Join" {
+				joinNumb += 1
+			} else {
+				nonJoinNumb += 1
+			}
+			requestsBench = append(requestsBench, query)
 
 		} else if queryType == "zipf9" {
 			r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -395,6 +421,15 @@ func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDur
 			r := rand.New(rand.NewSource(time.Now().UnixNano()))
 			requestsBench = append(requestsBench, getZipfQueries(r, zipf75_list)...)
 		}
+	}
+	if queryType == "bdb" {
+		ResetBDBCallCounter()
+		fmt.Println("--------Benchmark--------")
+		fmt.Printf("JoinNumber %d\n", joinNumb)
+		fmt.Printf("NonJoinNumber %d\n", nonJoinNumb)
+		fmt.Println("---------------------------")
+		fmt.Println()
+
 	}
 
 	// if queryType == "zipf" {
