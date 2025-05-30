@@ -18,6 +18,13 @@ We do this for our system as well. All reported numbers include this delay.
 
 Query execution code is taken as is from their respective functions. 
 
+System Config:
+
+Intel(R) Xeon(R) E-2374G CPU @ 3.70GHz
+125GB RAM
+
+Intel SGX: 2.22.100.3
+
 ------------------------------------
 Step 1: Generate Key
 ------------------------------------
