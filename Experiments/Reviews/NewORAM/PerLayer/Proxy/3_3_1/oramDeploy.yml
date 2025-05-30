@@ -1,0 +1,288 @@
+---
+- name: Deploy and Manage Processes
+  hosts: all
+  vars:
+    oram_one_cmd: "./oramExecutor -br {{r}} -l 22 -z 4 -sl /hdd1/haseeb/ObliSQL/cmd/oramExecutor/Scale1Epinion/proxy_snapshot.json -rh {{ hostvars['redis_server_one'].ansible_host }} -rp 6381 -snapshot"
+
+    batcher_one_cmd: "./batchManager -p {{ hostvars['batcher_one'].batcher_port }} -R {{r}} -Z 400 -num {{sf}} -T Oram -X 2 -hosts {{ hostvars['oram_one'].ansible_host }} -ports {{ hostvars['oram_one'].oram_port }}"
+    batcher_two_cmd: "./batchManager -p {{ hostvars['batcher_two'].batcher_port }} -R {{r}} -Z 400 -num {{sf}} -T Oram -X 2 -hosts {{ hostvars['oram_one'].ansible_host }} -ports {{ hostvars['oram_one'].oram_port }}"
+    batcher_three_cmd: "./batchManager -p {{ hostvars['batcher_three'].batcher_port }} -R {{r}} -Z 400 -num {{sf}} -T Oram -X 2 -hosts {{ hostvars['oram_one'].ansible_host }} -ports {{ hostvars['oram_one'].oram_port }}"
+
+    resolver_one_cmd: "./resolver -p {{hostvars['resolver_one'].resolver_port}} -bh {{ hostvars['batcher_one'].ansible_host }},{{ hostvars['batcher_two'].ansible_host }},{{ hostvars['batcher_three'].ansible_host }} -bp {{ hostvars['batcher_one'].batcher_port }},{{ hostvars['batcher_two'].batcher_port }},{{ hostvars['batcher_three'].batcher_port }} -bf"
+    resolver_two_cmd: "./resolver -p {{hostvars['resolver_two'].resolver_port}} -bh {{ hostvars['batcher_one'].ansible_host }},{{ hostvars['batcher_two'].ansible_host }},{{ hostvars['batcher_three'].ansible_host }} -bp {{ hostvars['batcher_one'].batcher_port }},{{ hostvars['batcher_two'].batcher_port }},{{ hostvars['batcher_three'].batcher_port }} -bf"
+    resolver_three_cmd: "./resolver -p {{hostvars['resolver_three'].resolver_port}} -bh {{ hostvars['batcher_one'].ansible_host }},{{ hostvars['batcher_two'].ansible_host }},{{ hostvars['batcher_three'].ansible_host }} -bp {{ hostvars['batcher_one'].batcher_port }},{{ hostvars['batcher_two'].batcher_port }},{{ hostvars['batcher_three'].batcher_port }} -bf"
+
+    benchmark_cmd: "./benchmark -h {{ hostvars['resolver_one'].ansible_host }},{{ hostvars['resolver_two'].ansible_host }},{{ hostvars['resolver_three'].ansible_host }} -p {{ hostvars['resolver_one'].resolver_port }},{{ hostvars['resolver_two'].resolver_port }},{{ hostvars['resolver_three'].resolver_port }} {{ benchmark_args }}"
+    benchmark_output: "/tmp/benchmark_output.txt"
+
+  tasks:
+
+    - name: Kill any process running on port 9090 on oram 1 machine
+      when: "'oram-one' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9090) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9090"
+      ignore_errors: yes
+
+    # - name: Kill any process running on port 9090 on oram 2 machine
+    #   when: "'oram-two' in group_names"
+    #   shell: |
+    #     pid=$(lsof -t -i:9090) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9090"
+    #   ignore_errors: yes
+
+    # - name: Kill any process running on port 9090 on oram 3 machine
+    #   when: "'oram-three' in group_names"
+    #   shell: |
+    #     pid=$(lsof -t -i:9090) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9090"
+    #   ignore_errors: yes
+
+    - name: Kill any process running on port 9500 on batcher 1 machine
+      when: "'batcher-one' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9500) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9500"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9500 on batcher 2 machine
+      when: "'batcher-two' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9500) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9500"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9500 on batcher 3 machine
+      when: "'batcher-three' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9500) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9500"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9800 on resolver 1
+      when: "'resolver-one' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9800) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9800"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9800 on resolver 2
+      when: "'resolver-two' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9800) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9800"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9800 on resolver 3
+      when: "'resolver-three' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9800) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9800"
+      ignore_errors: yes
+
+    - name: Stop Redis on tem202 (ports 6381, 6382 and 6383)
+      when: "'redis' in group_names"
+      shell: |
+        redis-cli -p 6381 shutdown nosave &&
+        redis-cli -p 6382 shutdown nosave &&
+        redis-cli -p 6383 shutdown nosave
+        rm -f dump.rdb
+      ignore_errors: yes
+
+    - name: Clean up PID files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/oram_zero.pid
+        # - /tmp/oram_one.pid
+        # - /tmp/oram_two.pid
+        - /tmp/batcher_zero.pid
+        - /tmp/batcher_one.pid
+        - /tmp/resolver_zero.pid
+        - /tmp/resolver_one.pid
+      ignore_errors: yes
+
+
+    - name: Configure Redis
+      when: "'redis' in group_names"
+      shell: |
+        rm -f /hdd1/haseeb/EpinionsSnapshots/ScaleOne/workingDir/dump.rdb &&
+        cp /hdd1/haseeb/EpinionsSnapshots/ScaleOne/One/snapshot_redis.rdbb /hdd1/haseeb/EpinionsSnapshots/ScaleOne/workingDir &&
+        mv /hdd1/haseeb/EpinionsSnapshots/ScaleOne/workingDir/snapshot_redis.rdbb /hdd1/haseeb/EpinionsSnapshots/ScaleOne/workingDir/dump.rdb
+      register: redis_configured
+
+
+    - name: Start Redis
+      when: "'redis' in group_names"
+      shell: |
+        redis-server --port 6381 --protected-mode no --dir /hdd1/haseeb/EpinionsSnapshots/ScaleOne/workingDir --daemonize yes
+      register: redis_start
+
+    - name: Wait for Redis to start and load snapshot
+      pause:
+        seconds: 30
+
+
+    - name: Start ORAM One
+      when: inventory_hostname == "oram_one"
+      shell: |
+        cd /hdd1/haseeb/ObliSQL/cmd/oramExecutor &&
+        nohup {{ oram_one_cmd }} > /tmp/oram_zero.log 2>&1 & echo $! > /tmp/oram_zero.pid
+      register: oram_zero_start
+      async: 0
+      poll: 0
+
+   
+    - name: Wait for Executors to start
+      run_once: true
+      pause:
+        seconds: 20
+
+    - name: Start Batcher One
+      when: inventory_hostname == "batcher_one"
+      shell: "nohup {{ batcher_one_cmd }} > /tmp/batcher_one.log 2>&1 & echo $! > /tmp/batcher_one.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/batchManager
+      register: batcher_zero_start
+      async: 0
+      poll: 0
+    
+    - name: Start Batcher Two
+      when: inventory_hostname == "batcher_two"
+      shell: "nohup {{ batcher_two_cmd }} > /tmp/batcher_two.log 2>&1 & echo $! > /tmp/batcher_two.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/batchManager
+      register: batcher_one_start
+      async: 0
+      poll: 0
+
+    - name: Start Batcher Three
+      when: inventory_hostname == "batcher_three"
+      shell: "nohup {{ batcher_three_cmd }} > /tmp/batcher_three.log 2>&1 & echo $! > /tmp/batcher_three.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/batchManager
+      register: batcher_three_start
+      async: 0
+      poll: 0
+
+    - name: Wait for Batchers to start
+      pause:
+        seconds: 10
+
+    - name: Start Resolver One
+      when: inventory_hostname == "resolver_one"
+      shell: "nohup {{ resolver_one_cmd }} > /tmp/resolver_zero.log 2>&1 & echo $! > /tmp/resolver_zero.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/resolver
+      register: resolver_zero_start
+      async: 0
+      poll: 0
+
+    - name: Start Resolver Two
+      when: inventory_hostname == "resolver_two"
+      shell: "nohup {{ resolver_two_cmd }} > /tmp/resolver_two.log 2>&1 & echo $! > /tmp/resolver_two.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/resolver
+      register: resolver_two_start
+      async: 0
+      poll: 0
+    
+    - name: Start Resolver Three
+      when: inventory_hostname == "resolver_three"
+      shell: "nohup {{ resolver_three_cmd }} > /tmp/resolver_three.log 2>&1 & echo $! > /tmp/resolver_three.pid"
+      args:
+        chdir: /hdd1/haseeb/ObliSQL/cmd/resolver
+      register: resolver_three_start
+      async: 0
+      poll: 0
+
+    - name: Wait for Resolvers to start
+      pause:
+        seconds: 10
+
+    - name: Start Benchmark
+      when: inventory_hostname == "benchmark_server"
+      shell: |
+        cd /hdd1/haseeb/ObliSQL/cmd/benchmark &&
+        sudo rm -f /tmp/benchmark_output.txt &&
+        {{ benchmark_cmd }} > {{ benchmark_output }} 2>&1
+      register: benchmark_run
+
+    - name: Retrieve Benchmark Output
+      when: inventory_hostname == "benchmark_server"
+      fetch:
+        src: "{{ benchmark_output }}"
+        dest: "{{ output_filename }}"
+        flat: yes
+
+    - name: Kill any process running on port 9090 on oram 1 machine
+      when: "'oram-one' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9090) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9090"
+      ignore_errors: yes
+
+    # - name: Kill any process running on port 9090 on oram 2 machine
+    #   when: "'oram-two' in group_names"
+    #   shell: |
+    #     pid=$(lsof -t -i:9090) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9090"
+    #   ignore_errors: yes
+
+    # - name: Kill any process running on port 9090 on oram 3 machine
+    #   when: "'oram-three' in group_names"
+    #   shell: |
+    #     pid=$(lsof -t -i:9090) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9090"
+    #   ignore_errors: yes
+
+    - name: Kill any process running on port 9500 on batcher 1 machine
+      when: "'batcher-one' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9500) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9500"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9500 on batcher 2 machine
+      when: "'batcher-two' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9500) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9500"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9500 on batcher 3 machine
+      when: "'batcher-three' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9500) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9500"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9800 on resolver 1
+      when: "'resolver-one' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9800) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9800"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9800 on resolver 2
+      when: "'resolver-two' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9800) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9800"
+      ignore_errors: yes
+
+    - name: Kill any process running on port 9800 on resolver 3
+      when: "'resolver-three' in group_names"
+      shell: |
+        pid=$(lsof -t -i:9800) && [ -n "$pid" ] && kill -9 $pid || echo "No process found on port 9800"
+      ignore_errors: yes
+
+    - name: Stop Redis on tem202 (ports 6381, 6382 and 6383)
+      when: "'redis' in group_names"
+      shell: |
+        cd /hdd1/haseeb/nachiket/redis_scale3/redis1 &&
+        redis-cli -p 6381 shutdown &&
+        cd /hdd1/haseeb/nachiket/redis_scale3/redis2 &&
+        redis-cli -p 6382 shutdown &&
+        cd /hdd1/haseeb/nachiket/redis_scale3/redis3 &&
+        redis-cli -p 6383 shutdown &&
+        rm -f dump.rdb
+      ignore_errors: yes
+
+    - name: Clean up PID files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/oram_zero.pid
+        # - /tmp/oram_one.pid
+        # - /tmp/oram_two.pid
+        - /tmp/batcher_zero.pid
+        - /tmp/batcher_one.pid
+        - /tmp/resolver_zero.pid
+        - /tmp/resolver_one.pid
+      ignore_errors: yes

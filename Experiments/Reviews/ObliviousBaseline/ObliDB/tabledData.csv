@@ -1,0 +1,4 @@
+Throughput (requests/second),Average running time (s),Iterations,Test ID
+96.69,0.01034,10000,testTwo
+96.68,0.01034,10000,testThree
+96.61,0.01035,10000,testOne

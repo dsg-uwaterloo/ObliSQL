@@ -1,0 +1,20 @@
+Connected to Resolver tem123:9800
+Connected to Resolver tem112:9800
+Connected to Resolver tem113:9800
+Read 150001 records for ../../pkg/benchmark/benchmarkIdLists/i_id.csv
+Read 300001 records for ../../pkg/benchmark/benchmarkIdLists/u_id.csv
+Read 417649 records for ../../pkg/benchmark/benchmarkIdLists/a_id.csv
+Read 135 records for ../../pkg/benchmark/benchmarkIdLists/pageRank.csv
+In-Flight Requests: 1000
+Non-Empty Requests: 15865
+Warmup Done! 15865 0
+-------
+Running Benchmark! 30 seconds 
+Ops/s,53407,Err,0
+Non-Empty Requests: 53407
+Total Ops: 53407
+Total Err: 0
+Average Latency: 551 ms
+Total Keys: 95411+95179+94533 = 285123
+
+4.115992031

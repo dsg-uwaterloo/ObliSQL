@@ -1,0 +1,21 @@
+Connected to Resolver tem123:9800
+Connected to Resolver tem124:9700
+Connected to Resolver tem127:9500
+Query Type: zipf9
+Read 150001 records for ../../pkg/benchmark/benchmarkIdLists/i_id.csv
+Read 300001 records for ../../pkg/benchmark/benchmarkIdLists/u_id.csv
+Read 417649 records for ../../pkg/benchmark/benchmarkIdLists/a_id.csv
+Read 135 records for ../../pkg/benchmark/benchmarkIdLists/pageRank.csv
+Read 1000000 records for ../../pkg/benchmark/benchmarkIdLists/Skewed/skewed_ids_0.99.csv
+In-Flight Requests: 900
+Non-Empty Requests: 10144
+Warmup Done! 13087 0
+-------
+Running Benchmark! 30 seconds 
+Ops/s,30347,Err,0
+Non-Empty Requests: 23608
+Total Ops: 30347
+Total Err: 0
+Average Latency: 875 ms
+Total Key Added: 1199627
+Total Fake Keys Added: 31179

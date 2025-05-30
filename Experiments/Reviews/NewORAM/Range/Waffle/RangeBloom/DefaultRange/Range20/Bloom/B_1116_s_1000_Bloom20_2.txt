@@ -1,0 +1,34 @@
+Connected to Resolver tem123:9800
+Connected to Resolver tem112:9800
+Connected to Resolver tem113:9800
+Query Type: default
+Read 150001 records for ../../pkg/benchmark/benchmarkIdLists/i_id.csv
+Read 300001 records for ../../pkg/benchmark/benchmarkIdLists/u_id.csv
+Read 417649 records for ../../pkg/benchmark/benchmarkIdLists/a_id.csv
+Read 135 records for ../../pkg/benchmark/benchmarkIdLists/pageRank.csv
+In-Flight Requests: 1000
+Non-Empty Requests: 10549
+Warmup Done! 10857 0
+-------
+Running Benchmark! 30 seconds 
+Ops/s,32128,Err,0
+Non-Empty Requests: 31234
+Total Ops: 32128
+Total Err: 0
+Average Latency: 916 ms
+
+
+Total Range Index Keys Created -- DEFAULT CASE: 88846
+Total Range Index Keys Created: 298440
+Total Range Index Keys Inserted after bloom: 88846
+Total Keys fetched after filtering: 278787
+
+Total Range Index Keys Created -- DEFAULT CASE: 88756
+Total Range Index Keys Created: 298180
+Total Range Index Keys Inserted after bloom: 88756
+Total Keys fetched after filtering: 301044
+
+Total Range Index Keys Created -- DEFAULT CASE: 90647
+Total Range Index Keys Created: 303040
+Total Range Index Keys Inserted after bloom: 90647
+Total Keys fetched after filtering: 361314
