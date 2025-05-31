@@ -1,0 +1,10 @@
+# Build output.
+*.o
+*.so
+*.a
+*.d
+test/test
+
+# Compilation database.
+.clangd/
+compile_commands.json

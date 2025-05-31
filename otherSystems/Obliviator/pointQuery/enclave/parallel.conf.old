@@ -1,0 +1,13 @@
+Debug=1
+NumHeapPages=2097152
+NumStackPages=262144
+NumTCS=1
+ProductID=1
+SecurityVersion=1
+
+Debug=1
+NumHeapPages=36700160
+NumStackPages=262144
+NumTCS=32
+ProductID=1
+SecurityVersion=1

@@ -1,0 +1,14 @@
+-------- Point ----------
+Completed iteration 1 - Program reported time: 0.003484s, Measured time: 636.055382151s, Round-trip time: .013484s
+Completed iteration 2 - Program reported time: 0.003301s, Measured time: 634.077429164s, Round-trip time: .013301s
+Completed iteration 3 - Program reported time: 0.003381s, Measured time: 638.351573194s, Round-trip time: .013381s
+
+-------- Range ----------
+Completed iteration 4 - Program reported time: 0.003288s, Measured time: 634.065676488s, Round-trip time: .013288s
+Completed iteration 5 - Program reported time: 0.003286s, Measured time: 635.825190797s, Round-trip time: .013286s
+Completed iteration 6 - Program reported time: 0.003524s, Measured time: 636.493477071s, Round-trip time: .013524s
+
+-------- Join ----------
+Completed iteration 7 - Program reported time: .065933s, Measured time: 630.075740922s, Round-trip time: .075933s
+Completed iteration 8 - Program reported time: .077510s, Measured time: 640.525839126s, Round-trip time: .087510s
+Completed iteration 9 - Program reported time: .093345s, Measured time: 642.731234967s, Round-trip time: .103345s

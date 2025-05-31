@@ -1,0 +1,76 @@
+enclave {
+    from "openenclave/edl/syscall.edl" import *;
+    from "platform.edl" import *;
+
+    include "common/ocalls.h"
+    include "common/algorithm_type.h"
+
+    untrusted {
+        int ocall_mpi_send_bytes(
+                [in, count=count] const unsigned char *buf,
+                size_t count,
+                int dest,
+                int tag);
+        int ocall_mpi_recv_bytes(
+                [out, count=count] unsigned char *buf,
+                size_t count,
+                int source,
+                int tag,
+                [out] ocall_mpi_status_t *status);
+        int ocall_mpi_try_recv_bytes(
+                [out, count=count] unsigned char *buf,
+                size_t count,
+                int source,
+                int tag,
+                [out] int *flag,
+                [out] ocall_mpi_status_t *status);
+        int ocall_mpi_isend_bytes(
+                [in, count=count] const unsigned char *buf,
+                size_t count,
+                int dest,
+                int tag,
+                [out] ocall_mpi_request_t *request);
+        int ocall_mpi_irecv_bytes(
+                size_t count,
+                int source,
+                int tag,
+                [out] ocall_mpi_request_t *request);
+        int ocall_mpi_wait(
+                [out, count=count] unsigned char *buf,
+                size_t count,
+                [in] ocall_mpi_request_t *request,
+                [out] ocall_mpi_status_t *status);
+        int ocall_mpi_waitany(
+                [out, count=bufcount] unsigned char *buf,
+                size_t bufcount,
+                size_t count,
+                [in, count=count] ocall_mpi_request_t *requests,
+                [out] size_t *index,
+                [out] ocall_mpi_status_t *status);
+        int ocall_mpi_try_wait(
+                [out, count=count] unsigned char *buf,
+                size_t count,
+                [in] ocall_mpi_request_t *request,
+                [out] int *flag,
+                [out] ocall_mpi_status_t *status);
+        int ocall_mpi_cancel(
+                [in] ocall_mpi_request_t *request);
+        void ocall_mpi_barrier(void);
+        void ocall_print_string([in, string] const char *str);
+        void get_time(bool if_print);
+        void init_time(void);
+        void get_time2(bool if_print);
+        void init_time2(void);
+    };
+
+    trusted {
+        public void ecall_release_threads(void);
+        public void ecall_unrelease_threads(void);
+
+        public int ecall_ojoin_init(int world_rank, int world_size, size_t num_threads);
+        public void ecall_ojoin_free_arr();
+        public void ecall_ojoin_free(void);
+        public void ecall_start_work(void);
+        public int ecall_scalable_oblivious_join([in, out, size=len] char *input_path, size_t len);
+    };
+};
