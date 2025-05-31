@@ -194,6 +194,8 @@ func runBenchmark(resolverClient *[]resolver.ResolverClient, requests *[]Query, 
 }
 
 func StartBench(resolverClient *[]resolver.ResolverClient, inFlight int, timeDuration int, queryType string, joinRange int, rangeSize int) {
+	fmt.Println("Join Range: ", joinRange)
+	fmt.Println("RangeSize: ", rangeSize)
 	itemIDFile := os.Getenv("ITEM_ID_FILE")
 	if itemIDFile == "" {
 		itemIDFile = "../../pkg/benchmark/benchmarkIdLists/i_id.csv"
