@@ -3,6 +3,7 @@ package batcher
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,6 +60,28 @@ type myBatcher struct {
 	TotalKeysSeen     atomic.Int64
 	aggBatchIds       atomic.Int64
 	TotalFakeAdded    atomic.Int64
+}
+
+func extractTableName(key string) string {
+	parts := strings.Split(key, "/")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return key
+}
+
+func assignTableToExecutor(key string, N uint32) uint32 {
+	tableName := extractTableName(key)
+	switch tableName {
+	case "rankings":
+		return 0
+	case "uservisits":
+		return 1 % N
+	default:
+		h := fnv.New32a()
+		h.Write([]byte(tableName))
+		return h.Sum32() % N
+	}
 }
 
 func (lb *myBatcher) ConnectPing(ctx context.Context, req *loadBalancer.ClientConnect) (*loadBalancer.ClientConnect, error) {
@@ -145,6 +168,8 @@ func (lb *myBatcher) AddKeys(ctx context.Context, req *loadBalancer.LoadBalanceR
 	ctx, span := lb.tracer.Start(ctx, "Add Keys")
 	defer span.End()
 
+	fmt.Println(req.RequestId)
+
 	span.SetAttributes(
 		attribute.Int64("request_id", req.RequestId),
 		attribute.Int("num_keys", len(req.Keys)),
@@ -180,7 +205,7 @@ func (lb *myBatcher) AddKeys(ctx context.Context, req *loadBalancer.LoadBalanceR
 		// 	continue
 		// }
 		value := req.Values[i]
-		hashVal := int(hashString(key, uint32(lb.executorNumber))) //Rename it to somthing else
+		hashVal := int(assignTableToExecutor(key, uint32(lb.executorNumber)))
 		kv := &KVPair{
 			channelId:  channelId,
 			Key:        key,
@@ -431,21 +456,41 @@ func (lb *myBatcher) batchWorker(client ExecutorClient, idx int, workerId int) {
 
 		aggregateBatchId := lb.aggBatchIds.Add(1)
 		startTime := time.Now()
+
+		// Collect request IDs for tracing
+		var requestIDs []int
 		for _, batch := range allBatches {
 			batch.aggregateBatchID = aggregateBatchId //Assign a batch ID
 			for _, pair := range batch.input {
 				aggregatedKeys = append(aggregatedKeys, pair.Key)
 				aggregatedValues = append(aggregatedValues, pair.Value)
 				batchInputs = append(batchInputs, pair)
+				requestIDs = append(requestIDs, pair.RequestID)
 			}
 		}
+
+		// Create span for MixBatch operation
+		_, span := lb.tracer.Start(context.Background(), "MixBatch")
+		span.SetAttributes(
+			attribute.Int("executor_id", idx),
+			attribute.Int("worker_id", workerId),
+			attribute.Int64("aggregate_batch_id", aggregateBatchId),
+			attribute.Int("num_keys", len(aggregatedKeys)),
+			attribute.IntSlice("request_ids", requestIDs),
+		)
 
 		// Send all the aggregated keys and values to MixBatch in one call
 		// log.Info().Msg("Sending all aggregated keys and values to MixBatch")
 		// log.Debug().Msgf("Sending Request to Waffle: %d. WorkerID: %d", idx, workerId)
 		// log.Info().Msgf("Sending Key Length: %d, ID: %d", len(aggregatedKeys), workerId)
+
 		execResp, err := client.MixBatch(aggregatedKeys, aggregatedValues, aggregateBatchId)
 		finishTime := time.Since(startTime)
+
+		span.SetAttributes(
+			attribute.Float64("mixbatch_duration_millisecond", float64(finishTime.Milliseconds())),
+		)
+		span.End()
 		if err != nil {
 			log.Fatal().Msgf("Failed to Fetch Values from MixBatch! Error: %s", err)
 		}
