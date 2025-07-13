@@ -1,6 +1,7 @@
 .vscode/
 .idea/
 ._.DS_Store
+tracefiles
 cmakebuild
 commands.txt
 latencies_benchmark*.txt
