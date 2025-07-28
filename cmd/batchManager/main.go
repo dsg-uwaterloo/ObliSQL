@@ -30,6 +30,7 @@ func main() {
 	portsPtr := flag.String("ports", "9090", "Comma-separated list of port numbers")
 	fakeReqPtr := flag.Bool("fr", false, "Turn off Fake Requests")
 	tracingBool := flag.Bool("t", false, "Tracing Boolean") //Default no tracing is on.
+	configPtr := flag.String("c", "./tracefiles/table_config.json", "Table configuration file path")
 
 	flag.Parse()
 
@@ -65,7 +66,7 @@ func main() {
 	)
 
 	// Initialize the batcher service with Redis connection and tracingProvider
-	batchService := batcher.NewBatcher(ctx, *rPtr, *nPtr, *timeOutPtr, *tPtr, *hostsPtr, *portsPtr, *numCPtr, *fakeReqPtr, tracer)
+	batchService := batcher.NewBatcher(ctx, *rPtr, *nPtr, *timeOutPtr, *tPtr, *hostsPtr, *portsPtr, *numCPtr, *fakeReqPtr, tracer, *configPtr)
 
 	// Register the service with the gRPC server
 	loadBalancer.RegisterLoadBalancerServer(grpcServer, batchService)

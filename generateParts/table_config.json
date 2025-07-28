@@ -1,0 +1,14 @@
+{
+  "tables": [
+    {
+      "name": "rankings",
+      "partition_id": 0
+    },
+    {
+      "name": "uservisits", 
+      "partition_id": 1
+    }
+  ],
+  "total_partitions": 2,
+  "default_partitioning": "hash"
+}

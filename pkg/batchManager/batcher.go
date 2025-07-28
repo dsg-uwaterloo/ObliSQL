@@ -2,8 +2,10 @@ package batcher
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -40,6 +42,17 @@ type responseChannel struct {
 	channel chan KVPair
 }
 
+type TableConfig struct {
+	Name        string `json:"name"`
+	PartitionID uint32 `json:"partition_id"`
+}
+
+type Config struct {
+	Tables             []TableConfig `json:"tables"`
+	TotalPartitions    uint32        `json:"total_partitions"`
+	DefaultPartitioning string       `json:"default_partitioning"`
+}
+
 type myBatcher struct {
 	loadBalancer.UnimplementedLoadBalancerServer
 	R                 int
@@ -60,6 +73,7 @@ type myBatcher struct {
 	TotalKeysSeen     atomic.Int64
 	aggBatchIds       atomic.Int64
 	TotalFakeAdded    atomic.Int64
+	config            *Config
 }
 
 func extractTableName(key string) string {
@@ -70,18 +84,42 @@ func extractTableName(key string) string {
 	return key
 }
 
-func assignTableToExecutor(key string, N uint32) uint32 {
+func loadConfig(configPath string) (*Config, error) {
+	file, err := os.Open(configPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var config Config
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
+func assignTableToExecutor(key string, config *Config) uint32 {
 	tableName := extractTableName(key)
-	switch tableName {
-	case "rankings":
-		return 0
-	case "uservisits":
-		return 1 % N
-	default:
+	
+	// First check if table is explicitly configured
+	for _, table := range config.Tables {
+		if table.Name == tableName {
+			return table.PartitionID % config.TotalPartitions
+		}
+	}
+
+	// For unknown tables, use the default partitioning strategy
+	if config.DefaultPartitioning == "hash" {
 		h := fnv.New32a()
 		h.Write([]byte(tableName))
-		return h.Sum32() % N
+		return h.Sum32() % config.TotalPartitions
 	}
+
+	// Default fallback to partition 0
+	return 0
 }
 
 func (lb *myBatcher) ConnectPing(ctx context.Context, req *loadBalancer.ClientConnect) (*loadBalancer.ClientConnect, error) {
@@ -205,7 +243,7 @@ func (lb *myBatcher) AddKeys(ctx context.Context, req *loadBalancer.LoadBalanceR
 		// 	continue
 		// }
 		value := req.Values[i]
-		hashVal := int(assignTableToExecutor(key, uint32(lb.executorNumber)))
+		hashVal := int(assignTableToExecutor(key, lb.config))
 		kv := &KVPair{
 			channelId:  channelId,
 			Key:        key,
@@ -506,7 +544,13 @@ func (lb *myBatcher) batchWorker(client ExecutorClient, idx int, workerId int) {
 	}
 }
 
-func NewBatcher(ctx context.Context, R int, executorNumber int, waitTime int, executorType string, executorHosts string, executorPorts string, numClients int, fakeReqPtr bool, tracer trace.Tracer) *myBatcher {
+func NewBatcher(ctx context.Context, R int, executorNumber int, waitTime int, executorType string, executorHosts string, executorPorts string, numClients int, fakeReqPtr bool, tracer trace.Tracer, configPath string) *myBatcher {
+	// Load configuration
+	config, err := loadConfig(configPath)
+	if err != nil {
+		log.Fatal().Msgf("Error loading config: %s", err)
+	}
+
 	hosts := strings.Split(executorHosts, ",")
 	ports := strings.Split(executorPorts, ",")
 
@@ -530,6 +574,7 @@ func NewBatcher(ctx context.Context, R int, executorNumber int, waitTime int, ex
 		executorWorkerIds: make(map[int][]int),
 		fakeRequestsOff:   fakeReqPtr,
 		TotalFakeAdded:    atomic.Int64{},
+		config:            config,
 	}
 
 	// // Initialize batchChannel before any goroutines start
