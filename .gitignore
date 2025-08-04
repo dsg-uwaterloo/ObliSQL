@@ -8,4 +8,4 @@ latencies_benchmark*.txt
 batchManager
 waffle
 waffle/
-waffle/*
+waffle/*tracefiles/Output/
