@@ -2,7 +2,8 @@ version: '3.8'
 
 services:
   jaeger:
-    image: jaegertracing/opentelemetry-all-in-one:latest
+    image: jaegertracing/all-in-one:latest
     ports:
-      - "16686:16686" # api
-      - "4317:4317" # grpc
+    - "16686:16686"  # UI + HTTP API (v2/v3)
+    - "16685:16685"  # gRPC query
+    - "4317:4317"    # OTLP gRPC ingest
