@@ -126,4 +126,4 @@ If you are running `Type=2` then also pass range size `-rs <SIZE>`. It will defa
 
 
 ### DB Trace Files: 
-https://vault.cs.uwaterloo.ca/s/9CqsQTbsZdn832B
+[https://vault.cs.uwaterloo.ca/s/9CqsQTbsZdn832B](https://nextcloud.cs.uwaterloo.ca/s/pgERKzTnHRXQ9kZ)
